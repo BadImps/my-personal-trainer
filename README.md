@@ -46,3 +46,7 @@ The Welcome page now introduces Coach Mia and Coach Leo side by side beneath “
 ## 1.9 dashboard visual rebuild
 
 Home, My Plan and Guided Workout now share the dark coach-rail design system from the approved reference: bright action cards, a compact training calendar, exercise rows, animated movement panels, and set/rest counters.
+
+## 2.0 interactive coach rail
+
+The coach rail is now real navigation—Home, Plan, Progress, Library, and Account controls are available directly from the persistent left edge of signed-in screens.

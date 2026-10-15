@@ -47,11 +47,11 @@ public final class BuildExerciseGifs {
             ArrayList<BufferedImage> frames = readFrames(file);
             if (frames.size() < 2) continue;
             ArrayList<BufferedImage> loop = new ArrayList<>();
-            for (int i = 0; i < frames.size() - 1; i++) { loop.add(frames.get(i)); loop.add(blend(frames.get(i), frames.get(i + 1), .5f)); }
+            for (int i = 0; i < frames.size() - 1; i++) { loop.add(frames.get(i)); loop.add(blend(frames.get(i), frames.get(i + 1), .25f)); loop.add(blend(frames.get(i), frames.get(i + 1), .5f)); loop.add(blend(frames.get(i), frames.get(i + 1), .75f)); }
             loop.add(frames.get(frames.size() - 1));
-            for (int i = frames.size() - 1; i > 0; i--) loop.add(blend(frames.get(i), frames.get(i - 1), .5f));
+            for (int i = frames.size() - 1; i > 0; i--) { loop.add(blend(frames.get(i), frames.get(i - 1), .75f));loop.add(blend(frames.get(i), frames.get(i - 1), .5f));loop.add(blend(frames.get(i), frames.get(i - 1), .25f)); }
             File temporary = new File(directory, file.getName() + ".smooth");
-            try (ImageOutputStream stream = new FileImageOutputStream(temporary); GifWriter gif = new GifWriter(stream, 115, true)) { for (BufferedImage frame : loop) gif.write(frame); }
+            try (ImageOutputStream stream = new FileImageOutputStream(temporary); GifWriter gif = new GifWriter(stream, 70, true)) { for (BufferedImage frame : loop) gif.write(frame); }
             if (!file.delete() || !temporary.renameTo(file)) throw new IllegalStateException("Cannot replace " + file);
         }
     }

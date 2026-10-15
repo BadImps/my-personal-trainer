@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 10,
-  "versionName": "1.9",
-  "publishedAt": "2026-10-15T06:49:32Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v1.9/My-Personal-Trainer-1.9.apk",
-  "sha256": "800406407de424ea5b825b73e465dbd900510c70b4e1d2b90851748ce3abd106",
-  "sizeBytes": 25195363,
-  "notes": "Rebuilds Home, My Plan and Guided Workout around the approved dark coach-rail visual system."
+  "versionCode": 11,
+  "versionName": "2.0",
+  "publishedAt": "2026-10-15T07:07:45Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v2.0/My-Personal-Trainer-2.0.apk",
+  "sha256": "ae63f61d3bd5e982b2c35b7c1039244ab1927a6bc3e18a812e4bcfdb1bbc42e6",
+  "sizeBytes": 25195703,
+  "notes": "Adds fully interactive coach-rail navigation and strengthens the reference dashboard design across the primary training screens."
 }
