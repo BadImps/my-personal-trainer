@@ -2,11 +2,13 @@ package com.badimps.personaltrainer;
 
 import android.app.Activity;
 import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.os.CountDownTimer;
 import android.speech.tts.TextToSpeech;
 import android.view.Gravity;
 import android.view.View;
+import android.view.animation.DecelerateInterpolator;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
@@ -37,15 +39,18 @@ public final class MainActivity extends Activity {
     @Override protected void onDestroy() { if (restTimer != null) restTimer.cancel(); if (voice != null) voice.shutdown(); super.onDestroy(); }
     private int dp(int n) { return (int)(n*getResources().getDisplayMetrics().density+.5f); }
     private TextView text(String value, int sp, int color) { TextView t=new TextView(this); t.setText(value); t.setTextSize(sp); t.setTextColor(color); t.setLineSpacing(dp(3),1); return t; }
+    private GradientDrawable surface(int fill, int radius, int stroke, int strokeColor) { GradientDrawable bg=new GradientDrawable();bg.setColor(fill);bg.setCornerRadius(dp(radius));if(stroke>0)bg.setStroke(dp(stroke),strokeColor);return bg; }
     private LinearLayout page() { LinearLayout body=new LinearLayout(this); body.setOrientation(LinearLayout.VERTICAL); body.setPadding(dp(22),dp(24),dp(22),dp(32)); body.setBackgroundColor(paper); ScrollView s=new ScrollView(this); s.addView(body); setContentView(s); return body; }
     private void gap(LinearLayout box, int n) { View v=new View(this); box.addView(v,new LinearLayout.LayoutParams(1,dp(n))); }
-    private Button button(String label) { Button b=new Button(this); b.setText(label); b.setAllCaps(false); b.setTextSize(16); b.setTextColor(Color.WHITE); b.setBackgroundColor(coral); b.setPadding(dp(12),dp(10),dp(12),dp(10)); b.setLayoutParams(new LinearLayout.LayoutParams(-1,dp(52))); return b; }
-    private TextView badge(String value) { TextView t=text(value,13,navy); t.setPadding(dp(12),dp(8),dp(12),dp(8)); t.setBackgroundColor(mint); return t; }
+    private Button button(String label) { Button b=new Button(this); b.setText(label); b.setAllCaps(false); b.setTextSize(16); b.setTextColor(Color.WHITE); b.setBackground(surface(coral,14,0,Color.TRANSPARENT)); b.setElevation(dp(3)); b.setPadding(dp(12),dp(10),dp(12),dp(10)); b.setLayoutParams(new LinearLayout.LayoutParams(-1,dp(52))); b.setOnTouchListener((v,event)->{if(event.getAction()==0)v.animate().scaleX(.975f).scaleY(.975f).setDuration(80).start();else if(event.getAction()==1||event.getAction()==3)v.animate().scaleX(1f).scaleY(1f).setDuration(130).setInterpolator(new DecelerateInterpolator()).start();return false;}); return b; }
+    private void tint(Button b,int color) { b.setBackground(surface(color,14,0,Color.TRANSPARENT)); }
+    private TextView badge(String value) { TextView t=text(value,13,navy); t.setPadding(dp(12),dp(8),dp(12),dp(8)); t.setBackground(surface(mint,99,0,Color.TRANSPARENT)); return t; }
     private void header(LinearLayout b, String eyebrow, String title, String subtitle) { b.addView(text(eyebrow.toUpperCase(Locale.ROOT),12,coral)); gap(b,5); b.addView(text(title,30,navy)); gap(b,8); b.addView(text(subtitle,16,Color.rgb(71,83,108))); gap(b,20); }
     private void nav(LinearLayout b, String active) {
         gap(b,22); LinearLayout row=new LinearLayout(this); row.setOrientation(LinearLayout.HORIZONTAL);
         String[] labels={"Today","Plans","Library","Progress","Profile"};
-        for(String label:labels){Button item=new Button(this);item.setText(label);item.setAllCaps(false);item.setTextSize(11);item.setTextColor(label.equals(active)?navy:Color.WHITE);item.setBackgroundColor(label.equals(active)?mint:navy);item.setOnClickListener(v->{if(label.equals("Today"))showHome();else if(label.equals("Plans"))showPlans();else if(label.equals("Library"))showLibrary();else if(label.equals("Progress"))showProgress();else showProfile();});row.addView(item,new LinearLayout.LayoutParams(0,dp(46),1));} b.addView(row);
+        String[] icons={"●","▣","▶","↗","◌"}; int i=0;
+        for(String label:labels){Button item=new Button(this);item.setText(icons[i++]+"\n"+label);item.setAllCaps(false);item.setTextSize(10);item.setTextColor(label.equals(active)?navy:Color.WHITE);item.setBackground(surface(label.equals(active)?mint:navy,12,0,Color.TRANSPARENT));item.setOnClickListener(v->{if(label.equals("Today"))showHome();else if(label.equals("Plans"))showPlans();else if(label.equals("Library"))showLibrary();else if(label.equals("Progress"))showProgress();else showProfile();});row.addView(item,new LinearLayout.LayoutParams(0,dp(50),1));} b.addView(row);
     }
 
     private void showHome() {
@@ -56,16 +61,16 @@ public final class MainActivity extends Activity {
         b.addView(text("Your next session",20,navy)); gap(b,5); b.addView(text(goal+" • "+target+" • about 32 minutes",15,Color.rgb(71,83,108))); gap(b,10);
         Button start=button("Start my personalized workout"); start.setOnClickListener(v->showWizard()); b.addView(start); gap(b,18);
         b.addView(text("Explore",20,navy)); gap(b,7);
-        Button plans=button("Plans for home, gym & machines"); plans.setBackgroundColor(navy);plans.setOnClickListener(v->showPlans());b.addView(plans);gap(b,9);
-        Button library=button("Animated exercise library"); library.setBackgroundColor(Color.rgb(45,91,101)); library.setOnClickListener(v->showLibrary()); b.addView(library);gap(b,9);
-        Button progress=button("Progress & weight trend"); progress.setBackgroundColor(Color.rgb(76,108,151));progress.setOnClickListener(v->showProgress());b.addView(progress);
+        Button plans=button("▣  Plans for home, gym & machines"); tint(plans,navy);plans.setOnClickListener(v->showPlans());b.addView(plans);gap(b,9);
+        Button library=button("▶  Animated exercise library"); tint(library,Color.rgb(45,91,101)); library.setOnClickListener(v->showLibrary()); b.addView(library);gap(b,9);
+        Button progress=button("↗  Progress & weight trend"); tint(progress,Color.rgb(76,108,151));progress.setOnClickListener(v->showProgress());b.addView(progress);
         nav(b,"Today");
     }
 
     private void showPlans() {
         LinearLayout b=page(); header(b,"PLANS","Train your way.","Choose a goal, focus and equipment. Your plan is built around the options you select.");
         b.addView(text("Quick starts",20,navy)); gap(b,7);
-        for(String choice:new String[]{"Full Body","Upper","Lower","Machines"}) { Button pick=button(choice+" plan");pick.setBackgroundColor(choice.equals("Machines")?Color.rgb(45,91,101):navy);pick.setOnClickListener(v->{target=choice;showWizard();});b.addView(pick);gap(b,8); }
+        for(String choice:new String[]{"Full Body","Upper","Lower","Machines"}) { Button pick=button("✦  "+choice+" plan");tint(pick,choice.equals("Machines")?Color.rgb(45,91,101):navy);pick.setOnClickListener(v->{target=choice;showWizard();});b.addView(pick);gap(b,8); }
         gap(b,6); b.addView(text("Your current setup",18,navy));gap(b,5);b.addView(text(goal+" • "+environment+"\nChange goals, focus and equipment in the plan builder.",15,Color.rgb(71,83,108)));gap(b,12);Button custom=button("Customize my plan");custom.setOnClickListener(v->showWizard());b.addView(custom);nav(b,"Plans");
     }
 
@@ -81,7 +86,7 @@ public final class MainActivity extends Activity {
         AccountStore.Profile profile=AccountStore.get(this); String coach="Male".equals(profile.trainer)?"Coach Leo":"Coach Mia";
         LinearLayout b=page();header(b,"PROFILE",""+profile.username,"Your trainer, preferences, and updates stay on this device.");
         b.addView(badge(coach+"  •  "+profile.email));gap(b,16);b.addView(text("Privacy",19,navy));gap(b,5);b.addView(text("This version stores your profile locally and does not send your registration details to a server.",15,Color.rgb(71,83,108)));gap(b,14);
-        Button updates=button("Check for OTA update");updates.setBackgroundColor(Color.rgb(91,102,126));updates.setOnClickListener(v->showUpdate());b.addView(updates);gap(b,9);Button plans=button("Adjust workout preferences");plans.setOnClickListener(v->showWizard());b.addView(plans);nav(b,"Profile");
+        Button updates=button("↻  Check for OTA update");tint(updates,Color.rgb(91,102,126));updates.setOnClickListener(v->showUpdate());b.addView(updates);gap(b,9);Button plans=button("✦  Adjust workout preferences");plans.setOnClickListener(v->showWizard());b.addView(plans);nav(b,"Profile");
     }
 
     private void showRegistration() {
@@ -95,7 +100,7 @@ public final class MainActivity extends Activity {
         RadioButton male=new RadioButton(this); male.setId(R.id.trainer_male); male.setText("Male personal trainer — Coach Leo"); male.setTextSize(16); male.setTextColor(navy); trainers.addView(male); b.addView(trainers); gap(b,18);
         Button create=button("Create my profile"); create.setOnClickListener(v->{String e=email.getText().toString().trim(),u=username.getText().toString().trim(),p=password.getText().toString(); if(!e.contains("@")||!e.contains(".")){toast("Enter a valid email address.");return;} if(u.length()<3){toast("Choose a username with at least 3 characters.");return;} if(p.length()<8){toast("Use a password with at least 8 characters.");return;} AccountStore.create(this,e,u,p,trainers.getCheckedRadioButtonId()==R.id.trainer_male?"Male":"Female"); showHome();}); b.addView(create);
     }
-    private EditText input(String hint,int kind) { EditText e=new EditText(this); e.setHint(hint); e.setTextSize(16); e.setTextColor(navy); e.setHintTextColor(Color.rgb(91,102,126)); e.setInputType(kind); e.setPadding(dp(12),dp(8),dp(12),dp(8)); e.setBackgroundColor(Color.WHITE); e.setLayoutParams(new LinearLayout.LayoutParams(-1,dp(54))); return e; }
+    private EditText input(String hint,int kind) { EditText e=new EditText(this); e.setHint(hint); e.setTextSize(16); e.setTextColor(navy); e.setHintTextColor(Color.rgb(91,102,126)); e.setInputType(kind); e.setPadding(dp(14),dp(8),dp(14),dp(8)); e.setBackground(surface(Color.WHITE,12,1,Color.rgb(215,224,220))); e.setLayoutParams(new LinearLayout.LayoutParams(-1,dp(54))); return e; }
     private void toast(String value) { Toast.makeText(this,value,Toast.LENGTH_SHORT).show(); }
 
     private void showWeightTracker() {
@@ -129,7 +134,10 @@ public final class MainActivity extends Activity {
         goals.setOnCheckedChangeListener((g,id)->goal=id==R.id.goal_strength?Coach.GOALS[0]:id==R.id.goal_muscle?Coach.GOALS[1]:id==R.id.goal_fat_loss?Coach.GOALS[2]:id==R.id.goal_endurance?Coach.GOALS[3]:Coach.GOALS[4]); b.addView(goals); gap(b,18);
         b.addView(text("Choose a focus",18,navy)); gap(b,6); LinearLayout rows=new LinearLayout(this); rows.setOrientation(LinearLayout.VERTICAL);
         for (String choice:Coach.TARGETS) { Button pick=button(choice); pick.setTextColor(navy); pick.setBackgroundColor(choice.equals(target)?mint:Color.WHITE); pick.setOnClickListener(v->{ target=choice; showWizard(); }); rows.addView(pick); LinearLayout.LayoutParams lp=(LinearLayout.LayoutParams)pick.getLayoutParams(); lp.height=dp(44); lp.bottomMargin=dp(7); pick.setLayoutParams(lp); }
-        b.addView(rows); gap(b,14); b.addView(text("Where are you training?",18,navy)); gap(b,6);
+        b.addView(rows); gap(b,12);
+        List<Coach.Exercise> previewExercises=Coach.library().get(target);
+        if(previewExercises!=null&&!previewExercises.isEmpty()) { Coach.Exercise preview=previewExercises.get(0); LinearLayout previewCard=new LinearLayout(this);previewCard.setOrientation(LinearLayout.HORIZONTAL);previewCard.setPadding(dp(10),dp(10),dp(10),dp(10));previewCard.setBackground(surface(Color.WHITE,18,1,Color.rgb(215,224,220)));previewCard.setElevation(dp(2));int visual=ExerciseVisuals.forExercise(this,AccountStore.get(this).trainer,preview.name);if(visual!=0){AnimatedGifView gif=new AnimatedGifView(this,visual);previewCard.addView(gif,new LinearLayout.LayoutParams(dp(118),dp(100)));}TextView previewText=text("ANIMATED PREVIEW\n"+preview.name+"\n"+preview.description,14,navy);previewText.setPadding(dp(12),dp(8),0,0);previewCard.addView(previewText,new LinearLayout.LayoutParams(0,-2,1));previewCard.setAlpha(0f);previewCard.setTranslationY(dp(10));b.addView(previewCard);previewCard.animate().alpha(1f).translationY(0).setDuration(220).setInterpolator(new DecelerateInterpolator()).start();gap(b,14);}
+        b.addView(text("Where are you training?",18,navy)); gap(b,6);
         LinearLayout places=new LinearLayout(this); places.setOrientation(LinearLayout.VERTICAL);
         for(String place:Coach.ENVIRONMENTS){Button pick=button(place);pick.setTextColor(navy);pick.setBackgroundColor(place.equals(environment)?mint:Color.WHITE);pick.setOnClickListener(v->{environment=place;showWizard();});places.addView(pick);LinearLayout.LayoutParams lp=(LinearLayout.LayoutParams)pick.getLayoutParams();lp.height=dp(44);lp.bottomMargin=dp(7);pick.setLayoutParams(lp);} b.addView(places); gap(b,12);
         Button next=button("Create my " + target + " plan"); next.setOnClickListener(v->{session=Coach.recommendation(target,goal,environment); showPlan();}); b.addView(next);
@@ -138,7 +146,7 @@ public final class MainActivity extends Activity {
     private void showPlan() {
         LinearLayout b=page(); header(b,"YOUR PLAN",""+target+" session",""+goal+" • "+environment+" • " + session.size() + " exercises • about " + session.size()*8 + " minutes");
         b.addView(text(Coach.goalSummary(goal),16,Color.rgb(71,83,108))); gap(b,14);
-        for (int i=0;i<session.size();i++) { Coach.Exercise e=session.get(i); TextView card=text((i+1)+"  "+e.name+"\n"+e.sets+" sets × "+e.reps+" reps  •  "+e.restSeconds+" sec rest\n"+e.cue,16,navy); card.setPadding(dp(15),dp(13),dp(15),dp(13)); card.setBackgroundColor(Color.WHITE); b.addView(card); gap(b,8); }
+        for (int i=0;i<session.size();i++) { Coach.Exercise e=session.get(i); TextView card=text("0"+(i+1)+"  "+e.name+"\n"+e.sets+" sets × "+e.reps+" reps  •  "+e.restSeconds+" sec rest\n"+e.cue,16,navy); card.setPadding(dp(15),dp(13),dp(15),dp(13)); card.setBackground(surface(Color.WHITE,16,1,Color.rgb(215,224,220))); card.setElevation(dp(2)); b.addView(card); gap(b,8); }
         gap(b,10); Button go=button("Start guided workout"); go.setOnClickListener(v->showActive(0,1)); b.addView(go); gap(b,10); Button back=button("Adjust choices"); back.setBackgroundColor(navy); back.setOnClickListener(v->showWizard()); b.addView(back);
     }
 
@@ -172,7 +180,7 @@ public final class MainActivity extends Activity {
     private void showLibrary() {
         String trainer=AccountStore.get(this).trainer;
         LinearLayout b=page(); header(b,"EXERCISE LIBRARY","Every move, animated.","Each move has a looping Coach "+("Male".equals(trainer)?"Leo":"Mia")+" demonstration. Choose a movement that matches your equipment and ability.");
-        for (String group:Coach.TARGETS) { b.addView(text(group,21,navy)); gap(b,5); for(Coach.Exercise e:Coach.library().get(group)) { LinearLayout card=new LinearLayout(this);card.setOrientation(LinearLayout.HORIZONTAL);card.setPadding(dp(10),dp(10),dp(10),dp(10));card.setBackgroundColor(Color.WHITE);int visual=ExerciseVisuals.forExercise(this,trainer,e.name);if(visual!=0){AnimatedGifView image=new AnimatedGifView(this,visual);card.addView(image,new LinearLayout.LayoutParams(dp(136),dp(102)));}TextView details=text(e.name+"\n"+e.description+"\n"+e.cue,14,Color.rgb(71,83,108));details.setPadding(dp(12),0,0,0);card.addView(details,new LinearLayout.LayoutParams(0,-2,1));b.addView(card);gap(b,10); } gap(b,9); }
+        for (String group:Coach.TARGETS) { b.addView(text("✦  "+group,21,navy)); gap(b,5); for(Coach.Exercise e:Coach.library().get(group)) { LinearLayout card=new LinearLayout(this);card.setOrientation(LinearLayout.HORIZONTAL);card.setPadding(dp(10),dp(10),dp(10),dp(10));card.setBackground(surface(Color.WHITE,18,1,Color.rgb(215,224,220)));card.setElevation(dp(2));int visual=ExerciseVisuals.forExercise(this,trainer,e.name);if(visual!=0){AnimatedGifView image=new AnimatedGifView(this,visual);card.addView(image,new LinearLayout.LayoutParams(dp(136),dp(102)));}TextView details=text(e.name+"\n"+e.description+"\n"+e.cue,14,Color.rgb(71,83,108));details.setPadding(dp(12),0,0,0);card.addView(details,new LinearLayout.LayoutParams(0,-2,1));b.addView(card);gap(b,10); } gap(b,9); }
         nav(b,"Library");
     }
     private void showMeals() {

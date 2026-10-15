@@ -30,3 +30,7 @@ Set `JAVA_HOME` to JDK 21 and `ANDROID_HOME` to your Android SDK, then run:
 ```
 
 This app provides general fitness and meal ideas, not medical or dietary treatment.
+
+## 1.6 polished motion and workout selection
+
+Coach GIFs now use smoother ping-pong motion with blended in-between frames. The workout wizard adds a live animated movement preview for the currently selected focus, while polished surfaces, icons, tactile buttons, and elevated cards make the native Android experience easier to scan and use.

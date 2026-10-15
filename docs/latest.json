@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 6,
-  "versionName": "1.5",
-  "publishedAt": "2026-10-15T05:30:00Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v1.5/My-Personal-Trainer-1.5.apk",
-  "sha256": "f2e50fff263943ff798f44900d5890b573a5a413b838dbfd5f8a0a3c990a8a84",
-  "sizeBytes": 11932331,
-  "notes": "A new original Today, Plans, Library, Progress and Profile structure makes planning, guided training and progress tracking easier to navigate."
+  "versionCode": 7,
+  "versionName": "1.6",
+  "publishedAt": "2026-10-15T05:46:45Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v1.6/My-Personal-Trainer-1.6.apk",
+  "sha256": "6fa9b64ddf0e21da3e3c33bc9d3d091a223dddb0d63775f84f025839d6a84088",
+  "sizeBytes": 21481431,
+  "notes": "Smoother coach motion, an animated exercise preview while choosing a workout, and a more polished icon-and-card interface."
 }

@@ -3,20 +3,27 @@ import javax.imageio.ImageIO;
 import javax.imageio.ImageTypeSpecifier;
 import javax.imageio.ImageWriteParam;
 import javax.imageio.ImageWriter;
+import javax.imageio.ImageReader;
 import javax.imageio.metadata.IIOMetadata;
 import javax.imageio.metadata.IIOMetadataNode;
 import javax.imageio.stream.FileImageOutputStream;
 import javax.imageio.stream.ImageOutputStream;
+import javax.imageio.stream.ImageInputStream;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.io.File;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.awt.AlphaComposite;
+import java.awt.Color;
 
 /** Converts a generated 3-by-4 motion sheet into four looping Android GIF resources. */
 public final class BuildExerciseGifs {
     private static final int FRAME_W = 180, FRAME_H = 240, TRIM = 4;
 
     public static void main(String[] args) throws Exception {
+        if (args.length == 1) { smoothExisting(new File(args[0])); return; }
         if (args.length != 4) throw new IllegalArgumentException("sheet outputDir exerciseA exerciseB");
         BufferedImage sheet = ImageIO.read(new File(args[0]));
         File output = new File(args[1]);
@@ -26,6 +33,40 @@ public final class BuildExerciseGifs {
         write(sheet, cellW, cellH, 1, new File(output, "mia_" + args[3] + ".gif"));
         write(sheet, cellW, cellH, 2, new File(output, "leo_" + args[2] + ".gif"));
         write(sheet, cellW, cellH, 3, new File(output, "leo_" + args[3] + ".gif"));
+    }
+
+    /**
+     * Re-encodes the offline coach animations as a short ping-pong loop with
+     * blended in-between frames. This eliminates the abrupt last-frame-to-first-frame jump
+     * while preserving the existing generated trainer imagery.
+     */
+    private static void smoothExisting(File directory) throws Exception {
+        File[] files = directory.listFiles((dir, name) -> name.matches("(mia|leo)_.*\\.gif"));
+        if (files == null || files.length == 0) throw new IllegalArgumentException("No coach GIFs found in " + directory);
+        for (File file : files) {
+            ArrayList<BufferedImage> frames = readFrames(file);
+            if (frames.size() < 2) continue;
+            ArrayList<BufferedImage> loop = new ArrayList<>();
+            for (int i = 0; i < frames.size() - 1; i++) { loop.add(frames.get(i)); loop.add(blend(frames.get(i), frames.get(i + 1), .5f)); }
+            loop.add(frames.get(frames.size() - 1));
+            for (int i = frames.size() - 1; i > 0; i--) loop.add(blend(frames.get(i), frames.get(i - 1), .5f));
+            File temporary = new File(directory, file.getName() + ".smooth");
+            try (ImageOutputStream stream = new FileImageOutputStream(temporary); GifWriter gif = new GifWriter(stream, 115, true)) { for (BufferedImage frame : loop) gif.write(frame); }
+            if (!file.delete() || !temporary.renameTo(file)) throw new IllegalStateException("Cannot replace " + file);
+        }
+    }
+
+    private static ArrayList<BufferedImage> readFrames(File file) throws Exception {
+        Iterator<ImageReader> readers = ImageIO.getImageReadersBySuffix("gif");
+        ImageReader reader = readers.next(); ArrayList<BufferedImage> result = new ArrayList<>();
+        try (ImageInputStream input = ImageIO.createImageInputStream(file)) { reader.setInput(input); for (int i = 0; i < reader.getNumImages(true); i++) result.add(reader.read(i)); }
+        finally { reader.dispose(); }
+        return result;
+    }
+    private static BufferedImage blend(BufferedImage from, BufferedImage to, float amount) {
+        int width = Math.max(from.getWidth(), to.getWidth()), height = Math.max(from.getHeight(), to.getHeight());
+        BufferedImage output = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB); Graphics2D graphics = output.createGraphics(); graphics.setColor(Color.WHITE); graphics.fillRect(0, 0, width, height);
+        graphics.setComposite(AlphaComposite.SrcOver.derive(1f - amount)); graphics.drawImage(from, 0, 0, null); graphics.setComposite(AlphaComposite.SrcOver.derive(amount)); graphics.drawImage(to, 0, 0, null); graphics.dispose(); return output;
     }
 
     private static void write(BufferedImage sheet, int cellW, int cellH, int row, File out) throws Exception {
