@@ -48,4 +48,13 @@ public final class PlanOptionsTest {
         assertTrue(Coach.recommendedForDuration(options, 45).size() <= 4);
         assertTrue(Coach.recommendedForDuration(options, 60).size() <= 6);
     }
+
+    @Test public void twoEquipmentCategoriesMergeWithoutDuplicateMovements() {
+        List<Coach.Exercise> options = Coach.planOptions(Arrays.asList("Chest"), Arrays.asList("Dumbbells", "Machine-assisted"));
+        assertTrue(options.size() >= 7);
+        java.util.HashSet<String> identities = new java.util.HashSet<>();
+        for (Coach.Exercise exercise : options) assertTrue(identities.add(exercise.name + "|" + exercise.target));
+        assertTrue(identities.contains("Floor Press|Chest"));
+        assertTrue(identities.contains("Machine Chest Press|Chest"));
+    }
 }

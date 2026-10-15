@@ -54,3 +54,9 @@ The coach rail is now real navigation—Home, Plan, Progress, Library, and Accou
 ## 2.6 five-step plan builder
 
 The Workout page is now a focused five-step builder: Plan type, Training area, Equipment, Exercises, and Sets. Weekly plans include a persisted Monday-to-Sunday scheduler with explicit Rest Days. Training areas no longer include a generic Machines option; instead, Machine-assisted is an equipment category with tailored choices such as chest press, cable press, pec deck, assisted dip, lat pulldown, cable row, leg press, leg curl, and leg extension.
+
+## 3.0 coach and media customization
+
+Account Settings now includes Customize your Coach with six choices: Mia and Leo (Spanish delivery), Amy and Mark (US delivery), and Claudia and Stephen (UK delivery). Audio can be set to Full Dialogue, Minimal, No Dialogue with low 3–1 beeps plus a high start beep, or No Sound. Keep Phone Awake prevents the display from sleeping while the app is open.
+
+Workout planning accepts one or two equipment categories and merges compatible exercises without duplicates. Training-area and equipment tiles use new high-resolution artwork. Press and hold an exercise to open a detailed animated form preview. All 88 offline demonstrations use looping 30 fps local video for stable, flicker-free motion.

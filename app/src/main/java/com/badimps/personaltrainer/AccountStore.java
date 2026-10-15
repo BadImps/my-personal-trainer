@@ -9,12 +9,35 @@ import java.security.SecureRandom;
 /** Holds a device-local profile only; it deliberately makes no network account claim. */
 public final class AccountStore {
     private static final String FILE="trainer_profile";
-    public static final class Profile { public final String email, username, trainer; Profile(String e,String u,String t){email=e;username=u;trainer=t;} }
+    public static final class Profile {
+        public final String email, username, trainer, coachName, dialogueMode;
+        public final boolean keepPhoneAwake;
+        Profile(String e, String u, String t, String coach, String dialogue, boolean awake) {
+            email=e; username=u; trainer=t; coachName=coach; dialogueMode=dialogue; keepPhoneAwake=awake;
+        }
+    }
     public static boolean exists(Context c) { return c.getSharedPreferences(FILE,Context.MODE_PRIVATE).getBoolean("created",false); }
-    public static Profile get(Context c) { SharedPreferences p=c.getSharedPreferences(FILE,Context.MODE_PRIVATE); return new Profile(p.getString("email",""),p.getString("username","Athlete"),p.getString("trainer","Female")); }
+    public static Profile get(Context c) {
+        SharedPreferences p=c.getSharedPreferences(FILE,Context.MODE_PRIVATE);
+        String gender=p.getString("trainer","Female");
+        String coach=p.getString("coach_name",CoachPreferences.defaultCoach(gender));
+        CoachPreferences.CoachOption option=CoachPreferences.coach(coach);
+        return new Profile(p.getString("email",""),p.getString("username","Athlete"),option.gender,option.name,
+                CoachPreferences.normalizeDialogueMode(p.getString("dialogue_mode",CoachPreferences.FULL_DIALOGUE)),
+                p.getBoolean("keep_phone_awake",false));
+    }
     public static void create(Context c,String email,String username,String password,String trainer) {
         byte[] salt=new byte[16]; new SecureRandom().nextBytes(salt);
-        c.getSharedPreferences(FILE,Context.MODE_PRIVATE).edit().putBoolean("created",true).putString("email",email.trim()).putString("username",username.trim()).putString("trainer",trainer).putString("salt",hex(salt)).putString("passwordHash",hash(salt,password)).apply();
+        c.getSharedPreferences(FILE,Context.MODE_PRIVATE).edit().putBoolean("created",true).putString("email",email.trim()).putString("username",username.trim()).putString("trainer",trainer).putString("coach_name",CoachPreferences.defaultCoach(trainer)).putString("dialogue_mode",CoachPreferences.FULL_DIALOGUE).putBoolean("keep_phone_awake",false).putString("salt",hex(salt)).putString("passwordHash",hash(salt,password)).apply();
+    }
+    public static void updateCoachPreferences(Context c,String coachName,String dialogueMode,boolean keepPhoneAwake) {
+        CoachPreferences.CoachOption coach=CoachPreferences.coach(coachName);
+        c.getSharedPreferences(FILE,Context.MODE_PRIVATE).edit()
+                .putString("trainer",coach.gender)
+                .putString("coach_name",coach.name)
+                .putString("dialogue_mode",CoachPreferences.normalizeDialogueMode(dialogueMode))
+                .putBoolean("keep_phone_awake",keepPhoneAwake)
+                .apply();
     }
     public static boolean authenticate(Context c,String email,String password) {
         SharedPreferences p=c.getSharedPreferences(FILE,Context.MODE_PRIVATE);

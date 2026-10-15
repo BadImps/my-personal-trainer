@@ -92,6 +92,24 @@ public final class Coach {
         return new ArrayList<>(combined.values());
     }
 
+    /** Combines one or two equipment categories and one or two focus areas without duplicates. */
+    public static List<Exercise> planOptions(List<String> targets, List<String> equipmentTypes) {
+        LinkedHashMap<String, Exercise> combined = new LinkedHashMap<>();
+        if (equipmentTypes != null) {
+            for (String equipment : equipmentTypes) {
+                for (Exercise exercise : planOptions(targets, equipment)) {
+                    combined.put(exercise.name + "|" + exercise.target, exercise);
+                }
+            }
+        }
+        if (combined.isEmpty()) {
+            for (Exercise exercise : planOptions(targets, EQUIPMENT_TYPES[0])) {
+                combined.put(exercise.name + "|" + exercise.target, exercise);
+            }
+        }
+        return new ArrayList<>(combined.values());
+    }
+
     /** The default shortlist fills a chosen session without forcing every catalogue item into it. */
     public static List<Exercise> recommendedForDuration(List<Exercise> options, int minutes) {
         int idealCount = minutes <= 45 ? 4 : minutes <= 60 ? 6 : minutes <= 110 ? 8 : 10;

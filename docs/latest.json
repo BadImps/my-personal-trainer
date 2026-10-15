@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 20,
-  "versionName": "2.9",
-  "publishedAt": "2026-10-15T21:15:42Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v2.9/app-release.apk",
-  "sha256": "2ac8cb306c0826c1caccacd71446318802ab168f92f779a384668770a4bc0a02",
-  "sizeBytes": 23356317,
-  "notes": "Corrects guided tracking to time complete sets instead of individual reps, records every completed set time, adds set-completion recovery coaching, uses distinct spoken 5-to-1 prompts for a next set versus a new exercise, and shows live in-app OTA download progress."
+  "versionCode": 21,
+  "versionName": "3.0",
+  "publishedAt": "2026-10-15T23:52:33Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v3.0/app-release.apk",
+  "sha256": "cea36d888304eae0b82a1c46961c321615410841b22a3a440cff45ab9b0f5cac",
+  "sizeBytes": 32990281,
+  "notes": "Adds six selectable coaches with Spanish, US, and UK delivery, four dialogue and sound modes, Keep Phone Awake, one-or-two equipment selection, sharper training and equipment artwork, and animated press-and-hold exercise details. All 88 offline exercise videos loop at 30 fps for smooth, stable playback."
 }

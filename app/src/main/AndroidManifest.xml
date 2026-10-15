@@ -13,7 +13,19 @@
         <activity-alias android:name=".MiaLauncher" android:enabled="false" android:exported="true" android:icon="@drawable/mia_launcher" android:label="My Personal Trainer · Mia" android:targetActivity=".MainActivity">
             <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
         </activity-alias>
+        <activity-alias android:name=".AmyLauncher" android:enabled="false" android:exported="true" android:icon="@drawable/amy_launcher" android:label="My Personal Trainer · Amy" android:targetActivity=".MainActivity">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".ClaudiaLauncher" android:enabled="false" android:exported="true" android:icon="@drawable/claudia_launcher" android:label="My Personal Trainer · Claudia" android:targetActivity=".MainActivity">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
         <activity-alias android:name=".LeoLauncher" android:enabled="false" android:exported="true" android:icon="@drawable/leo_launcher" android:label="My Personal Trainer · Leo" android:targetActivity=".MainActivity">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".MarkLauncher" android:enabled="false" android:exported="true" android:icon="@drawable/mark_launcher" android:label="My Personal Trainer · Mark" android:targetActivity=".MainActivity">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".StephenLauncher" android:enabled="false" android:exported="true" android:icon="@drawable/stephen_launcher" android:label="My Personal Trainer · Stephen" android:targetActivity=".MainActivity">
             <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
         </activity-alias>
         <provider

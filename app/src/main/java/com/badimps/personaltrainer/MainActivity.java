@@ -1,6 +1,7 @@
 package com.badimps.personaltrainer;
 
 import android.app.Activity;
+import android.app.Dialog;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.Typeface;
@@ -11,6 +12,8 @@ import android.os.CountDownTimer;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
+import android.media.AudioManager;
+import android.media.ToneGenerator;
 import android.speech.tts.TextToSpeech;
 import android.speech.tts.UtteranceProgressListener;
 import android.speech.tts.Voice;
@@ -18,7 +21,9 @@ import android.text.InputType;
 import android.view.Gravity;
 import android.view.View;
 import android.view.WindowInsets;
+import android.view.WindowManager;
 import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.HorizontalScrollView;
@@ -61,6 +66,7 @@ public final class MainActivity extends Activity {
     private String selectedTrainer = "Female";
     private String planMode = Coach.PLAN_MODES[0];
     private String equipmentType = Coach.EQUIPMENT_TYPES[0];
+    private final List<String> selectedEquipmentTypes = new ArrayList<>();
     private int sessionMinutes = 45;
     private boolean customDuration;
     private int trainingDays = 3;
@@ -88,6 +94,7 @@ public final class MainActivity extends Activity {
     private final Map<String, Runnable> speechDoneCallbacks = new HashMap<>();
     private boolean ttsReady;
     private Voice coachTtsVoice;
+    private ToneGenerator toneGenerator;
     private long speechSequence;
     private long speechGeneration;
     private Runnable setClockUpdate;
@@ -114,8 +121,10 @@ public final class MainActivity extends Activity {
         });
         boolean hasLocalAccount = AccountStore.exists(this);
         if (hasLocalAccount) {
-            selectedTrainer = AccountStore.get(this).trainer;
-            LauncherIconManager.apply(this, selectedTrainer);
+            AccountStore.Profile profile = AccountStore.get(this);
+            selectedTrainer = profile.trainer;
+            LauncherIconManager.apply(this, profile.coachName);
+            applyKeepPhoneAwake(profile.keepPhoneAwake);
         }
         initialisePlanSelections();
         restoreSavedPlan();
@@ -132,6 +141,7 @@ public final class MainActivity extends Activity {
         workoutHandler.removeCallbacksAndMessages(null);
         speechDoneCallbacks.clear();
         if (voice != null) voice.shutdown();
+        if (toneGenerator != null) toneGenerator.release();
         super.onDestroy();
     }
 
@@ -139,8 +149,27 @@ public final class MainActivity extends Activity {
         return (int) (value * getResources().getDisplayMetrics().density + .5f);
     }
 
+    private AccountStore.Profile profile() { return AccountStore.get(this); }
+
+    private String coachName() { return profile().coachName; }
+
+    private int coachPortrait(String name) {
+        if ("Amy".equals(name)) return R.drawable.amy_launcher;
+        if ("Claudia".equals(name)) return R.drawable.claudia_launcher;
+        if ("Leo".equals(name)) return R.drawable.leo_launcher;
+        if ("Mark".equals(name)) return R.drawable.mark_launcher;
+        if ("Stephen".equals(name)) return R.drawable.stephen_launcher;
+        return R.drawable.mia_launcher;
+    }
+
+    private void applyKeepPhoneAwake(boolean keepAwake) {
+        if (keepAwake) getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+    }
+
     private void initialisePlanSelections() {
         if (selectedTargets.isEmpty()) selectedTargets.add(target);
+        if (selectedEquipmentTypes.isEmpty()) selectedEquipmentTypes.add(equipmentType);
         while (weeklyDayTargets.size() < 7) weeklyDayTargets.add(new ArrayList<>());
         while (weeklySessions.size() < 7) weeklySessions.add(new ArrayList<>());
         for (int i = 0; i < weeklyWorkoutDays.length; i++) {
@@ -158,6 +187,32 @@ public final class MainActivity extends Activity {
     private String focusSummary(List<String> focuses) {
         if (focuses == null || focuses.isEmpty()) return "Choose a focus";
         return String.join(" + ", focuses);
+    }
+
+    private String equipmentSummary() {
+        initialisePlanSelections();
+        return String.join(" + ", selectedEquipmentTypes);
+    }
+
+    private String encodeEquipmentTypes() {
+        initialisePlanSelections();
+        return String.join("|", selectedEquipmentTypes);
+    }
+
+    private void restoreEquipmentTypes(String encoded) {
+        selectedEquipmentTypes.clear();
+        if (encoded != null) {
+            for (String value : encoded.split("\\|", -1)) {
+                String normalized = normalizeEquipment(value.trim());
+                for (String available : Coach.EQUIPMENT_TYPES) {
+                    if (available.equals(normalized) && !selectedEquipmentTypes.contains(available) && selectedEquipmentTypes.size() < 2) {
+                        selectedEquipmentTypes.add(available);
+                    }
+                }
+            }
+        }
+        if (selectedEquipmentTypes.isEmpty()) selectedEquipmentTypes.add(Coach.EQUIPMENT_TYPES[0]);
+        equipmentType = selectedEquipmentTypes.get(0);
     }
 
     private void syncPrimaryTarget() {
@@ -339,7 +394,7 @@ public final class MainActivity extends Activity {
 
     private LinearLayout planCoachRail() {
         AccountStore.Profile profile = AccountStore.get(this);
-        String trainerName = "Male".equals(profile.trainer) ? "Leo" : "Mia";
+        String trainerName = profile.coachName;
         LinearLayout rail = new LinearLayout(this);
         rail.setOrientation(LinearLayout.VERTICAL);
         rail.setGravity(Gravity.CENTER_HORIZONTAL);
@@ -347,7 +402,7 @@ public final class MainActivity extends Activity {
         rail.setBackgroundColor(navy);
 
         ImageView portrait = new ImageView(this);
-        portrait.setImageResource("Male".equals(profile.trainer) ? R.drawable.leo_launcher : R.drawable.mia_launcher);
+        portrait.setImageResource(coachPortrait(trainerName));
         portrait.setScaleType(ImageView.ScaleType.CENTER_CROP);
         portrait.setBackground(surface(navyPanel, 99, 1, mint));
         portrait.setClipToOutline(true);
@@ -403,7 +458,7 @@ public final class MainActivity extends Activity {
 
     private LinearLayout coachRail(String activeScreen) {
         AccountStore.Profile profile = AccountStore.get(this);
-        String trainerName = "Male".equals(profile.trainer) ? "Leo" : "Mia";
+        String trainerName = profile.coachName;
         LinearLayout rail = new LinearLayout(this);
         rail.setOrientation(LinearLayout.VERTICAL);
         rail.setGravity(Gravity.CENTER_HORIZONTAL);
@@ -411,7 +466,7 @@ public final class MainActivity extends Activity {
         rail.setBackgroundColor(navy);
 
         ImageView portrait = new ImageView(this);
-        portrait.setImageResource("Male".equals(profile.trainer) ? R.drawable.leo_launcher : R.drawable.mia_launcher);
+        portrait.setImageResource(coachPortrait(trainerName));
         portrait.setScaleType(ImageView.ScaleType.CENTER_CROP);
         portrait.setBackground(surface(navyPanel, 99, 2, mint));
         portrait.setClipToOutline(true);
@@ -590,7 +645,7 @@ public final class MainActivity extends Activity {
             mediaCard.setBackground(surface(navyPanel, 18, 1, mint));
             mediaCard.setClipToOutline(true);
             mediaCard.setClipChildren(true);
-            mediaCard.setContentDescription("Coach " + ("Male".equals(trainer) ? "Leo" : "Mia") + " demonstrating " + exercise.name);
+            mediaCard.setContentDescription("Coach " + coachName() + " demonstrating " + exercise.name);
             LoopingExerciseVideoView demonstration = new LoopingExerciseVideoView(this, video);
             mediaCard.addView(demonstration, new FrameLayout.LayoutParams(-1, -1));
             return mediaCard;
@@ -721,9 +776,11 @@ public final class MainActivity extends Activity {
         Button signIn = primary("Sign in");
         signIn.setOnClickListener(view -> {
             if (AccountStore.authenticate(this, email.getText().toString(), password.getText().toString())) {
-                selectedTrainer = AccountStore.get(this).trainer;
+                AccountStore.Profile signedInProfile = AccountStore.get(this);
+                selectedTrainer = signedInProfile.trainer;
                 configureSpeechVoices();
-                LauncherIconManager.apply(this, selectedTrainer);
+                LauncherIconManager.apply(this, signedInProfile.coachName);
+                applyKeepPhoneAwake(signedInProfile.keepPhoneAwake);
                 showHome();
             } else {
                 toast("That email or password does not match this profile.");
@@ -779,7 +836,7 @@ public final class MainActivity extends Activity {
             selectedTrainer = trainers.getCheckedRadioButtonId() == R.id.trainer_male ? "Male" : "Female";
             configureSpeechVoices();
             AccountStore.create(this, enteredEmail, usernameValue, passwordValue, selectedTrainer);
-            LauncherIconManager.apply(this, selectedTrainer);
+            LauncherIconManager.apply(this, AccountStore.get(this).coachName);
             showPlans();
         });
         addButton(body, create);
@@ -1222,13 +1279,16 @@ public final class MainActivity extends Activity {
         tile.setClipToOutline(true);
         elevatePlanSurface(tile, selected);
         FrameLayout imageArea = new FrameLayout(this);
-        ReferenceArtworkView artwork;
-        if ("Upper".equals(choice)) artwork = referenceArtwork(R.drawable.reference_train_page, 88, 223, 202, 307);
-        else if ("Lower".equals(choice)) artwork = referenceArtwork(R.drawable.reference_train_page, 205, 223, 320, 307);
-        else if ("Arms".equals(choice)) artwork = referenceArtwork(R.drawable.reference_train_page, 88, 337, 202, 421);
-        else if ("Chest".equals(choice)) artwork = referenceArtwork(R.drawable.reference_train_page, 205, 337, 320, 421);
-        else if ("Legs".equals(choice)) artwork = referenceArtwork(R.drawable.reference_train_page, 88, 449, 202, 533);
-        else artwork = referenceArtwork(R.drawable.reference_train_page, 205, 449, 320, 533);
+        int targetIndex = 0;
+        for (int index = 0; index < WIZARD_TARGETS.length; index++) if (WIZARD_TARGETS[index].equals(choice)) targetIndex = index;
+        int[] columnLeft = {4, 515};
+        int[] columnRight = {510, 1021};
+        int[] rowTop = {3, 491, 966};
+        int[] rowBottom = {487, 961, 1533};
+        int column = targetIndex % 2;
+        int row = targetIndex / 2;
+        ReferenceArtworkView artwork = referenceArtwork(R.drawable.workout_focus_tiles,
+                columnLeft[column], rowTop[row], columnRight[column], rowBottom[row]);
         imageArea.addView(artwork, new FrameLayout.LayoutParams(-1, -1));
         if (selected) {
             TextView check = heading("✓", hasTallPlanViewport() ? 14 : 12, navy);
@@ -1321,17 +1381,30 @@ public final class MainActivity extends Activity {
     }
 
     private void showPlanEquipment() {
+        initialisePlanSelections();
         LinearLayout body = planPage();
-        planTitle(body, "PLAN YOUR WORKOUT", "Choose your\nequipment", "We’ll tailor your " + focusSummary(activeTargets()).toLowerCase(Locale.ROOT) + " session to what you have available.");
+        planTitle(body, "PLAN YOUR WORKOUT", "Choose your\nequipment", "Select one or two categories. We’ll combine compatible " + focusSummary(activeTargets()).toLowerCase(Locale.ROOT) + " movements.");
         addWizardProgress(body, wizardStep("Equipment"));
         for (int index = 0; index < Coach.EQUIPMENT_TYPES.length; index += 2) {
             LinearLayout row = new LinearLayout(this);
             row.setOrientation(LinearLayout.HORIZONTAL);
             for (int offset = 0; offset < 2; offset++) {
                 String equipment = Coach.EQUIPMENT_TYPES[index + offset];
-                LinearLayout tile = equipmentTile(equipment, equipment.equals(equipmentType));
+                LinearLayout tile = equipmentTile(equipment, selectedEquipmentTypes.contains(equipment));
                 tile.setOnClickListener(view -> {
-                    equipmentType = equipment;
+                    if (selectedEquipmentTypes.contains(equipment)) {
+                        if (selectedEquipmentTypes.size() == 1) {
+                            toast("Keep at least one equipment category selected.");
+                            return;
+                        }
+                        selectedEquipmentTypes.remove(equipment);
+                    } else if (selectedEquipmentTypes.size() >= 2) {
+                        toast("Choose up to two equipment categories per workout.");
+                        return;
+                    } else {
+                        selectedEquipmentTypes.add(equipment);
+                    }
+                    equipmentType = selectedEquipmentTypes.get(0);
                     session.clear();
                     resetExerciseSelection();
                     showPlanEquipment();
@@ -1343,7 +1416,13 @@ public final class MainActivity extends Activity {
             body.addView(row);
             gap(body, planGridGap());
         }
-        if ("Machine-assisted".equals(equipmentType)) {
+        LinearLayout selection = card();
+        selection.setPadding(dp(13), dp(10), dp(13), dp(10));
+        selection.addView(heading(selectedEquipmentTypes.size() + " of 2 selected", 13, ink));
+        selection.addView(text(equipmentSummary(), 12, muted));
+        body.addView(selection);
+        gap(body, 9);
+        if (selectedEquipmentTypes.contains("Machine-assisted")) {
             LinearLayout supported = new LinearLayout(this);
             supported.setOrientation(LinearLayout.VERTICAL);
             supported.setPadding(dp(14), dp(11), dp(14), dp(11));
@@ -1395,11 +1474,15 @@ public final class MainActivity extends Activity {
         tile.setClipToOutline(true);
         elevatePlanSurface(tile, selected);
         FrameLayout imageArea = new FrameLayout(this);
-        ReferenceArtworkView artwork;
-        if ("Dumbbells".equals(label)) artwork = referenceArtwork(R.drawable.reference_equipment_page, 87, 209, 201, 302);
-        else if ("At home".equals(label)) artwork = referenceArtwork(R.drawable.reference_equipment_page, 207, 209, 321, 302);
-        else if ("Machine-assisted".equals(label)) artwork = referenceArtwork(R.drawable.reference_equipment_page, 87, 364, 201, 457);
-        else artwork = referenceArtwork(R.drawable.reference_equipment_page, 207, 364, 321, 457);
+        int equipmentIndex = 0;
+        for (int index = 0; index < Coach.EQUIPMENT_TYPES.length; index++) if (Coach.EQUIPMENT_TYPES[index].equals(label)) equipmentIndex = index;
+        int column = equipmentIndex % 2;
+        int row = equipmentIndex / 2;
+        int left = column == 0 ? 2 : 629;
+        int right = column == 0 ? 625 : 1252;
+        int top = row == 0 ? 2 : 629;
+        int bottom = row == 0 ? 625 : 1252;
+        ReferenceArtworkView artwork = referenceArtwork(R.drawable.equipment_tiles, left, top, right, bottom);
         imageArea.addView(artwork, new FrameLayout.LayoutParams(-1, -1));
         if (selected) {
             TextView check = heading("✓", hasTallPlanViewport() ? 14 : 12, navy);
@@ -1435,7 +1518,7 @@ public final class MainActivity extends Activity {
         if (saved == null) return;
         planMode = saved.mode;
         target = saved.target;
-        equipmentType = normalizeEquipment(saved.equipment);
+        restoreEquipmentTypes(saved.equipment);
         sessionMinutes = saved.minutes;
         workingWeightKg = saved.weightKg;
         planSets = saved.sets;
@@ -1458,7 +1541,7 @@ public final class MainActivity extends Activity {
             }
             session = new ArrayList<>(weeklySessions.get(activeScheduleDay));
         } else {
-            session = prescribeNames(saved.exerciseNames, Coach.planOptions(activeTargets(), equipmentType));
+            session = prescribeNames(saved.exerciseNames, Coach.planOptions(activeTargets(), selectedEquipmentTypes));
         }
     }
 
@@ -1523,7 +1606,7 @@ public final class MainActivity extends Activity {
         for (int i = 0; i < weeklySessions.size(); i++) {
             weeklySessions.get(i).clear();
             if (!weeklyWorkoutDays[i]) continue;
-            List<Coach.Exercise> choices = Coach.planOptions(weeklyDayTargets.get(i), equipmentType);
+            List<Coach.Exercise> choices = Coach.planOptions(weeklyDayTargets.get(i), selectedEquipmentTypes);
             List<String> names = i < days.length && !days[i].isEmpty()
                     ? java.util.Arrays.asList(days[i].split("\\|", -1)) : Collections.emptyList();
             List<Coach.Exercise> restored = prescribeNames(names, choices);
@@ -1558,10 +1641,10 @@ public final class MainActivity extends Activity {
     }
 
     private void prepareExerciseSelection() {
-        String key = String.join("|", activeTargets()) + "|" + equipmentType + "|" + sessionMinutes;
+        String key = String.join("|", activeTargets()) + "|" + encodeEquipmentTypes() + "|" + sessionMinutes;
         if (key.equals(selectionKey) && !availableExercises.isEmpty()) return;
         selectionKey = key;
-        availableExercises = Coach.planOptions(activeTargets(), equipmentType);
+        availableExercises = Coach.planOptions(activeTargets(), selectedEquipmentTypes);
         selectedExercises = Coach.recommendedForDuration(availableExercises, sessionMinutes);
     }
 
@@ -1631,10 +1714,14 @@ public final class MainActivity extends Activity {
             elevatePlanSurface(row, selected);
             row.setClickable(true);
             row.setFocusable(true);
-            row.setContentDescription((selected ? "Selected " : "Not selected ") + exercise.name + ". " + exercise.description);
+            row.setContentDescription((selected ? "Selected " : "Not selected ") + exercise.name + ". Tap to change selection. Press and hold for details and animation.");
             row.setOnClickListener(view -> {
                 toggleExercise(exercise);
                 showExerciseSelection();
+            });
+            row.setOnLongClickListener(view -> {
+                showExercisePreviewDialog(exercise);
+                return true;
             });
             LinearLayout details = new LinearLayout(this);
             details.setOrientation(LinearLayout.VERTICAL);
@@ -1676,13 +1763,45 @@ public final class MainActivity extends Activity {
         addPlanBack(body, back);
     }
 
-    /** Exact image crops supplied for the default Chest → Machine-assisted reference state. */
     private View exerciseSelectionArtwork(Coach.Exercise exercise, int index) {
-        if ("Chest".equals(target) && "Machine-assisted".equals(equipmentType) && index < 4) {
-            int top = 263 + (index * 88);
-            return referenceArtwork(R.drawable.reference_exercises_page, 80, top, 154, top + 80);
-        }
         return exercisePoster(AccountStore.get(this).trainer, exercise);
+    }
+
+    private void showExercisePreviewDialog(Coach.Exercise exercise) {
+        Dialog dialog = new Dialog(this);
+        LinearLayout popup = new LinearLayout(this);
+        popup.setOrientation(LinearLayout.VERTICAL);
+        popup.setPadding(dp(18), dp(18), dp(18), dp(18));
+        popup.setBackground(surface(paper, 24, 1, cardLine));
+        TextView eyebrow = heading("EXERCISE DETAILS", 11, coral);
+        eyebrow.setLetterSpacing(.08f);
+        popup.addView(eyebrow);
+        gap(popup, 5);
+        popup.addView(heading(exercise.name, 24, ink));
+        popup.addView(text(exercise.target + "  •  " + equipmentSummary(), 13, muted));
+        gap(popup, 12);
+        popup.addView(exerciseMedia(profile().trainer, exercise, 220), new LinearLayout.LayoutParams(-1, dp(220)));
+        gap(popup, 12);
+        popup.addView(heading("What it works", 15, ink));
+        popup.addView(text(exercise.description, 15, muted));
+        gap(popup, 8);
+        popup.addView(heading("Coach " + coachName() + "’s cue", 15, ink));
+        popup.addView(text(exercise.cue, 15, muted));
+        gap(popup, 14);
+        Button close = primary("Close preview");
+        close.setOnClickListener(view -> dialog.dismiss());
+        addButton(popup, close);
+        dialog.setContentView(popup);
+        dialog.setCanceledOnTouchOutside(true);
+        dialog.show();
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+            dialog.getWindow().setLayout((int) (getResources().getDisplayMetrics().widthPixels * .88f), WindowManager.LayoutParams.WRAP_CONTENT);
+            dialog.getWindow().addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+            WindowManager.LayoutParams attributes = dialog.getWindow().getAttributes();
+            attributes.dimAmount = .68f;
+            dialog.getWindow().setAttributes(attributes);
+        }
     }
 
     /** Step 5: weekly days and working-set controls stay together before the irreversible build action. */
@@ -1734,7 +1853,7 @@ public final class MainActivity extends Activity {
         settings.addView(heading("Working sets", 21, ink));
         settings.addView(text("Choose comfortable starting targets. You can adjust them later.", 13, muted));
         gap(settings, 8);
-        if ("Dumbbells".equals(equipmentType) || "Machine-assisted".equals(equipmentType)) {
+        if (selectedEquipmentTypes.contains("Dumbbells") || selectedEquipmentTypes.contains("Machine-assisted")) {
             addWorkingStepper(settings, "Weight", workingWeightKg + " kg", () -> workingWeightKg = Math.max(0, workingWeightKg - 2), () -> workingWeightKg += 2);
         }
         addWorkingStepper(settings, "Sets", String.valueOf(planSets), () -> planSets = Math.max(1, planSets - 1), () -> planSets = Math.min(6, planSets + 1));
@@ -1816,7 +1935,7 @@ public final class MainActivity extends Activity {
         } else {
             session = prescribeExercises(selectedExercises);
         }
-        PlanStore.save(this, planMode, target, equipmentType, sessionMinutes, workingWeightKg, planSets, planReps, planRestSeconds, weeklyWorkoutDays, encodeFocusTargets(activeTargets()), encodeWeeklyTargets(), encodeWeeklySessionNames(), "Weekly".equals(planMode) ? activeScheduleDay : dailyScheduledDay, selectedWeekOffset, session);
+        PlanStore.save(this, planMode, target, encodeEquipmentTypes(), sessionMinutes, workingWeightKg, planSets, planReps, planRestSeconds, weeklyWorkoutDays, encodeFocusTargets(activeTargets()), encodeWeeklyTargets(), encodeWeeklySessionNames(), "Weekly".equals(planMode) ? activeScheduleDay : dailyScheduledDay, selectedWeekOffset, session);
         showPlanReady();
     }
 
@@ -1833,7 +1952,7 @@ public final class MainActivity extends Activity {
             if (!weeklyWorkoutDays[i]) continue;
             List<Coach.Exercise> choices;
             if (i == activeScheduleDay) choices = selectedExercises;
-            else choices = Coach.recommendedForDuration(Coach.planOptions(weeklyDayTargets.get(i), equipmentType), sessionMinutes);
+            else choices = Coach.recommendedForDuration(Coach.planOptions(weeklyDayTargets.get(i), selectedEquipmentTypes), sessionMinutes);
             weeklySessions.get(i).addAll(prescribeExercises(choices));
         }
     }
@@ -1846,7 +1965,7 @@ public final class MainActivity extends Activity {
 
     private void showPlanReady() {
         LinearLayout body = planPage();
-        planTitle(body, "PLAN READY", "Your " + focusSummary(activeTargets()).toLowerCase(Locale.ROOT) + " plan is ready", session.size() + " selected movements  •  " + sessionMinutes + " min  •  " + equipmentType);
+        planTitle(body, "PLAN READY", "Your " + focusSummary(activeTargets()).toLowerCase(Locale.ROOT) + " plan is ready", session.size() + " selected movements  •  " + sessionMinutes + " min  •  " + equipmentSummary());
         LinearLayout schedule = card();
         schedule.addView(heading("Weekly".equals(planMode) ? "Your weekly templates" : "Scheduled workout", 18, ink));
         schedule.addView(text("Ready when you are  •  " + planSchedule(), 14, muted));
@@ -1866,14 +1985,14 @@ public final class MainActivity extends Activity {
             LinearLayout details = new LinearLayout(this);
             details.setOrientation(LinearLayout.VERTICAL);
             details.addView(heading(exercise.name, 18, ink));
-            String load = ("Dumbbells".equals(equipmentType) || "Machine-assisted".equals(equipmentType)) ? "  •  " + workingWeightKg + " kg" : "";
+            String load = (selectedEquipmentTypes.contains("Dumbbells") || selectedEquipmentTypes.contains("Machine-assisted")) ? "  •  " + workingWeightKg + " kg" : "";
             details.addView(text(exercise.sets + " sets × " + exercise.reps + " reps" + load + "  •  Rest " + exercise.restSeconds + " sec", 14, muted));
             item.addView(details, new LinearLayout.LayoutParams(0, -2, 1));
             body.addView(item);
             gap(body, 8);
         }
         LinearLayout cue = card();
-        cue.addView(heading("Coach " + ("Male".equals(AccountStore.get(this).trainer) ? "Leo" : "Mia") + "'s focus", 18, ink));
+        cue.addView(heading("Coach " + coachName() + "'s focus", 18, ink));
         cue.addView(text("Move with control, choose a comfortable load, and stop if you feel pain.", 14, muted));
         body.addView(cue);
         gap(body, 12);
@@ -1883,7 +2002,7 @@ public final class MainActivity extends Activity {
         gap(body, 10);
         Button scheduleLater = secondary("Schedule for later");
         scheduleLater.setOnClickListener(view -> {
-            PlanStore.save(this, planMode, target, equipmentType, sessionMinutes, workingWeightKg, planSets, planReps, planRestSeconds, weeklyWorkoutDays, encodeFocusTargets(activeTargets()), encodeWeeklyTargets(), encodeWeeklySessionNames(), "Weekly".equals(planMode) ? activeScheduleDay : dailyScheduledDay, selectedWeekOffset, session);
+            PlanStore.save(this, planMode, target, encodeEquipmentTypes(), sessionMinutes, workingWeightKg, planSets, planReps, planRestSeconds, weeklyWorkoutDays, encodeFocusTargets(activeTargets()), encodeWeeklyTargets(), encodeWeeklySessionNames(), "Weekly".equals(planMode) ? activeScheduleDay : dailyScheduledDay, selectedWeekOffset, session);
             toast("Your " + planSchedule() + " is saved on this device.");
         });
         addButton(body, scheduleLater);
@@ -1961,7 +2080,7 @@ public final class MainActivity extends Activity {
 
     private void showProfile() {
         AccountStore.Profile profile = AccountStore.get(this);
-        String coach = "Male".equals(profile.trainer) ? "Coach Leo" : "Coach Mia";
+        String coach = "Coach " + profile.coachName;
         LinearLayout body = appPage("Settings");
         title(body, "ACCOUNT", profile.username, "Your trainer, preferences, and update controls live here.");
 
@@ -1971,6 +2090,30 @@ public final class MainActivity extends Activity {
         identity.addView(heading(profile.email, 18, ink));
         identity.addView(text("Your local profile is stored on this device.", 14, muted));
         body.addView(identity);
+        gap(body, 12);
+
+        LinearLayout coachSettings = card();
+        coachSettings.setOrientation(LinearLayout.HORIZONTAL);
+        ImageView coachImage = new ImageView(this);
+        coachImage.setImageResource(coachPortrait(profile.coachName));
+        coachImage.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        coachImage.setBackground(surface(navyPanel, 99, 2, mint));
+        coachImage.setClipToOutline(true);
+        coachImage.setContentDescription("Coach " + profile.coachName);
+        LinearLayout.LayoutParams coachImageParams = new LinearLayout.LayoutParams(dp(76), dp(76));
+        coachImageParams.rightMargin = dp(14);
+        coachSettings.addView(coachImage, coachImageParams);
+        LinearLayout coachCopy = new LinearLayout(this);
+        coachCopy.setOrientation(LinearLayout.VERTICAL);
+        coachCopy.addView(heading("Customize your Coach", 19, ink));
+        coachCopy.addView(text(profile.coachName + " · " + CoachPreferences.coach(profile.coachName).accent, 14, muted));
+        coachCopy.addView(text(profile.dialogueMode + (profile.keepPhoneAwake ? " · Phone stays awake" : ""), 13, muted));
+        coachSettings.addView(coachCopy, new LinearLayout.LayoutParams(0, -2, 1));
+        coachSettings.setClickable(true);
+        coachSettings.setFocusable(true);
+        coachSettings.setContentDescription("Customize your Coach. Current coach " + profile.coachName + ", " + profile.dialogueMode);
+        coachSettings.setOnClickListener(view -> showCoachCustomization());
+        body.addView(coachSettings);
         gap(body, 12);
 
         LinearLayout privacy = card();
@@ -1995,9 +2138,114 @@ public final class MainActivity extends Activity {
             session.clear();
             selectedExercises.clear();
             selectedTrainer = "Female";
+            applyKeepPhoneAwake(false);
             showWelcome();
         });
         addButton(body, signOut);
+    }
+
+    private void showCoachCustomization() {
+        AccountStore.Profile profile = profile();
+        LinearLayout body = appPage("Settings");
+        title(body, "COACH SETTINGS", "Customize your Coach", "Choose who guides you, how much they speak, and whether the screen stays awake during training.");
+
+        body.addView(heading("Female coaches", 21, Color.WHITE));
+        gap(body, 8);
+        for (CoachPreferences.CoachOption option : CoachPreferences.coaches()) {
+            if ("Female".equals(option.gender)) addCoachChoice(body, option, option.name.equals(profile.coachName));
+        }
+        gap(body, 10);
+        body.addView(heading("Male coaches", 21, Color.WHITE));
+        gap(body, 8);
+        for (CoachPreferences.CoachOption option : CoachPreferences.coaches()) {
+            if ("Male".equals(option.gender)) addCoachChoice(body, option, option.name.equals(profile.coachName));
+        }
+
+        gap(body, 15);
+        body.addView(heading("How much should your coach talk?", 21, Color.WHITE));
+        gap(body, 8);
+        for (String mode : CoachPreferences.DIALOGUE_MODES) {
+            String explanation;
+            if (CoachPreferences.FULL_DIALOGUE.equals(mode)) explanation = "All count-ins, form guidance, and set-completion encouragement.";
+            else if (CoachPreferences.MINIMAL.equals(mode)) explanation = "Only get-ready prompts and spoken countdowns.";
+            else if (CoachPreferences.NO_DIALOGUE.equals(mode)) explanation = "Low beeps for 3–1, then one high start beep.";
+            else explanation = "No voice and no countdown beeps.";
+            LinearLayout choice = card();
+            choice.setBackground(surface(paper, 18, mode.equals(profile.dialogueMode) ? 2 : 1, mode.equals(profile.dialogueMode) ? mint : cardLine));
+            choice.addView(heading((mode.equals(profile.dialogueMode) ? "✓  " : "") + mode, 17, ink));
+            choice.addView(text(explanation, 14, muted));
+            choice.setClickable(true);
+            choice.setFocusable(true);
+            choice.setContentDescription(mode + ". " + explanation + (mode.equals(profile.dialogueMode) ? " Selected" : ""));
+            choice.setOnClickListener(view -> updateCoachSettings(profile.coachName, mode, profile.keepPhoneAwake));
+            body.addView(choice);
+            gap(body, 8);
+        }
+
+        LinearLayout wake = card();
+        CheckBox keepAwake = new CheckBox(this);
+        keepAwake.setText("Keep Phone Awake");
+        keepAwake.setTextSize(17);
+        keepAwake.setTextColor(ink);
+        keepAwake.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
+        keepAwake.setButtonTintList(ColorStateList.valueOf(mint));
+        keepAwake.setChecked(profile.keepPhoneAwake);
+        wake.addView(keepAwake);
+        wake.addView(text("Prevents the screen from sleeping while the app is open. Your normal timeout returns when this is off.", 14, muted));
+        keepAwake.setOnCheckedChangeListener((button, checked) -> updateCoachSettings(profile.coachName, profile.dialogueMode, checked));
+        body.addView(wake);
+        gap(body, 12);
+
+        LinearLayout note = card();
+        note.addView(heading("Voice availability", 15, ink));
+        note.addView(text("Android uses the closest installed regional voice for Spanish, US, or UK delivery. You can add more voices in your phone’s text-to-speech settings.", 13, muted));
+        body.addView(note);
+        gap(body, 12);
+        Button back = secondary("Back to account");
+        back.setOnClickListener(view -> showProfile());
+        addButton(body, back);
+    }
+
+    private void addCoachChoice(LinearLayout body, CoachPreferences.CoachOption option, boolean selected) {
+        LinearLayout choice = new LinearLayout(this);
+        choice.setOrientation(LinearLayout.HORIZONTAL);
+        choice.setGravity(Gravity.CENTER_VERTICAL);
+        choice.setPadding(dp(12), dp(10), dp(12), dp(10));
+        choice.setBackground(surface(paper, 19, selected ? 2 : 1, selected ? mint : cardLine));
+        choice.setElevation(dp(selected ? 5 : 2));
+        ImageView photo = new ImageView(this);
+        photo.setImageResource(coachPortrait(option.name));
+        photo.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        photo.setBackground(surface(navyPanel, 99, 1, mint));
+        photo.setClipToOutline(true);
+        choice.addView(photo, new LinearLayout.LayoutParams(dp(68), dp(68)));
+        LinearLayout copy = new LinearLayout(this);
+        copy.setOrientation(LinearLayout.VERTICAL);
+        copy.setPadding(dp(13), 0, 0, 0);
+        copy.addView(heading("Coach " + option.name, 18, ink));
+        copy.addView(text(option.accent + " · " + option.gender, 14, muted));
+        choice.addView(copy, new LinearLayout.LayoutParams(0, -2, 1));
+        TextView mark = heading(selected ? "✓" : "○", 19, selected ? navy : muted);
+        mark.setGravity(Gravity.CENTER);
+        mark.setBackground(surface(selected ? mint : Color.TRANSPARENT, 99, selected ? 0 : 1, muted));
+        choice.addView(mark, new LinearLayout.LayoutParams(dp(34), dp(34)));
+        choice.setClickable(true);
+        choice.setFocusable(true);
+        choice.setContentDescription("Coach " + option.name + ", " + option.accent + (selected ? ", selected" : ""));
+        choice.setOnClickListener(view -> updateCoachSettings(option.name, profile().dialogueMode, profile().keepPhoneAwake));
+        body.addView(choice);
+        gap(body, 8);
+    }
+
+    private void updateCoachSettings(String coach, String dialogueMode, boolean keepAwake) {
+        stopSpeech();
+        AccountStore.updateCoachPreferences(this, coach, dialogueMode, keepAwake);
+        AccountStore.Profile updated = profile();
+        selectedTrainer = updated.trainer;
+        LauncherIconManager.apply(this, updated.coachName);
+        applyKeepPhoneAwake(updated.keepPhoneAwake);
+        configureSpeechVoices();
+        showCoachCustomization();
     }
 
     // Plan wizard
@@ -2168,14 +2416,22 @@ public final class MainActivity extends Activity {
         String phrase = newExercise
                 ? "Let's start our new exercise in 5, 4, 3, 2, 1."
                 : setOpenings[openingPhraseIndex++ % setOpenings.length];
-        String trainerName = "Male".equals(AccountStore.get(this).trainer) ? "Leo" : "Mia";
+        String trainerName = coachName();
+        String dialogueMode = profile().dialogueMode;
+        boolean audioCountdown = CoachPreferences.usesVoice(dialogueMode);
         LinearLayout body = appPage("Workouts");
-        title(body, newExercise ? "NEW EXERCISE" : "NEXT SET", "Coach " + trainerName + " is counting you in", "Your set timer begins only after the spoken 5-to-1 count-in is complete.");
+        String countdownTitle = CoachPreferences.NO_DIALOGUE.equals(dialogueMode) ? "Audio countdown is ready"
+                : CoachPreferences.NO_SOUND.equals(dialogueMode) ? "Silent countdown is ready"
+                : "Coach " + trainerName + " is counting you in";
+        title(body, newExercise ? "NEW EXERCISE" : "NEXT SET", countdownTitle, "Your set timer begins only after the count-in is complete.");
         LinearLayout countCard = card();
-        TextView count = heading("5  ·  4  ·  3  ·  2  ·  1", 34, ink);
+        TextView count = heading(audioCountdown ? "5  ·  4  ·  3  ·  2  ·  1" : "3  ·  2  ·  1  ·  GO", 34, ink);
         count.setGravity(Gravity.CENTER);
         countCard.addView(count, new LinearLayout.LayoutParams(-1, dp(96)));
-        TextView dialogue = text("“" + phrase + "”", 17, muted);
+        String dialogueCopy = CoachPreferences.NO_DIALOGUE.equals(dialogueMode) ? "Low · low · low · high start beep"
+                : CoachPreferences.NO_SOUND.equals(dialogueMode) ? "Silent visual count-in"
+                : "“" + phrase + "”";
+        TextView dialogue = text(dialogueCopy, 17, muted);
         dialogue.setGravity(Gravity.CENTER);
         countCard.addView(dialogue);
         body.addView(countCard);
@@ -2184,7 +2440,7 @@ public final class MainActivity extends Activity {
         note.addView(heading(newExercise ? session.get(index).name : "Set " + set + " of " + session.get(index).sets, 17, ink));
         note.addView(text("Complete the whole set, then tap Set completed. The app records one time for the full set.", 14, muted));
         body.addView(note);
-        speakCoach(phrase, TextToSpeech.QUEUE_FLUSH, () -> showActive(index, set));
+        runWorkoutCountIn(phrase, () -> showActive(index, set));
     }
 
     private void showActive(int index, int set) {
@@ -2264,10 +2520,12 @@ public final class MainActivity extends Activity {
         });
         addButton(body, done);
         gap(body, 10);
-        Button callout = secondary("Hear set guidance");
-        callout.setOnClickListener(view -> say("Set " + set + ". Work with controlled form. " + exercise.cue));
-        addButton(body, callout);
-        gap(body, 10);
+        if (CoachPreferences.FULL_DIALOGUE.equals(profile().dialogueMode)) {
+            Button callout = secondary("Hear set guidance");
+            callout.setOnClickListener(view -> say("Set " + set + ". Work with controlled form. " + exercise.cue));
+            addButton(body, callout);
+            gap(body, 10);
+        }
         Button emergency = emergencyStopButton();
         emergency.setOnClickListener(view -> showEmergencyStopConfirmation(index, set, () -> showActive(index, set)));
         addButton(body, emergency);
@@ -2318,20 +2576,24 @@ public final class MainActivity extends Activity {
                 "This set is complete. Well done. Time to take a rest."
         };
         String completion = completions[completionPhraseIndex++ % completions.length];
-        speakCoach(completion, TextToSpeech.QUEUE_FLUSH, () -> {
-            boolean sessionComplete = set >= exercise.sets && index + 1 >= session.size();
-            if (sessionComplete) {
-                showComplete();
-            } else {
-                showRest(index, set, exercise, recoverySeconds, true, set >= exercise.sets);
-            }
-        });
+        Runnable next = () -> continueAfterCompletedSet(index, set, exercise, recoverySeconds);
+        if (CoachPreferences.usesCompletionDialogue(profile().dialogueMode)) {
+            speakCoach(completion, TextToSpeech.QUEUE_FLUSH, next);
+        } else {
+            next.run();
+        }
+    }
+
+    private void continueAfterCompletedSet(int index, int set, Coach.Exercise exercise, int recoverySeconds) {
+        boolean sessionComplete = set >= exercise.sets && index + 1 >= session.size();
+        if (sessionComplete) showComplete();
+        else showRest(index, set, exercise, recoverySeconds, true, set >= exercise.sets);
     }
 
     private void showRest(int index, int set, Coach.Exercise exercise, int secondsRemaining, boolean running, boolean betweenExercises) {
         stopSetClock();
         LinearLayout body = appPage("Workouts");
-        title(body, "REST CLOCK", betweenExercises ? "Exercise complete · recover" : "Set complete · recover", betweenExercises ? "Your next exercise begins after Coach " + ("Male".equals(AccountStore.get(this).trainer) ? "Leo" : "Mia") + " counts down from 5." : "Your next set begins after your coach counts down from 5.");
+        title(body, "REST CLOCK", betweenExercises ? "Exercise complete · recover" : "Set complete · recover", betweenExercises ? "Your next exercise begins after Coach " + coachName() + " gives your selected count-in." : "Your next set begins after your selected count-in.");
         LinearLayout timerCard = card();
         TextView timer = heading(format(secondsRemaining), 52, ink);
         timer.setGravity(Gravity.CENTER);
@@ -2422,20 +2684,52 @@ public final class MainActivity extends Activity {
     }
 
     private void say(String words) {
-        speakCoach(words, TextToSpeech.QUEUE_FLUSH, null);
+        if (CoachPreferences.FULL_DIALOGUE.equals(profile().dialogueMode)) speakCoach(words, TextToSpeech.QUEUE_FLUSH, null);
+    }
+
+    private void runWorkoutCountIn(String phrase, Runnable done) {
+        String mode = profile().dialogueMode;
+        if (CoachPreferences.usesVoice(mode)) {
+            speakCoach(phrase, TextToSpeech.QUEUE_FLUSH, done);
+            return;
+        }
+        stopSpeech();
+        final long generation = speechGeneration;
+        if (CoachPreferences.usesBeeps(mode)) {
+            if (toneGenerator == null) toneGenerator = new ToneGenerator(AudioManager.STREAM_MUSIC, 72);
+            int[] delays = {0, 700, 1400};
+            for (int delay : delays) workoutHandler.postDelayed(() -> {
+                if (generation == speechGeneration && toneGenerator != null) toneGenerator.startTone(ToneGenerator.TONE_DTMF_1, 180);
+            }, delay);
+            workoutHandler.postDelayed(() -> {
+                if (generation == speechGeneration && toneGenerator != null) toneGenerator.startTone(ToneGenerator.TONE_DTMF_9, 260);
+            }, 2100);
+            workoutHandler.postDelayed(() -> { if (generation == speechGeneration) done.run(); }, 2450);
+        } else {
+            workoutHandler.postDelayed(() -> { if (generation == speechGeneration) done.run(); }, 1400);
+        }
     }
 
     private void configureSpeechVoices() {
         if (voice == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) return;
         Set<Voice> installed = voice.getVoices();
         if (installed == null || installed.isEmpty()) return;
+        String activeCoach = AccountStore.exists(this) ? profile().coachName : CoachPreferences.defaultCoach(selectedTrainer);
+        CoachPreferences.CoachOption option = CoachPreferences.coach(activeCoach);
+        voice.setLanguage(option.locale);
+        ArrayList<Voice> regional = new ArrayList<>();
         ArrayList<Voice> english = new ArrayList<>();
         for (Voice candidate : installed) {
-            if (candidate.getLocale() != null && "en".equals(candidate.getLocale().getLanguage())) english.add(candidate);
+            if (candidate.getLocale() == null || !"en".equals(candidate.getLocale().getLanguage())) continue;
+            english.add(candidate);
+            if (option.locale.getCountry().equalsIgnoreCase(candidate.getLocale().getCountry())) regional.add(candidate);
         }
+        regional.sort(Comparator.comparing(Voice::getName));
         english.sort(Comparator.comparing(Voice::getName));
-        boolean maleTrainer = "Male".equals(selectedTrainer);
-        coachTtsVoice = findNamedVoice(english, maleTrainer ? "male" : "female");
+        boolean maleTrainer = "Male".equals(option.gender);
+        coachTtsVoice = findNamedVoice(regional, maleTrainer ? "male" : "female");
+        if (coachTtsVoice == null && !regional.isEmpty()) coachTtsVoice = regional.get(maleTrainer ? regional.size() - 1 : 0);
+        if (coachTtsVoice == null) coachTtsVoice = findNamedVoice(english, maleTrainer ? "male" : "female");
         if (coachTtsVoice == null && !english.isEmpty()) coachTtsVoice = english.get(maleTrainer ? english.size() - 1 : 0);
     }
 
@@ -2499,7 +2793,7 @@ public final class MainActivity extends Activity {
 
     private void showLibrary() {
         String trainer = AccountStore.get(this).trainer;
-        String trainerName = "Male".equals(trainer) ? "Leo" : "Mia";
+        String trainerName = coachName();
         LinearLayout body = appPage("Workouts");
         title(body, "EXERCISE LIBRARY", "Every move, filmed", "Open a movement for a smooth, looping Coach " + trainerName + " demonstration and a concise form cue.");
         for (String group : Coach.TARGETS) {
