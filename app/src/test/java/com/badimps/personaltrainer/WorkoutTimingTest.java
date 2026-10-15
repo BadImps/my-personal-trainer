@@ -7,25 +7,25 @@ import static org.junit.Assert.assertTrue;
 import java.util.Arrays;
 import org.junit.Test;
 
-/** Regression coverage for per-rep timing and adaptive recovery. */
+/** Regression coverage for per-set timing and adaptive recovery. */
 public final class WorkoutTimingTest {
-    @Test public void firstTwoRepsNeverAddRecovery() {
-        WorkoutTiming.RepTracker tracker = new WorkoutTiming.RepTracker(180);
-        tracker.startRep(0); tracker.completeRep(3_000);
-        tracker.startRep(3_000); WorkoutTiming.RepResult second = tracker.completeRep(6_200);
+    @Test public void firstTwoSetsNeverAddRecovery() {
+        WorkoutTiming.SetTracker tracker = new WorkoutTiming.SetTracker(180);
+        tracker.startSet(0); tracker.completeSet(30_000);
+        tracker.startSet(30_000); WorkoutTiming.SetResult second = tracker.completeSet(62_000);
         assertFalse(second.slowerThanRecentPace);
         assertEquals(180, second.recoverySeconds);
     }
 
-    @Test public void fasterThirdRepDoesNotAddRecovery() {
-        assertFalse(WorkoutTiming.isMeaningfullySlower(Arrays.asList(3_000L, 3_200L), 2_900L));
+    @Test public void fasterThirdSetDoesNotAddRecovery() {
+        assertFalse(WorkoutTiming.isMeaningfullySlower(Arrays.asList(30_000L, 32_000L), 29_000L));
     }
 
-    @Test public void meaningfullySlowerThirdRepAddsTenSeconds() {
-        WorkoutTiming.RepTracker tracker = new WorkoutTiming.RepTracker(180);
-        tracker.startRep(0); tracker.completeRep(3_000);
-        tracker.startRep(3_000); tracker.completeRep(6_000);
-        tracker.startRep(6_000); WorkoutTiming.RepResult third = tracker.completeRep(10_000);
+    @Test public void meaningfullySlowerThirdSetAddsTenSeconds() {
+        WorkoutTiming.SetTracker tracker = new WorkoutTiming.SetTracker(180);
+        tracker.startSet(0); tracker.completeSet(30_000);
+        tracker.startSet(30_000); tracker.completeSet(60_000);
+        tracker.startSet(60_000); WorkoutTiming.SetResult third = tracker.completeSet(100_000);
         assertTrue(third.slowerThanRecentPace);
         assertEquals(10, tracker.restBonusSeconds());
         assertEquals(190, third.recoverySeconds);
@@ -36,14 +36,14 @@ public final class WorkoutTimingTest {
     }
 
     @Test public void recoveryNeverExceedsFiveMinutes() {
-        WorkoutTiming.RepTracker tracker = new WorkoutTiming.RepTracker(295);
-        tracker.startRep(0); tracker.completeRep(1_000);
-        tracker.startRep(1_000); tracker.completeRep(2_000);
-        tracker.startRep(2_000); tracker.completeRep(4_000);
+        WorkoutTiming.SetTracker tracker = new WorkoutTiming.SetTracker(295);
+        tracker.startSet(0); tracker.completeSet(1_000);
+        tracker.startSet(1_000); tracker.completeSet(2_000);
+        tracker.startSet(2_000); tracker.completeSet(4_000);
         assertEquals(300, tracker.recoverySeconds());
     }
 
-    @Test public void repTimeUsesMinuteSecondAndTenthFormat() {
-        assertEquals("01:05.4", WorkoutTiming.formatRepMillis(65_499));
+    @Test public void setTimeUsesMinuteSecondAndTenthFormat() {
+        assertEquals("01:05.4", WorkoutTiming.formatElapsedMillis(65_499));
     }
 }

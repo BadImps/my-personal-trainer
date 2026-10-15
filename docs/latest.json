@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 19,
-  "versionName": "2.8",
-  "publishedAt": "2026-10-15T20:20:22Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v2.8/app-release.apk",
-  "sha256": "f31325885ec81c1e4e551f7cddd9a27701f11b3e5ec788988980c5e8d6b7b938",
-  "sizeBytes": 23355841,
-  "notes": "Adds Mia or Leo's spoken 5-to-1 workout opening, a live ascending timer for every rep, visible rep records, pace-aware 10-second recovery increases capped at five minutes, Coach completion callouts, Olivia's between-exercise handoff, and a spoken 10-to-1 restart count-in."
+  "versionCode": 20,
+  "versionName": "2.9",
+  "publishedAt": "2026-10-15T21:15:42Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v2.9/app-release.apk",
+  "sha256": "2ac8cb306c0826c1caccacd71446318802ab168f92f779a384668770a4bc0a02",
+  "sizeBytes": 23356317,
+  "notes": "Corrects guided tracking to time complete sets instead of individual reps, records every completed set time, adds set-completion recovery coaching, uses distinct spoken 5-to-1 prompts for a next set versus a new exercise, and shows live in-app OTA download progress."
 }

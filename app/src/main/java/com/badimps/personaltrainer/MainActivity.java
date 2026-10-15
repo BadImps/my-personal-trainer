@@ -24,6 +24,7 @@ import android.widget.FrameLayout;
 import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.ProgressBar;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.ScrollView;
@@ -87,13 +88,12 @@ public final class MainActivity extends Activity {
     private final Map<String, Runnable> speechDoneCallbacks = new HashMap<>();
     private boolean ttsReady;
     private Voice coachTtsVoice;
-    private Voice oliviaTtsVoice;
     private long speechSequence;
     private long speechGeneration;
-    private Runnable repClockUpdate;
-    private WorkoutTiming.RepTracker repTracker;
+    private Runnable setClockUpdate;
+    private WorkoutTiming.SetTracker setTracker;
     private int timingExerciseIndex = -1;
-    private final List<String> repHistory = new ArrayList<>();
+    private final List<String> setHistory = new ArrayList<>();
     private int openingPhraseIndex;
     private int completionPhraseIndex;
 
@@ -128,7 +128,7 @@ public final class MainActivity extends Activity {
 
     @Override protected void onDestroy() {
         if (restTimer != null) restTimer.cancel();
-        stopRepClock();
+        stopSetClock();
         workoutHandler.removeCallbacksAndMessages(null);
         speechDoneCallbacks.clear();
         if (voice != null) voice.shutdown();
@@ -2146,21 +2146,31 @@ public final class MainActivity extends Activity {
             return;
         }
         if (restTimer != null) restTimer.cancel();
-        stopRepClock();
+        stopSetClock();
         stopSpeech();
         timingExerciseIndex = -1;
-        repTracker = null;
-        repHistory.clear();
-        String[] openings = {
+        setTracker = null;
+        setHistory.clear();
+        showSetCountIn(0, 1, true);
+    }
+
+    private void showSetCountIn(int index, int set, boolean newExercise) {
+        if (index >= session.size()) {
+            showComplete();
+            return;
+        }
+        String[] setOpenings = {
                 "Okay, let's begin in 5, 4, 3, 2, 1.",
                 "Let's start in 5, 4, 3, 2, 1.",
                 "Let's go in 5, 4, 3, 2, 1.",
                 "Let's get ready in 5, 4, 3, 2, 1."
         };
-        String phrase = openings[openingPhraseIndex++ % openings.length];
+        String phrase = newExercise
+                ? "Let's start our new exercise in 5, 4, 3, 2, 1."
+                : setOpenings[openingPhraseIndex++ % setOpenings.length];
         String trainerName = "Male".equals(AccountStore.get(this).trainer) ? "Leo" : "Mia";
         LinearLayout body = appPage("Workouts");
-        title(body, "GET READY", "Coach " + trainerName + " is starting your session", "Your first rep timer begins only after the spoken count-in is complete.");
+        title(body, newExercise ? "NEW EXERCISE" : "NEXT SET", "Coach " + trainerName + " is counting you in", "Your set timer begins only after the spoken 5-to-1 count-in is complete.");
         LinearLayout countCard = card();
         TextView count = heading("5  ·  4  ·  3  ·  2  ·  1", 34, ink);
         count.setGravity(Gravity.CENTER);
@@ -2171,10 +2181,10 @@ public final class MainActivity extends Activity {
         body.addView(countCard);
         gap(body, 12);
         LinearLayout note = card();
-        note.addView(heading("Rep-by-rep timing", 17, ink));
-        note.addView(text("Tap Rep completed after every rep. Your recent pace is saved for this exercise and recovery adapts only when a meaningful slowdown is detected.", 14, muted));
+        note.addView(heading(newExercise ? session.get(index).name : "Set " + set + " of " + session.get(index).sets, 17, ink));
+        note.addView(text("Complete the whole set, then tap Set completed. The app records one time for the full set.", 14, muted));
         body.addView(note);
-        speakCoach(phrase, TextToSpeech.QUEUE_FLUSH, () -> showActive(0, 1));
+        speakCoach(phrase, TextToSpeech.QUEUE_FLUSH, () -> showActive(index, set));
     }
 
     private void showActive(int index, int set) {
@@ -2183,12 +2193,12 @@ public final class MainActivity extends Activity {
             return;
         }
         if (restTimer != null) restTimer.cancel();
-        stopRepClock();
+        stopSetClock();
         Coach.Exercise exercise = session.get(index);
-        if (timingExerciseIndex != index || repTracker == null) {
+        if (timingExerciseIndex != index || setTracker == null) {
             timingExerciseIndex = index;
-            repTracker = new WorkoutTiming.RepTracker(exercise.restSeconds);
-            repHistory.clear();
+            setTracker = new WorkoutTiming.SetTracker(exercise.restSeconds);
+            setHistory.clear();
         }
         LinearLayout body = appPage("Workouts");
         title(body, "GUIDED WORKOUT", exercise.target, "Exercise " + (index + 1) + " of " + session.size() + "  •  Set " + set + " of " + exercise.sets);
@@ -2199,7 +2209,7 @@ public final class MainActivity extends Activity {
         body.addView(demoCard);
         gap(body, 14);
         body.addView(heading(exercise.name, 25, Color.WHITE));
-        body.addView(text(exercise.sets + " sets × " + exercise.reps + " reps", 17, mint));
+        body.addView(text("Set " + set + " of " + exercise.sets + "  •  Work with controlled form", 17, mint));
         gap(body, 10);
 
         LinearLayout cue = card();
@@ -2209,18 +2219,18 @@ public final class MainActivity extends Activity {
         gap(body, 12);
 
         LinearLayout timing = card();
-        TextView timerLabel = heading("CURRENT REP", 11, muted);
+        TextView timerLabel = heading("CURRENT SET TIME", 11, muted);
         timerLabel.setLetterSpacing(.07f);
         timing.addView(timerLabel);
-        TextView repClock = heading("00:00.0", 44, ink);
-        repClock.setGravity(Gravity.CENTER);
-        repClock.setContentDescription("Current rep elapsed time zero seconds");
-        timing.addView(repClock, new LinearLayout.LayoutParams(-1, dp(70)));
-        TextView paceStatus = text("Timing rep 1. Tap completed as soon as the rep ends.", 14, muted);
+        TextView setClock = heading("00:00.0", 44, ink);
+        setClock.setGravity(Gravity.CENTER);
+        setClock.setContentDescription("Current set elapsed time zero seconds");
+        timing.addView(setClock, new LinearLayout.LayoutParams(-1, dp(70)));
+        TextView paceStatus = text("Timing set " + set + ". Tap completed when the whole set is finished.", 14, muted);
         paceStatus.setGravity(Gravity.CENTER);
         timing.addView(paceStatus);
         gap(timing, 8);
-        TextView history = text(repHistoryText(), 13, muted);
+        TextView history = text(setHistoryText(), 13, muted);
         history.setGravity(Gravity.CENTER);
         timing.addView(history);
         body.addView(timing);
@@ -2229,52 +2239,37 @@ public final class MainActivity extends Activity {
         LinearLayout counters = new LinearLayout(this);
         counters.setOrientation(LinearLayout.HORIZONTAL);
         addCounterValue(counters, "SET", set + " / " + exercise.sets);
-        TextView recoveryValue = addCounterValue(counters, "RECOVERY", format(repTracker.recoverySeconds()));
-        TextView repValue = addCounterValue(counters, "REP", "1 / " + exercise.reps);
+        TextView recoveryValue = addCounterValue(counters, "RECOVERY", format(setTracker.recoverySeconds()));
         body.addView(counters);
         gap(body, 14);
-        final int[] repInSet = {1};
-        final long[] repStartedAt = {SystemClock.elapsedRealtime()};
-        repTracker.startRep(repStartedAt[0]);
-        startRepClock(repClock, repStartedAt[0]);
-        Button done = primary("Rep 1 completed");
-        done.setContentDescription("Mark rep 1 completed and record its time");
+        final long setStartedAt = SystemClock.elapsedRealtime();
+        setTracker.startSet(setStartedAt);
+        startSetClock(setClock, setStartedAt);
+        Button done = primary("Set " + set + " completed");
+        done.setContentDescription("Mark set " + set + " completed and record its total time");
         done.setOnClickListener(view -> {
             done.setEnabled(false);
-            stopRepClock();
-            WorkoutTiming.RepResult result = repTracker.completeRep(SystemClock.elapsedRealtime());
-            repHistory.add("Set " + set + " · Rep " + repInSet[0] + "   " + WorkoutTiming.formatRepMillis(result.durationMillis));
-            history.setText(repHistoryText());
+            stopSetClock();
+            WorkoutTiming.SetResult result = setTracker.completeSet(SystemClock.elapsedRealtime());
+            setHistory.add("Set " + set + "   " + WorkoutTiming.formatElapsedMillis(result.durationMillis));
+            history.setText(setHistoryText());
             recoveryValue.setText(format(result.recoverySeconds));
             if (result.slowerThanRecentPace) {
-                paceStatus.setText("Pace slowed meaningfully · recovery increased by 10 seconds.");
+                paceStatus.setText("This set took longer · recovery increased by 10 seconds.");
                 recoveryValue.setTextColor(coral);
             } else {
-                paceStatus.setText("Rep " + repInSet[0] + " recorded at " + WorkoutTiming.formatRepMillis(result.durationMillis) + ".");
+                paceStatus.setText("Set " + set + " recorded at " + WorkoutTiming.formatElapsedMillis(result.durationMillis) + ".");
             }
-            if (repInSet[0] < exercise.reps) {
-                repInSet[0]++;
-                repValue.setText(repInSet[0] + " / " + exercise.reps);
-                repClock.setText("00:00.0");
-                done.setText("Rep " + repInSet[0] + " completed");
-                done.setContentDescription("Mark rep " + repInSet[0] + " completed and record its time");
-                repStartedAt[0] = SystemClock.elapsedRealtime();
-                repTracker.startRep(repStartedAt[0]);
-                startRepClock(repClock, repStartedAt[0]);
-                done.setEnabled(true);
-            } else {
-                paceStatus.setText("Set " + set + " complete · " + repHistory.size() + " rep times recorded for this exercise.");
-                finishSet(index, set, exercise, result.recoverySeconds);
-            }
+            finishSet(index, set, exercise, result.recoverySeconds);
         });
         addButton(body, done);
         gap(body, 10);
-        Button callout = secondary("Hear rep guidance");
-        callout.setOnClickListener(view -> say("Set " + set + ". Complete " + exercise.reps + " controlled reps. " + exercise.cue));
+        Button callout = secondary("Hear set guidance");
+        callout.setOnClickListener(view -> say("Set " + set + ". Work with controlled form. " + exercise.cue));
         addButton(body, callout);
         gap(body, 10);
         Button emergency = emergencyStopButton();
-        emergency.setOnClickListener(view -> showEmergencyStopConfirmation(index, set));
+        emergency.setOnClickListener(view -> showEmergencyStopConfirmation(index, set, () -> showActive(index, set)));
         addButton(body, emergency);
     }
 
@@ -2292,64 +2287,57 @@ public final class MainActivity extends Activity {
         return valueView;
     }
 
-    private void startRepClock(TextView clock, long startedAt) {
-        stopRepClock();
-        repClockUpdate = new Runnable() {
+    private void startSetClock(TextView clock, long startedAt) {
+        stopSetClock();
+        setClockUpdate = new Runnable() {
             @Override public void run() {
                 long elapsed = SystemClock.elapsedRealtime() - startedAt;
-                clock.setText(WorkoutTiming.formatRepMillis(elapsed));
-                clock.setContentDescription("Current rep elapsed time " + WorkoutTiming.formatRepMillis(elapsed));
+                clock.setText(WorkoutTiming.formatElapsedMillis(elapsed));
+                clock.setContentDescription("Current set elapsed time " + WorkoutTiming.formatElapsedMillis(elapsed));
                 workoutHandler.postDelayed(this, 100L);
             }
         };
-        workoutHandler.post(repClockUpdate);
+        workoutHandler.post(setClockUpdate);
     }
 
-    private void stopRepClock() {
-        if (repClockUpdate != null) workoutHandler.removeCallbacks(repClockUpdate);
-        repClockUpdate = null;
+    private void stopSetClock() {
+        if (setClockUpdate != null) workoutHandler.removeCallbacks(setClockUpdate);
+        setClockUpdate = null;
     }
 
-    private String repHistoryText() {
-        if (repHistory.isEmpty()) return "Previous rep times will appear here.";
-        int start = Math.max(0, repHistory.size() - 5);
-        return "RECENT REP RECORDS\n" + String.join("   •   ", repHistory.subList(start, repHistory.size()));
+    private String setHistoryText() {
+        if (setHistory.isEmpty()) return "Completed set times will appear here.";
+        return "SET TIME RECORDS\n" + String.join("   •   ", setHistory);
     }
 
     private void finishSet(int index, int set, Coach.Exercise exercise, int recoverySeconds) {
-        stopRepClock();
-        boolean exerciseComplete = set >= exercise.sets;
-        if (!exerciseComplete) {
-            speakCoach("Set complete. Take a break.", TextToSpeech.QUEUE_FLUSH,
-                    () -> showRest(index, set, exercise, recoverySeconds, true, false));
-            return;
-        }
+        stopSetClock();
         String[] completions = {
-                "Congrats, you have completed this exercise.",
-                "Good work, you have completed this exercise.",
-                "This exercise is complete. Well done."
+                "Congrats, you have completed this set. Time to take a rest.",
+                "Good work, you have completed this set. Time to take a rest.",
+                "This set is complete. Well done. Time to take a rest."
         };
         String completion = completions[completionPhraseIndex++ % completions.length];
         speakCoach(completion, TextToSpeech.QUEUE_FLUSH, () -> {
-            if (index + 1 >= session.size()) {
+            boolean sessionComplete = set >= exercise.sets && index + 1 >= session.size();
+            if (sessionComplete) {
                 showComplete();
             } else {
-                speakOlivia("Okay, let's take a break.", TextToSpeech.QUEUE_ADD,
-                        () -> showRest(index, set, exercise, recoverySeconds, true, true));
+                showRest(index, set, exercise, recoverySeconds, true, set >= exercise.sets);
             }
         });
     }
 
     private void showRest(int index, int set, Coach.Exercise exercise, int secondsRemaining, boolean running, boolean betweenExercises) {
-        stopRepClock();
+        stopSetClock();
         LinearLayout body = appPage("Workouts");
-        title(body, "REST CLOCK", betweenExercises ? "Exercise complete · recover" : "Set complete · recover", betweenExercises ? "Olivia is guiding this break. Your next exercise begins after the count-in." : "Your next set begins after the count-in.");
+        title(body, "REST CLOCK", betweenExercises ? "Exercise complete · recover" : "Set complete · recover", betweenExercises ? "Your next exercise begins after Coach " + ("Male".equals(AccountStore.get(this).trainer) ? "Leo" : "Mia") + " counts down from 5." : "Your next set begins after your coach counts down from 5.");
         LinearLayout timerCard = card();
         TextView timer = heading(format(secondsRemaining), 52, ink);
         timer.setGravity(Gravity.CENTER);
         timer.setContentDescription("Rest time remaining " + secondsRemaining + " seconds");
         timerCard.addView(timer, new LinearLayout.LayoutParams(-1, dp(98)));
-        TextView reminder = text(running ? "Breathe slowly. At 10 seconds, your coach will count you in." : "Countdown paused. Resume when you are ready.", 15, muted);
+        TextView reminder = text(running ? "Breathe slowly. Your 5-to-1 count-in begins when recovery is complete." : "Countdown paused. Resume when you are ready.", 15, muted);
         reminder.setGravity(Gravity.CENTER);
         timerCard.addView(reminder);
         body.addView(timerCard);
@@ -2377,36 +2365,21 @@ public final class MainActivity extends Activity {
         body.addView(controls);
         gap(body, 12);
         Button emergency = emergencyStopButton();
-        emergency.setOnClickListener(view -> showEmergencyStopConfirmation(index, set));
+        emergency.setOnClickListener(view -> showEmergencyStopConfirmation(index, set,
+                () -> showRest(index, set, exercise, remaining[0], true, betweenExercises)));
         addButton(body, emergency);
         if (!running) return;
-        final boolean[] countInIntroQueued = {false};
-        final boolean[] advanceQueued = {false};
-        if (secondsRemaining <= 11) {
-            countInIntroQueued[0] = true;
-            speakCoach("Okay, get ready to start the exercise in...", TextToSpeech.QUEUE_FLUSH, null);
-        }
         restTimer = new CountDownTimer(secondsRemaining * 1000L, 1000) {
             @Override public void onTick(long left) {
                 int seconds = (int) Math.ceil(left / 1000d);
                 remaining[0] = seconds;
                 timer.setText(format(seconds));
                 timer.setContentDescription("Rest time remaining " + seconds + " seconds");
-                if (seconds <= 12 && !countInIntroQueued[0]) {
-                    countInIntroQueued[0] = true;
-                    speakCoach("Okay, get ready to start the exercise in...", TextToSpeech.QUEUE_FLUSH, null);
-                }
-                if (seconds <= 10 && seconds >= 2) {
-                    speakCoach(String.valueOf(seconds), TextToSpeech.QUEUE_ADD, null);
-                } else if (seconds == 1 && !advanceQueued[0]) {
-                    advanceQueued[0] = true;
-                    speakCoach("1. Let's go.", TextToSpeech.QUEUE_ADD, () -> advance(index, set, exercise));
-                }
             }
 
             @Override public void onFinish() {
                 timer.setText("00:00");
-                if (!advanceQueued[0]) advance(index, set, exercise);
+                advance(index, set, exercise);
             }
         }.start();
     }
@@ -2419,9 +2392,9 @@ public final class MainActivity extends Activity {
         return button;
     }
 
-    private void showEmergencyStopConfirmation(int index, int set) {
+    private void showEmergencyStopConfirmation(int index, int set, Runnable continueAction) {
         if (restTimer != null) restTimer.cancel();
-        stopRepClock();
+        stopSetClock();
         stopSpeech();
         LinearLayout body = appPage("Workouts");
         title(body, "EMERGENCY STOP", "End this guided\nworkout?", "This stops the current session. Your saved Daily or Weekly plan will remain available to restart later.");
@@ -2435,13 +2408,13 @@ public final class MainActivity extends Activity {
         addButton(body, end);
         gap(body, 10);
         Button continueWorkout = secondary("Keep working out");
-        continueWorkout.setOnClickListener(view -> showActive(index, set));
+        continueWorkout.setOnClickListener(view -> continueAction.run());
         addButton(body, continueWorkout);
     }
 
     private void advance(int index, int set, Coach.Exercise exercise) {
-        if (set < exercise.sets) showActive(index, set + 1);
-        else showActive(index + 1, 1);
+        if (set < exercise.sets) showSetCountIn(index, set + 1, false);
+        else showSetCountIn(index + 1, 1, true);
     }
 
     private String format(int seconds) {
@@ -2464,10 +2437,6 @@ public final class MainActivity extends Activity {
         boolean maleTrainer = "Male".equals(selectedTrainer);
         coachTtsVoice = findNamedVoice(english, maleTrainer ? "male" : "female");
         if (coachTtsVoice == null && !english.isEmpty()) coachTtsVoice = english.get(maleTrainer ? english.size() - 1 : 0);
-        oliviaTtsVoice = findNamedVoice(english, "olivia");
-        if (oliviaTtsVoice == null) oliviaTtsVoice = findDifferentVoice(english, coachTtsVoice, "female");
-        if (oliviaTtsVoice == null) oliviaTtsVoice = findDifferentVoice(english, coachTtsVoice, null);
-        if (oliviaTtsVoice == null) oliviaTtsVoice = coachTtsVoice;
     }
 
     private Voice findNamedVoice(List<Voice> voices, String token) {
@@ -2478,20 +2447,8 @@ public final class MainActivity extends Activity {
         return null;
     }
 
-    private Voice findDifferentVoice(List<Voice> voices, Voice excluded, String preferredToken) {
-        for (Voice candidate : voices) {
-            if (candidate.equals(excluded)) continue;
-            if (preferredToken == null || candidate.getName().toLowerCase(Locale.ROOT).contains(preferredToken)) return candidate;
-        }
-        return null;
-    }
-
     private void speakCoach(String words, int queueMode, Runnable done) {
         speakWithVoice(words, queueMode, coachTtsVoice, done);
-    }
-
-    private void speakOlivia(String words, int queueMode, Runnable done) {
-        speakWithVoice(words, queueMode, oliviaTtsVoice, done);
     }
 
     private void speakWithVoice(String words, int queueMode, Voice selectedVoice, Runnable done) {
@@ -2534,7 +2491,7 @@ public final class MainActivity extends Activity {
     private void stopGuidedRuntime() {
         if (restTimer != null) restTimer.cancel();
         restTimer = null;
-        stopRepClock();
+        stopSetClock();
         stopSpeech();
     }
 
@@ -2696,6 +2653,17 @@ public final class MainActivity extends Activity {
         LinearLayout statusCard = card();
         TextView status = heading("Checking the update channel…", 18, ink);
         statusCard.addView(status);
+        ProgressBar downloadProgress = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+        downloadProgress.setMax(100);
+        downloadProgress.setProgressTintList(ColorStateList.valueOf(mint));
+        downloadProgress.setProgressBackgroundTintList(ColorStateList.valueOf(cardLine));
+        downloadProgress.setVisibility(View.GONE);
+        LinearLayout.LayoutParams progressParams = new LinearLayout.LayoutParams(-1, dp(10));
+        progressParams.topMargin = dp(16);
+        statusCard.addView(downloadProgress, progressParams);
+        TextView progressLabel = text("", 13, muted);
+        progressLabel.setVisibility(View.GONE);
+        statusCard.addView(progressLabel);
         body.addView(statusCard);
         gap(body, 18);
         Button back = secondary("Back to account");
@@ -2711,7 +2679,7 @@ public final class MainActivity extends Activity {
                     }
                     status.setText("Version " + info.name + " is ready to download.");
                     Button install = primary("Download and install " + info.name);
-                    install.setOnClickListener(view -> downloadUpdate(info, status));
+                    install.setOnClickListener(view -> downloadUpdate(info, status, downloadProgress, progressLabel, install));
                     LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(54));
                     params.bottomMargin = dp(10);
                     body.addView(install, 1, params);
@@ -2722,21 +2690,52 @@ public final class MainActivity extends Activity {
         }).start();
     }
 
-    private void downloadUpdate(UpdateManager.Info info, TextView status) {
-        status.setText("Downloading and verifying update…");
+    private void downloadUpdate(UpdateManager.Info info, TextView status, ProgressBar progress, TextView progressLabel, Button install) {
+        status.setText("Downloading version " + info.name + "…");
+        install.setEnabled(false);
+        progress.setVisibility(View.VISIBLE);
+        progress.setIndeterminate(true);
+        progressLabel.setVisibility(View.VISIBLE);
+        progressLabel.setText("Connecting securely…");
         new Thread(() -> {
             try {
-                UpdateManager.downloadAndInstall(this, info);
-                runOnUiThread(() -> status.setText("Verified. Android will now ask you to confirm the install."));
+                UpdateManager.downloadAndInstall(this, info, (downloaded, total) -> runOnUiThread(() -> {
+                    if (total > 0) {
+                        int percent = UpdateManager.progressPercent(downloaded, total);
+                        progress.setIndeterminate(false);
+                        progress.setProgress(percent, true);
+                        progressLabel.setText(percent + "%  •  " + formatDownloadSize(downloaded) + " of " + formatDownloadSize(total));
+                    } else {
+                        progress.setIndeterminate(true);
+                        progressLabel.setText(formatDownloadSize(downloaded) + " downloaded");
+                    }
+                }));
+                runOnUiThread(() -> {
+                    progress.setIndeterminate(false);
+                    progress.setProgress(100, true);
+                    status.setText("Download verified. Android will now ask you to confirm the install.");
+                    progressLabel.setText("100%  •  SHA-256 verified");
+                });
             } catch (Exception error) {
-                runOnUiThread(() -> status.setText("Update could not be verified: " + error.getMessage()));
+                runOnUiThread(() -> {
+                    status.setText("Update could not be verified: " + error.getMessage());
+                    progress.setIndeterminate(false);
+                    progress.setProgress(0);
+                    progressLabel.setText("Download stopped");
+                    install.setEnabled(true);
+                });
             }
         }).start();
     }
 
+    private String formatDownloadSize(long bytes) {
+        if (bytes < 1_048_576L) return String.format(Locale.US, "%.1f KB", bytes / 1024d);
+        return String.format(Locale.US, "%.1f MB", bytes / 1_048_576d);
+    }
+
     private void showComplete() {
         if (restTimer != null) restTimer.cancel();
-        stopRepClock();
+        stopSetClock();
         LinearLayout body = appPage("Workouts");
         title(body, "SESSION COMPLETE", "Strong work", "You completed your " + target + " plan. Hydrate, recover, and let your next session start with a fresh choice.");
         Button home = primary("Return home");

@@ -5,50 +5,50 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 
-/** Pure workout timing rules, kept independent from Android UI and text-to-speech. */
+/** Pure set-timing rules, kept independent from Android UI and text-to-speech. */
 public final class WorkoutTiming {
     public static final int REST_BONUS_SECONDS = 10;
     public static final int MAX_REST_SECONDS = 300;
     private static final long MINIMUM_SLOWER_MARGIN_MS = 250L;
     private static final double SLOWER_MARGIN_RATIO = 0.05d;
 
-    public static final class RepResult {
-        public final int repNumber;
+    public static final class SetResult {
+        public final int setNumber;
         public final long durationMillis;
         public final boolean slowerThanRecentPace;
         public final int recoverySeconds;
 
-        private RepResult(int repNumber, long durationMillis, boolean slowerThanRecentPace, int recoverySeconds) {
-            this.repNumber = repNumber;
+        private SetResult(int setNumber, long durationMillis, boolean slowerThanRecentPace, int recoverySeconds) {
+            this.setNumber = setNumber;
             this.durationMillis = durationMillis;
             this.slowerThanRecentPace = slowerThanRecentPace;
             this.recoverySeconds = recoverySeconds;
         }
     }
 
-    /** Tracks one exercise so pace comparisons remain available across all of its sets. */
-    public static final class RepTracker {
+    /** Tracks one exercise so completed-set times remain available until the next exercise. */
+    public static final class SetTracker {
         private final int baseRestSeconds;
         private final List<Long> durations = new ArrayList<>();
-        private long repStartedAtMillis = -1L;
+        private long setStartedAtMillis = -1L;
         private int restBonusSeconds;
 
-        public RepTracker(int baseRestSeconds) {
+        public SetTracker(int baseRestSeconds) {
             this.baseRestSeconds = Math.max(0, baseRestSeconds);
         }
 
-        public void startRep(long nowMillis) {
-            repStartedAtMillis = nowMillis;
+        public void startSet(long nowMillis) {
+            setStartedAtMillis = nowMillis;
         }
 
-        public RepResult completeRep(long nowMillis) {
-            if (repStartedAtMillis < 0L) throw new IllegalStateException("Start the rep before completing it.");
-            long duration = Math.max(100L, nowMillis - repStartedAtMillis);
+        public SetResult completeSet(long nowMillis) {
+            if (setStartedAtMillis < 0L) throw new IllegalStateException("Start the set before completing it.");
+            long duration = Math.max(100L, nowMillis - setStartedAtMillis);
             boolean slower = isMeaningfullySlower(durations, duration);
             if (slower) restBonusSeconds = Math.min(MAX_REST_SECONDS - Math.min(baseRestSeconds, MAX_REST_SECONDS), restBonusSeconds + REST_BONUS_SECONDS);
             durations.add(duration);
-            repStartedAtMillis = -1L;
-            return new RepResult(durations.size(), duration, slower, recoverySeconds());
+            setStartedAtMillis = -1L;
+            return new SetResult(durations.size(), duration, slower, recoverySeconds());
         }
 
         public int recoverySeconds() {
@@ -65,7 +65,7 @@ public final class WorkoutTiming {
     }
 
     /**
-     * A rep is slower only after two recorded reps and only when it exceeds the average of the
+     * A set is slower only after two recorded sets and only when it exceeds the average of the
      * previous two by both a useful percentage and a small anti-jitter floor.
      */
     public static boolean isMeaningfullySlower(List<Long> priorDurations, long currentDurationMillis) {
@@ -76,7 +76,7 @@ public final class WorkoutTiming {
         return currentDurationMillis > average + margin;
     }
 
-    public static String formatRepMillis(long millis) {
+    public static String formatElapsedMillis(long millis) {
         long safe = Math.max(0L, millis);
         long minutes = safe / 60_000L;
         long seconds = (safe / 1_000L) % 60L;
