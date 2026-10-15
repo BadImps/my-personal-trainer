@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 14,
-  "versionName": "2.3",
-  "publishedAt": "2026-10-15T09:11:18Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v2.3/app-release.apk",
-  "sha256": "6547df92c63b46820e336207c6cf017b6741e19227c5b5df918d4ab474bee781",
-  "sizeBytes": 25203163,
-  "notes": "Adds a Reps completed action that starts the rest timer. Coach Mia then counts down every second from 10 to 1 and says Let's go when rest finishes."
+  "versionCode": 15,
+  "versionName": "2.4",
+  "publishedAt": "2026-10-15T09:25:59Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v2.4/app-release.apk",
+  "sha256": "6ff05505484b941eca585639b34e1a518578a73c68693ac5a6dc2f8b2aceb997",
+  "sizeBytes": 25212051,
+  "notes": "Implements the Plan your workout flow with Custom, Daily, and Weekly modes; body-area and equipment choices; selectable exercises; adjustable weight, sets, reps, and rest; and locally saved plans."
 }
