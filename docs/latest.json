@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 13,
-  "versionName": "2.2",
-  "publishedAt": "2026-10-15T08:44:35Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v2.2/app-release.apk",
-  "sha256": "0843924b1cc34a86df952edbd31ff8b6c82bf9b0696244ea5e3cd1512a9ff103",
-  "sizeBytes": 25203075,
-  "notes": "Refines the preview-matched coach rail with labeled Home, Workouts, Progress, Nutrition, and Settings controls; each destination now has a specific icon and selected state."
+  "versionCode": 14,
+  "versionName": "2.3",
+  "publishedAt": "2026-10-15T09:11:18Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v2.3/app-release.apk",
+  "sha256": "6547df92c63b46820e336207c6cf017b6741e19227c5b5df918d4ab474bee781",
+  "sizeBytes": 25203163,
+  "notes": "Adds a Reps completed action that starts the rest timer. Coach Mia then counts down every second from 10 to 1 and says Let's go when rest finishes."
 }
