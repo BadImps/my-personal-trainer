@@ -14,6 +14,7 @@ import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -62,12 +63,17 @@ public final class MainActivity extends Activity {
         voice = new TextToSpeech(this, result -> {
             if (result == TextToSpeech.SUCCESS) voice.setLanguage(Locale.getDefault());
         });
-        if (AccountStore.exists(this)) {
+        boolean hasLocalAccount = AccountStore.exists(this);
+        if (hasLocalAccount) {
             selectedTrainer = AccountStore.get(this).trainer;
             LauncherIconManager.apply(this, selectedTrainer);
         }
         restoreSavedPlan();
-        showWelcome();
+        if (hasLocalAccount) {
+            showHome();
+        } else {
+            showWelcome();
+        }
     }
 
     @Override protected void onDestroy() {
@@ -161,7 +167,7 @@ public final class MainActivity extends Activity {
         LinearLayout rail = new LinearLayout(this);
         rail.setOrientation(LinearLayout.VERTICAL);
         rail.setGravity(Gravity.CENTER_HORIZONTAL);
-        rail.setPadding(dp(8), dp(18), dp(8), dp(10));
+        rail.setPadding(dp(8), dp(24), dp(8), dp(10));
         rail.setBackgroundColor(navy);
 
         ImageView portrait = new ImageView(this);
@@ -279,6 +285,37 @@ public final class MainActivity extends Activity {
     private Button primary(String label) { return action(label, coral, navy); }
     private Button secondary(String label) { return action(label, navyPanel, mint); }
     private Button lightAction(String label) { return action(label, paper, navy); }
+
+    /** One stable video component for every in-app exercise demonstration. */
+    private View exerciseMedia(String trainer, Coach.Exercise exercise, int height) {
+        int video = ExerciseVideos.forExercise(this, trainer, exercise.name);
+        if (video != 0) {
+            FrameLayout mediaCard = new FrameLayout(this);
+            mediaCard.setBackground(surface(navyPanel, 18, 1, mint));
+            mediaCard.setClipToOutline(true);
+            mediaCard.setClipChildren(true);
+            mediaCard.setContentDescription("Coach " + ("Male".equals(trainer) ? "Leo" : "Mia") + " demonstrating " + exercise.name);
+            LoopingExerciseVideoView demonstration = new LoopingExerciseVideoView(this, video);
+            mediaCard.addView(demonstration, new FrameLayout.LayoutParams(-1, -1));
+            return mediaCard;
+        }
+        ExerciseAnimationView fallback = new ExerciseAnimationView(this);
+        fallback.setContentDescription("Exercise illustration for " + exercise.name);
+        fallback.setBackground(surface(navyPanel, 18, 1, mint));
+        return fallback;
+    }
+
+    /** Posters make dense selection screens fast; playback is reserved for the focused exercise. */
+    private ImageView exercisePoster(String trainer, Coach.Exercise exercise) {
+        ImageView poster = new ImageView(this);
+        int visual = ExerciseVisuals.forExercise(this, trainer, exercise.name);
+        if (visual != 0) poster.setImageResource(visual);
+        poster.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        poster.setBackground(surface(navyPanel, 14, 0, Color.TRANSPARENT));
+        poster.setClipToOutline(true);
+        poster.setContentDescription(null);
+        return poster;
+    }
 
     private void addButton(LinearLayout body, Button button) {
         body.addView(button, new LinearLayout.LayoutParams(-1, dp(54)));
@@ -472,17 +509,15 @@ public final class MainActivity extends Activity {
         LinearLayout body = appPage("Home");
         title(body, "TODAY", "Train with purpose", "Showing up today builds a stronger tomorrow.");
 
-        List<Coach.Exercise> recommendation = Coach.recommendation(target, goal, environment);
+        // Surface the exact saved plan when one exists; a generic recommendation must not
+        // silently replace the movements the user chose in the builder.
+        List<Coach.Exercise> recommendation = session.isEmpty()
+                ? Coach.recommendation(target, goal, environment)
+                : session;
         Coach.Exercise first = recommendation.get(0);
         LinearLayout next = card();
-        int visual = ExerciseVisuals.forExercise(this, profile.trainer, first.name);
-        if (visual != 0) {
-            AnimatedGifView demonstration = new AnimatedGifView(this, visual);
-            demonstration.setContentDescription("Coach " + ("Male".equals(profile.trainer) ? "Leo" : "Mia") + " demonstrating " + first.name);
-            demonstration.setBackgroundColor(Color.WHITE);
-            next.addView(demonstration, new LinearLayout.LayoutParams(-1, dp(170)));
-            gap(next, 12);
-        }
+        next.addView(exerciseMedia(profile.trainer, first, 170), new LinearLayout.LayoutParams(-1, dp(170)));
+        gap(next, 12);
         TextView nextLabel = heading("NEXT WORKOUT", 12, Color.rgb(67, 98, 139));
         nextLabel.setLetterSpacing(.06f);
         next.addView(nextLabel);
@@ -594,14 +629,14 @@ public final class MainActivity extends Activity {
             row.setOrientation(LinearLayout.HORIZONTAL);
             for (int offset = 0; offset < 2; offset++) {
                 String equipment = Coach.EQUIPMENT_TYPES[index + offset];
-                Button option = equipmentTile(equipment, equipment.equals(equipmentType));
+                LinearLayout option = equipmentTile(equipment, equipment.equals(equipmentType));
                 option.setOnClickListener(view -> {
                     equipmentType = equipment;
                     session.clear();
                     resetExerciseSelection();
                     showExerciseSelection();
                 });
-                LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(84), 1);
+                LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(142), 1);
                 params.rightMargin = offset == 0 ? dp(7) : 0;
                 row.addView(option, params);
             }
@@ -633,17 +668,31 @@ public final class MainActivity extends Activity {
         return button;
     }
 
-    private Button equipmentTile(String label, boolean selected) {
+    private LinearLayout equipmentTile(String label, boolean selected) {
         String copy;
         if ("Dumbbells".equals(label)) copy = "Free weights";
         else if ("Home & household".equals(label)) copy = "Simple home items";
         else if ("Machine assisted".equals(label)) copy = "Guided gym equipment";
         else copy = "No equipment";
-        Button button = action((selected ? "✓  " : "") + label + "\n" + copy, selected ? mint : navyPanel, selected ? navy : mint);
-        button.setTextSize(12);
-        button.setAllCaps(false);
-        button.setLineSpacing(dp(2), 1f);
-        return button;
+        LinearLayout tile = new LinearLayout(this);
+        tile.setOrientation(LinearLayout.VERTICAL);
+        tile.setPadding(dp(8), dp(8), dp(8), dp(8));
+        tile.setClickable(true);
+        tile.setFocusable(true);
+        tile.setContentDescription((selected ? "Selected equipment: " : "Choose equipment: ") + label + ". " + copy);
+        tile.setBackground(surface(selected ? mint : navyPanel, 17, selected ? 2 : 1, selected ? coral : Color.rgb(35, 53, 78)));
+        List<Coach.Exercise> examples = Coach.planOptions(target, label);
+        if (!examples.isEmpty()) {
+            tile.addView(exercisePoster(AccountStore.get(this).trainer, examples.get(0)), new LinearLayout.LayoutParams(-1, dp(72)));
+            gap(tile, 5);
+        }
+        TextView name = heading((selected ? "✓ " : "") + label, 11, selected ? navy : Color.WHITE);
+        name.setSingleLine(true);
+        tile.addView(name);
+        TextView detail = text(copy, 9, selected ? navy : mint);
+        detail.setSingleLine(true);
+        tile.addView(detail);
+        return tile;
     }
 
     private void resetExerciseSelection() {
@@ -732,6 +781,10 @@ public final class MainActivity extends Activity {
             });
             LinearLayout details = new LinearLayout(this);
             details.setOrientation(LinearLayout.VERTICAL);
+            ImageView poster = exercisePoster(AccountStore.get(this).trainer, exercise);
+            LinearLayout.LayoutParams posterParams = new LinearLayout.LayoutParams(dp(58), dp(74));
+            posterParams.rightMargin = dp(11);
+            row.addView(poster, posterParams);
             details.addView(heading(exercise.name, 17, ink));
             details.addView(text(exercise.description, 13, muted));
             row.addView(details, new LinearLayout.LayoutParams(0, -2, 1));
@@ -827,9 +880,17 @@ public final class MainActivity extends Activity {
         gap(body, 10);
         for (Coach.Exercise exercise : session) {
             LinearLayout item = card();
-            item.addView(heading(exercise.name, 18, ink));
+            item.setOrientation(LinearLayout.HORIZONTAL);
+            ImageView poster = exercisePoster(AccountStore.get(this).trainer, exercise);
+            LinearLayout.LayoutParams posterParams = new LinearLayout.LayoutParams(dp(66), dp(74));
+            posterParams.rightMargin = dp(12);
+            item.addView(poster, posterParams);
+            LinearLayout details = new LinearLayout(this);
+            details.setOrientation(LinearLayout.VERTICAL);
+            details.addView(heading(exercise.name, 18, ink));
             String load = ("Dumbbells".equals(equipmentType) || "Machine assisted".equals(equipmentType)) ? "  •  " + workingWeightKg + " kg" : "";
-            item.addView(text(exercise.sets + " sets × " + exercise.reps + " reps" + load + "  •  Rest " + exercise.restSeconds + " sec", 14, muted));
+            details.addView(text(exercise.sets + " sets × " + exercise.reps + " reps" + load + "  •  Rest " + exercise.restSeconds + " sec", 14, muted));
+            item.addView(details, new LinearLayout.LayoutParams(0, -2, 1));
             body.addView(item);
             gap(body, 8);
         }
@@ -911,8 +972,16 @@ public final class MainActivity extends Activity {
         preferences.setOnClickListener(view -> showWizard());
         addButton(body, preferences);
         gap(body, 10);
-        Button signOut = secondary("Sign out");
-        signOut.setOnClickListener(view -> showWelcome());
+        Button signOut = secondary("Sign out and clear this device");
+        signOut.setOnClickListener(view -> {
+            AccountStore.clear(this);
+            PlanStore.clear(this);
+            WeightStore.clear(this);
+            session.clear();
+            selectedExercises.clear();
+            selectedTrainer = "Female";
+            showWelcome();
+        });
         addButton(body, signOut);
     }
 
@@ -963,18 +1032,14 @@ public final class MainActivity extends Activity {
         List<Coach.Exercise> choices = Coach.library().get(target);
         if (choices != null && !choices.isEmpty()) {
             Coach.Exercise first = choices.get(0);
-            int visual = ExerciseVisuals.forExercise(this, AccountStore.get(this).trainer, first.name);
-            if (visual != 0) {
-                LinearLayout preview = card();
-                AnimatedGifView demonstration = new AnimatedGifView(this, visual);
-                demonstration.setContentDescription("Preview of " + first.name);
-                demonstration.setBackgroundColor(Color.WHITE);
-                preview.addView(demonstration, new LinearLayout.LayoutParams(-1, dp(178)));
-                gap(preview, 10);
-                preview.addView(heading("PREVIEW  •  " + first.name, 14, ink));
-                body.addView(preview);
-                gap(body, 12);
-            }
+            LinearLayout preview = card();
+            preview.setPadding(0, 0, 0, 0);
+            preview.addView(exerciseMedia(AccountStore.get(this).trainer, first, 178), new LinearLayout.LayoutParams(-1, dp(178)));
+            TextView label = heading("PREVIEW  •  " + first.name, 14, ink);
+            label.setPadding(dp(16), dp(10), dp(16), dp(14));
+            preview.addView(label);
+            body.addView(preview);
+            gap(body, 12);
         }
         for (String choice : Coach.TARGETS) {
             Button option = choice.equals(target) ? primary("Selected  •  " + choice) : secondary(choice);
@@ -1069,18 +1134,10 @@ public final class MainActivity extends Activity {
         LinearLayout body = appPage("Workouts");
         title(body, "GUIDED WORKOUT", exercise.target, "Exercise " + (index + 1) + " of " + session.size() + "  •  Set " + set + " of " + exercise.sets);
 
-        int visual = ExerciseVisuals.forExercise(this, AccountStore.get(this).trainer, exercise.name);
-        if (visual != 0) {
-            LinearLayout demoCard = card();
-            AnimatedGifView demo = new AnimatedGifView(this, visual);
-            demo.setContentDescription("Coach demonstrating " + exercise.name);
-            demo.setBackgroundColor(Color.WHITE);
-            demoCard.addView(demo, new LinearLayout.LayoutParams(-1, dp(235)));
-            body.addView(demoCard);
-        } else {
-            ExerciseAnimationView demo = new ExerciseAnimationView(this);
-            body.addView(demo, new LinearLayout.LayoutParams(-1, dp(235)));
-        }
+        LinearLayout demoCard = card();
+        demoCard.setPadding(0, 0, 0, 0);
+        demoCard.addView(exerciseMedia(AccountStore.get(this).trainer, exercise, 235), new LinearLayout.LayoutParams(-1, dp(235)));
+        body.addView(demoCard);
         gap(body, 14);
         body.addView(heading(exercise.name, 25, Color.WHITE));
         body.addView(text(exercise.sets + " sets × " + exercise.reps + " reps", 17, mint));
@@ -1174,38 +1231,65 @@ public final class MainActivity extends Activity {
         String trainer = AccountStore.get(this).trainer;
         String trainerName = "Male".equals(trainer) ? "Leo" : "Mia";
         LinearLayout body = appPage("Workouts");
-        title(body, "EXERCISE LIBRARY", "Every move, animated", "Each exercise includes a looping Coach " + trainerName + " demonstration and a concise form cue.");
+        title(body, "EXERCISE LIBRARY", "Every move, filmed", "Open a movement for a smooth, looping Coach " + trainerName + " demonstration and a concise form cue.");
         for (String group : Coach.TARGETS) {
             body.addView(heading(group, 22, Color.WHITE));
             gap(body, 8);
             List<Coach.Exercise> exercises = Coach.library().get(group);
             for (Coach.Exercise exercise : exercises) {
                 LinearLayout item = card();
-                int visual = ExerciseVisuals.forExercise(this, trainer, exercise.name);
-                if (visual != 0) {
-                    AnimatedGifView demo = new AnimatedGifView(this, visual);
-                    demo.setContentDescription("Coach " + trainerName + " demonstrating " + exercise.name);
-                    demo.setBackgroundColor(Color.WHITE);
-                    item.addView(demo, new LinearLayout.LayoutParams(-1, dp(156)));
-                    gap(item, 11);
-                } else {
-                    TextView unavailable = text("Demonstration preparing", 14, muted);
-                    unavailable.setGravity(Gravity.CENTER);
-                    item.addView(unavailable, new LinearLayout.LayoutParams(-1, dp(88)));
-                    gap(item, 11);
-                }
-                item.addView(heading(exercise.name, 19, ink));
-                item.addView(text(exercise.description, 15, muted));
+                item.setOrientation(LinearLayout.HORIZONTAL);
+                ImageView poster = exercisePoster(trainer, exercise);
+                LinearLayout.LayoutParams posterParams = new LinearLayout.LayoutParams(dp(82), dp(104));
+                posterParams.rightMargin = dp(12);
+                item.addView(poster, posterParams);
+                LinearLayout details = new LinearLayout(this);
+                details.setOrientation(LinearLayout.VERTICAL);
+                details.addView(heading(exercise.name, 19, ink));
+                details.addView(text(exercise.description, 15, muted));
                 TextView cue = text("Coach cue: " + exercise.cue, 14, ink);
                 LinearLayout.LayoutParams cueParams = new LinearLayout.LayoutParams(-1, -2);
                 cueParams.topMargin = dp(5);
-                item.addView(cue, cueParams);
+                details.addView(cue, cueParams);
+                item.addView(details, new LinearLayout.LayoutParams(0, -2, 1));
                 item.setContentDescription(exercise.name + ". " + exercise.description + " Coach cue: " + exercise.cue);
+                item.setClickable(true);
+                item.setFocusable(true);
+                item.setOnClickListener(view -> showExerciseDetail(exercise));
                 body.addView(item);
                 gap(body, 10);
             }
             gap(body, 10);
         }
+    }
+
+    private void showExerciseDetail(Coach.Exercise exercise) {
+        String trainer = AccountStore.get(this).trainer;
+        LinearLayout body = appPage("Workouts");
+        title(body, "EXERCISE DEMO", exercise.name, "Smooth local loop • " + exercise.target + " • Offline-ready");
+        LinearLayout demoCard = card();
+        demoCard.setPadding(0, 0, 0, 0);
+        demoCard.addView(exerciseMedia(trainer, exercise, 270), new LinearLayout.LayoutParams(-1, dp(270)));
+        body.addView(demoCard);
+        gap(body, 13);
+        LinearLayout guidance = card();
+        guidance.addView(heading("Coach cue", 16, ink));
+        guidance.addView(text(exercise.cue, 16, muted));
+        gap(guidance, 8);
+        guidance.addView(heading("Suggested starting point", 16, ink));
+        guidance.addView(text(exercise.sets + " sets × " + exercise.reps + " reps • Rest " + exercise.restSeconds + " sec", 15, muted));
+        body.addView(guidance);
+        gap(body, 12);
+        Button choose = primary("Add to my " + target.toLowerCase(Locale.ROOT) + " plan");
+        choose.setOnClickListener(view -> {
+            target = exercise.target;
+            showPlans();
+        });
+        addButton(body, choose);
+        gap(body, 10);
+        Button back = secondary("Back to exercise library");
+        back.setOnClickListener(view -> showLibrary());
+        addButton(body, back);
     }
 
     private void showWeightTracker() {

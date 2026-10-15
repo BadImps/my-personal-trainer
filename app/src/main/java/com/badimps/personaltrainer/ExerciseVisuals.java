@@ -8,6 +8,11 @@ public final class ExerciseVisuals {
     private ExerciseVisuals() {}
 
     public static int forExercise(Context context, String trainer, String exerciseName) {
+        String coach = "Male".equals(trainer) ? "leo_" : "mia_";
+        return context.getResources().getIdentifier(coach + resourceStem(exerciseName), "drawable", context.getPackageName());
+    }
+
+    static String resourceStem(String exerciseName) {
         String slug;
         if ("90/90 Hip Switch".equals(exerciseName)) slug = "ninety_ninety_hip_switch";
         else if ("World's Greatest Stretch".equals(exerciseName)) slug = "worlds_greatest_stretch";
@@ -23,7 +28,6 @@ public final class ExerciseVisuals {
         else if ("Cable Triceps Pressdown".equals(exerciseName)) slug = "overhead_triceps_extension";
         else if ("Machine Shoulder Press".equals(exerciseName)) slug = "dumbbell_press";
         else slug = exerciseName.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "_").replaceAll("^_|_$", "");
-        String coach = "Male".equals(trainer) ? "leo_" : "mia_";
-        return context.getResources().getIdentifier(coach + slug, "drawable", context.getPackageName());
+        return slug;
     }
 }
