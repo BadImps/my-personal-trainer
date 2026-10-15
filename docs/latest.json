@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 9,
-  "versionName": "1.8",
-  "publishedAt": "2026-10-15T06:34:08Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v1.8/My-Personal-Trainer-1.8.apk",
-  "sha256": "d47b632eceabbfa2dcdabf521ff792100cf5ab074cbad8fb54c3b71690034864",
-  "sizeBytes": 25194975,
-  "notes": "A new Welcome experience presents both coaches, signed-in pages carry your selected coach at the left, and the launcher icon now uses polished coach artwork."
+  "versionCode": 10,
+  "versionName": "1.9",
+  "publishedAt": "2026-10-15T06:49:32Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v1.9/My-Personal-Trainer-1.9.apk",
+  "sha256": "800406407de424ea5b825b73e465dbd900510c70b4e1d2b90851748ce3abd106",
+  "sizeBytes": 25195363,
+  "notes": "Rebuilds Home, My Plan and Guided Workout around the approved dark coach-rail visual system."
 }

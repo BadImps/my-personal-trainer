@@ -53,6 +53,8 @@ public final class MainActivity extends Activity {
     private Button button(String label) { Button b=new Button(this); b.setText(label); b.setAllCaps(false); b.setTextSize(16); b.setTextColor(Color.WHITE); b.setBackground(surface(coral,14,0,Color.TRANSPARENT)); b.setElevation(dp(3)); b.setPadding(dp(12),dp(10),dp(12),dp(10)); b.setLayoutParams(new LinearLayout.LayoutParams(-1,dp(52))); b.setOnTouchListener((v,event)->{if(event.getAction()==0)v.animate().scaleX(.975f).scaleY(.975f).setDuration(80).start();else if(event.getAction()==1||event.getAction()==3)v.animate().scaleX(1f).scaleY(1f).setDuration(130).setInterpolator(new DecelerateInterpolator()).start();return false;}); return b; }
     private void tint(Button b,int color) { b.setBackground(surface(color,14,0,Color.TRANSPARENT)); }
     private TextView badge(String value) { TextView t=text(value,13,navy); t.setPadding(dp(12),dp(8),dp(12),dp(8)); t.setBackground(surface(mint,99,0,Color.TRANSPARENT)); return t; }
+    private LinearLayout darkPage() { LinearLayout b=page();b.setBackgroundColor(navy);return b; }
+    private TextView darkCard(String value,int sp) { TextView card=text(value,sp,navy);card.setPadding(dp(16),dp(15),dp(16),dp(15));card.setBackground(surface(Color.WHITE,18,0,Color.TRANSPARENT));card.setElevation(dp(3));return card; }
     private void header(LinearLayout b, String eyebrow, String title, String subtitle) { b.addView(text(eyebrow.toUpperCase(Locale.ROOT),12,coral)); gap(b,5); b.addView(text(title,30,navy)); gap(b,8); b.addView(text(subtitle,16,Color.rgb(71,83,108))); gap(b,20); }
     private void nav(LinearLayout b, String active) {
         gap(b,22); LinearLayout row=new LinearLayout(this); row.setOrientation(LinearLayout.HORIZONTAL);
@@ -62,24 +64,13 @@ public final class MainActivity extends Activity {
     }
 
     private void showHome() {
-        AccountStore.Profile profile=AccountStore.get(this);
-        String coach=profile.trainer.equals("Male") ? "Coach Leo" : "Coach Mia";
-        LinearLayout b=page(); header(b,"TODAY","Hi, "+profile.username+".",coach+" is ready. Choose a session, follow it, then record your progress.");
-        TextView today=badge("TODAY  •  " + target + "  •  " + environment); b.addView(today); gap(b,16);
-        b.addView(text("Your next session",20,navy)); gap(b,5); b.addView(text(goal+" • "+target+" • about 32 minutes",15,Color.rgb(71,83,108))); gap(b,10);
-        Button start=button("Start my personalized workout"); start.setOnClickListener(v->showWizard()); b.addView(start); gap(b,18);
-        b.addView(text("Explore",20,navy)); gap(b,7);
-        Button plans=button("▣  Plans for home, gym & machines"); tint(plans,navy);plans.setOnClickListener(v->showPlans());b.addView(plans);gap(b,9);
-        Button library=button("▶  Animated exercise library"); tint(library,Color.rgb(45,91,101)); library.setOnClickListener(v->showLibrary()); b.addView(library);gap(b,9);
-        Button progress=button("↗  Progress & weight trend"); tint(progress,Color.rgb(76,108,151));progress.setOnClickListener(v->showProgress());b.addView(progress);
-        nav(b,"Home");
+        AccountStore.Profile profile=AccountStore.get(this);LinearLayout b=darkPage();b.addView(text("Today",34,Color.WHITE));gap(b,4);b.addView(text("Showing up today builds a stronger tomorrow.",16,Color.rgb(211,231,230)));gap(b,18);
+        LinearLayout next=new LinearLayout(this);next.setOrientation(LinearLayout.VERTICAL);next.setPadding(dp(14),dp(14),dp(14),dp(14));next.setBackground(surface(Color.WHITE,20,0,Color.TRANSPARENT));next.setElevation(dp(4));List<Coach.Exercise> sample=Coach.library().get(target);if(sample!=null&&!sample.isEmpty()){int visual=ExerciseVisuals.forExercise(this,profile.trainer,sample.get(0).name);if(visual!=0){AnimatedGifView gif=new AnimatedGifView(this,visual);next.addView(gif,new LinearLayout.LayoutParams(-1,dp(150)));}}next.addView(text("NEXT WORKOUT",12,Color.rgb(76,108,151)));next.addView(text(target+" strength",22,navy));next.addView(text(sessionMinutes+" min  •  "+goal+"  •  "+environment,14,Color.rgb(71,83,108)));Button start=button("▶  Start workout");start.setOnClickListener(v->{session=Coach.recommendation(target,goal,environment);showActive(0,1);});next.addView(start);b.addView(next);gap(b,16);
+        b.addView(text("Weekly progress",20,Color.WHITE));gap(b,8);b.addView(darkCard("Mon     Tue     Wed     Thu     Fri\n  ✓       ✓       ◌       ○       ○\n100%   100%    60%      0%      0%",16));gap(b,12);LinearLayout stats=new LinearLayout(this);TextView sessions=darkCard("✦  "+trainingDays+"\nWorkouts this week",16);TextView momentum=darkCard("↗  Keep going\nYour next session is ready",16);stats.addView(sessions,new LinearLayout.LayoutParams(0,-2,1));View spacer=new View(this);stats.addView(spacer,new LinearLayout.LayoutParams(dp(8),1));stats.addView(momentum,new LinearLayout.LayoutParams(0,-2,1));b.addView(stats);gap(b,14);Button plan=button("View my plan");tint(plan,Color.rgb(26,58,72));plan.setOnClickListener(v->showPlans());b.addView(plan);
     }
 
     private void showPlans() {
-        LinearLayout b=page(); header(b,"PLANS","Train your way.","Choose a goal, focus and equipment. Your plan is built around the options you select.");
-        b.addView(text("Quick starts",20,navy)); gap(b,7);
-        for(String choice:new String[]{"Full Body","Upper","Lower","Machines"}) { Button pick=button("✦  "+choice+" plan");tint(pick,choice.equals("Machines")?Color.rgb(45,91,101):navy);pick.setOnClickListener(v->{target=choice;showWizard();});b.addView(pick);gap(b,8); }
-        gap(b,6); b.addView(text("Your current setup",18,navy));gap(b,5);b.addView(text(goal+" • "+environment+"\nChange goals, focus and equipment in the plan builder.",15,Color.rgb(71,83,108)));gap(b,12);Button custom=button("Customize my plan");custom.setOnClickListener(v->showWizard());b.addView(custom);nav(b,"Plans");
+        if(session.isEmpty())session=Coach.recommendation(target,goal,environment);LinearLayout b=darkPage();b.addView(text("My Plan",34,Color.WHITE));gap(b,14);LinearLayout days=new LinearLayout(this);String[] weekdays={"Mon\n12","Tue\n13","Wed\n14","Thu\n15","Fri\n16","Sat\n17","Sun\n18"};for(int i=0;i<weekdays.length;i++){TextView day=text(weekdays[i],13,i==2?navy:Color.WHITE);day.setGravity(Gravity.CENTER);day.setPadding(dp(4),dp(10),dp(4),dp(10));day.setBackground(surface(i==2?mint:Color.rgb(28,58,76),12,0,Color.TRANSPARENT));days.addView(day,new LinearLayout.LayoutParams(0,-2,1));}b.addView(days);gap(b,16);b.addView(text("STRENGTH DAY  •  "+sessionMinutes+" MIN",12,mint));TextView title=text(target+" strength",24,Color.WHITE);b.addView(title);gap(b,10);for(int i=0;i<session.size();i++){Coach.Exercise e=session.get(i);TextView row=darkCard((i+1)+"   "+e.name+"\n     "+e.sets+" sets × "+e.reps+" reps",16);b.addView(row);gap(b,7);}Button open=button("View session");open.setOnClickListener(v->showActive(0,1));b.addView(open);gap(b,8);Button adjust=button("Adjust this plan");tint(adjust,Color.rgb(26,58,72));adjust.setOnClickListener(v->showWizard());b.addView(adjust);
     }
 
     private void showProgress() {
@@ -173,15 +164,13 @@ public final class MainActivity extends Activity {
 
     private void showActive(int index, int set) {
         if (index >= session.size()) { showComplete(); return; }
-        Coach.Exercise e=session.get(index); LinearLayout b=page(); header(b,"GUIDED WORKOUT",""+e.name,"Exercise "+(index+1)+" of "+session.size()+"  •  Set "+set+" of "+e.sets);
+        Coach.Exercise e=session.get(index); LinearLayout b=darkPage();b.addView(text("Upper body",31,Color.WHITE));gap(b,5);b.addView(text("Exercise "+(index+1)+" of "+session.size()+"     Set "+set+" of "+e.sets,14,mint));gap(b,14);
         int visual=ExerciseVisuals.forExercise(this,AccountStore.get(this).trainer,e.name);
-        if(visual!=0){AnimatedGifView demo=new AnimatedGifView(this,visual);b.addView(demo,new LinearLayout.LayoutParams(-1,dp(240)));}
+        if(visual!=0){AnimatedGifView demo=new AnimatedGifView(this,visual);demo.setBackground(surface(Color.WHITE,20,0,Color.TRANSPARENT));b.addView(demo,new LinearLayout.LayoutParams(-1,dp(240)));}
         else {ExerciseAnimationView demo=new ExerciseAnimationView(this);b.addView(demo,new LinearLayout.LayoutParams(-1,dp(240)));}
         gap(b,12);
-        b.addView(text(e.sets+" sets × "+e.reps+" reps",24,navy)); gap(b,5); b.addView(text(e.description+"\nCoach cue: "+e.cue,16,Color.rgb(71,83,108))); gap(b,14);
-        Button callout=button("Call out rep guidance"); callout.setBackgroundColor(navy); callout.setOnClickListener(v->say("Set "+set+". Complete "+e.reps+" controlled reps. "+e.cue)); b.addView(callout); gap(b,9);
-        Button done=button("I finished this set"); done.setOnClickListener(v->startRest(index,set,e)); b.addView(done); gap(b,9);
-        Button leave=button("End workout"); leave.setBackgroundColor(Color.rgb(91,102,126)); leave.setOnClickListener(v->showHome()); b.addView(leave);
+        b.addView(text(e.name,24,Color.WHITE));gap(b,3);b.addView(text(e.sets+" sets × "+e.reps+" reps",17,mint));gap(b,10);TextView cue=darkCard("Coach cue\n"+e.cue,15);b.addView(cue);gap(b,12);LinearLayout counters=new LinearLayout(this);TextView setCard=darkCard("Set\n"+set+" / "+e.sets,17);TextView restCard=darkCard("Rest\n"+format(e.restSeconds),17);TextView repCard=darkCard("Reps\n0 / "+e.reps,17);counters.addView(setCard,new LinearLayout.LayoutParams(0,-2,1));counters.addView(restCard,new LinearLayout.LayoutParams(0,-2,1));counters.addView(repCard,new LinearLayout.LayoutParams(0,-2,1));b.addView(counters);gap(b,14);
+        Button done=button("✓  Complete set"); done.setOnClickListener(v->startRest(index,set,e)); b.addView(done); gap(b,8);Button callout=button("Call out rep guidance");tint(callout,Color.rgb(26,58,72));callout.setOnClickListener(v->say("Set "+set+". Complete "+e.reps+" controlled reps. "+e.cue));b.addView(callout);
     }
 
     private void startRest(int index, int set, Coach.Exercise e) {

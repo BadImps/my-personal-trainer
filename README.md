@@ -42,3 +42,7 @@ The app now opens at a dedicated Welcome page with separate Sign In and Create A
 ## 1.8 coach-led visual experience
 
 The Welcome page now introduces Coach Mia and Coach Leo side by side beneath “Your Health is Your Wealth.” After sign-in, a persistent left-side coach rail identifies the selected trainer throughout the app. The launcher icon uses the selected coach’s polished portrait artwork.
+
+## 1.9 dashboard visual rebuild
+
+Home, My Plan and Guided Workout now share the dark coach-rail design system from the approved reference: bright action cards, a compact training calendar, exercise rows, animated movement panels, and set/rest counters.
