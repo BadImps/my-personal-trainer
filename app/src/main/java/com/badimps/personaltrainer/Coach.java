@@ -8,11 +8,12 @@ import java.util.Map;
 
 /** Offline training templates. These are general fitness suggestions, not medical advice. */
 public final class Coach {
-    public static final String[] TARGETS = {"Upper", "Lower", "Arms", "Chest", "Legs", "Back & Core", "Cardio", "Mobility", "Full Body", "Machines"};
+    /** Training areas are deliberately separate from the equipment choice. */
+    public static final String[] TARGETS = {"Upper", "Lower", "Arms", "Chest", "Legs", "Back & Core", "Cardio", "Mobility", "Full Body"};
     public static final String[] GOALS = {"Build strength", "Build muscle", "Reduce body fat", "Improve endurance", "Move & feel good"};
     public static final String[] ENVIRONMENTS = {"Gym", "Home — no equipment", "Home — dumbbells", "Outdoors"};
-    public static final String[] PLAN_MODES = {"Custom", "Daily", "Weekly"};
-    public static final String[] EQUIPMENT_TYPES = {"Dumbbells", "Home & household", "Machine assisted", "Bodyweight"};
+    public static final String[] PLAN_MODES = {"Weekly", "Daily", "Custom"};
+    public static final String[] EQUIPMENT_TYPES = {"Dumbbells", "At home", "Machine-assisted", "Bodyweight"};
 
     public static final class Exercise {
         public final String name, target, cue, description;
@@ -34,7 +35,7 @@ public final class Coach {
         add("Cardio", ex("Brisk March", "Cardio", "Land softly and swing your arms.", "Low-impact heart-rate work."), ex("Mountain Climber", "Cardio", "Keep shoulders stacked over hands.", "Core and conditioning."), ex("Step-up", "Cardio", "Use a stable step and drive through the whole foot.", "Leg and cardio conditioning."), ex("Jumping Jack", "Cardio", "Choose a step-out version if needed.", "Simple full-body cardio."));
         add("Mobility", ex("Cat Cow", "Mobility", "Move slowly with your breath.", "Gentle spinal mobility."), ex("World's Greatest Stretch", "Mobility", "Keep the range comfortable.", "Hips, hamstrings and upper back."), ex("90/90 Hip Switch", "Mobility", "Use your hands for support if needed.", "Hip rotation control."), ex("Shoulder Wall Slide", "Mobility", "Keep ribs soft and arms smooth.", "Shoulder mobility."));
         add("Full Body", ex("Squat to Press", "Full Body", "Stand strongly, then press overhead.", "Legs and shoulders together."), ex("Burpee", "Full Body", "Choose a step-back option when needed.", "Full-body conditioning."), ex("Renegade Row", "Full Body", "Resist twisting through your hips.", "Core and upper back."), ex("Mountain Climber", "Full Body", "Keep shoulders stacked over hands.", "Full-body conditioning."));
-        add("Machines", ex("Machine Chest Press", "Machines", "Set the seat so handles meet mid-chest; stop short of locking out.", "Guided pressing with a machine."), ex("Lat Pulldown", "Machines", "Keep ribs down and pull toward your upper chest.", "Machine-assisted upper-back work."), ex("Leg Press", "Machines", "Keep your feet planted and do not lock your knees.", "Guided lower-body pressing."), ex("Seated Cable Row", "Machines", "Stay tall and pull the handle toward your ribs.", "Machine-assisted rowing."));
+        add("Machine-assisted", ex("Machine Chest Press", "Chest", "Set the seat so handles meet mid-chest; stop short of locking out.", "Guided pressing with a machine."), ex("Lat Pulldown", "Upper", "Keep ribs down and pull toward your upper chest.", "Machine-assisted upper-back work."), ex("Leg Press", "Legs", "Keep your feet planted and do not lock your knees.", "Guided lower-body pressing."), ex("Seated Cable Row", "Upper", "Stay tall and pull the handle toward your ribs.", "Machine-assisted rowing."));
     }
     private static Exercise ex(String name, String target, String cue, String description) { return new Exercise(name, target, 3, 10, 60, cue, description); }
     @SafeVarargs private static void add(String group, Exercise... items) { LIBRARY.put(group, Arrays.asList(items)); }
@@ -65,8 +66,8 @@ public final class Coach {
     /** Returns equipment-specific movements for the plan builder. */
     public static List<Exercise> planOptions(String target, String equipment) {
         if ("Dumbbells".equals(equipment)) return dumbbellOptions(target);
-        if ("Home & household".equals(equipment)) return householdOptions(target);
-        if ("Machine assisted".equals(equipment)) return machineOptions(target);
+        if ("At home".equals(equipment) || "Home & household".equals(equipment)) return householdOptions(target);
+        if ("Machine-assisted".equals(equipment) || "Machine assisted".equals(equipment)) return machineOptions(target);
         return bodyweightOptions(target);
     }
 
@@ -118,24 +119,29 @@ public final class Coach {
     private static List<Exercise> machineOptions(String target) {
         if ("Chest".equals(target)) return options(
                 ex("Machine Chest Press", target, "Set handles at mid-chest; stop short of locking out.", "Guided machine pressing."),
+                ex("Seated Cable Press", target, "Press forward without shrugging.", "Controlled cable chest pressing."),
                 ex("Pec Deck Fly", target, "Keep a soft elbow and squeeze your chest.", "Machine-assisted chest isolation."),
-                ex("Cable Chest Press", target, "Press forward without shrugging.", "Controlled cable chest pressing."));
+                ex("Assisted Dip", target, "Lean slightly forward and lower with control.", "Guided chest and triceps pressing."));
         if ("Legs".equals(target) || "Lower".equals(target)) return options(
                 ex("Leg Press", target, "Keep your feet planted; do not lock your knees.", "Guided lower-body pressing."),
                 ex("Seated Leg Curl", target, "Move slowly and control the return.", "Machine hamstring work."),
+                ex("Leg Extension", target, "Control the lift and lower; do not lock your knees.", "Machine quadriceps work."),
                 ex("Calf Raise", target, "Pause high; lower slowly.", "Machine or supported calf work."));
         if ("Arms".equals(target)) return options(
                 ex("Cable Biceps Curl", target, "Keep elbows beside your ribs.", "Cable biceps resistance."),
                 ex("Cable Triceps Pressdown", target, "Keep elbows close to your body.", "Cable triceps resistance."),
+                ex("Assisted Dip", target, "Keep shoulders away from your ears.", "Guided triceps pressing."),
                 ex("Seated Cable Row", target, "Stay tall and pull toward your ribs.", "Machine-assisted upper-body pulling."));
         if ("Upper".equals(target)) return options(
                 ex("Lat Pulldown", target, "Keep ribs down and pull toward your upper chest.", "Machine-assisted upper back."),
                 ex("Seated Cable Row", target, "Stay tall and pull toward your ribs.", "Cable upper-back work."),
-                ex("Machine Shoulder Press", target, "Keep ribs down and press smoothly.", "Guided shoulder pressing."));
+                ex("Machine Shoulder Press", target, "Keep ribs down and press smoothly.", "Guided shoulder pressing."),
+                ex("Cable Reverse Fly", target, "Open your arms without shrugging.", "Cable rear-shoulder work."));
         return options(
                 ex("Lat Pulldown", target, "Keep ribs down and pull toward your upper chest.", "Machine-assisted movement."),
                 ex("Leg Press", target, "Keep your feet planted; do not lock your knees.", "Guided lower-body movement."),
-                ex("Seated Cable Row", target, "Stay tall and pull toward your ribs.", "Controlled cable movement."));
+                ex("Seated Cable Row", target, "Stay tall and pull toward your ribs.", "Controlled cable movement."),
+                ex("Machine Chest Press", target, "Press forward with control.", "Guided upper-body pressing."));
     }
 
     private static List<Exercise> bodyweightOptions(String target) {
@@ -164,8 +170,8 @@ public final class Coach {
         return new ArrayList<>(source);
     }
 
-    private static List<Exercise> options(Exercise first, Exercise second, Exercise third) {
-        return new ArrayList<>(Arrays.asList(first, second, third));
+    private static List<Exercise> options(Exercise... exercises) {
+        return new ArrayList<>(Arrays.asList(exercises));
     }
     public static String goalSummary(String goal) {
         if(goal.equals(GOALS[0])) return "Likely focus: stronger movement patterns and confidence with gradually heavier loads.";

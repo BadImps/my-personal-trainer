@@ -1,6 +1,7 @@
 package com.badimps.personaltrainer;
 
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertEquals;
 
 import android.content.Context;
 
@@ -24,5 +25,21 @@ public final class ExerciseVideosTest {
                 }
             }
         }
+    }
+
+    @Test public void machineAssistedChestOffersTheFourPreviewedMovementsWithSmoothMedia() {
+        Context context = RuntimeEnvironment.getApplication();
+        String[] expected = {"Machine Chest Press", "Seated Cable Press", "Pec Deck Fly", "Assisted Dip"};
+        java.util.List<Coach.Exercise> exercises = Coach.planOptions("Chest", "Machine-assisted");
+        assertEquals(expected.length, exercises.size());
+        for (int i = 0; i < expected.length; i++) {
+            assertEquals(expected[i], exercises.get(i).name);
+            assertTrue(ExerciseVideos.forExercise(context, "Female", exercises.get(i).name) != 0);
+            assertTrue(ExerciseVideos.forExercise(context, "Male", exercises.get(i).name) != 0);
+        }
+    }
+
+    @Test public void trainingAreasDoNotTreatMachinesAsABodyArea() {
+        for (String target : Coach.TARGETS) assertTrue(!"Machines".equals(target));
     }
 }

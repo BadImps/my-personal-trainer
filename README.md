@@ -50,3 +50,7 @@ Home, My Plan and Guided Workout now share the dark coach-rail design system fro
 ## 2.0 interactive coach rail
 
 The coach rail is now real navigation—Home, Plan, Progress, Library, and Account controls are available directly from the persistent left edge of signed-in screens.
+
+## 2.6 five-step plan builder
+
+The Workout page is now a focused five-step builder: Plan type, Training area, Equipment, Exercises, and Sets. Weekly plans include a persisted Monday-to-Sunday scheduler with explicit Rest Days. Training areas no longer include a generic Machines option; instead, Machine-assisted is an equipment category with tailored choices such as chest press, cable press, pec deck, assisted dip, lat pulldown, cable row, leg press, leg curl, and leg extension.
