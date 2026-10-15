@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 15,
-  "versionName": "2.4",
-  "publishedAt": "2026-10-15T09:25:59Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v2.4/app-release.apk",
-  "sha256": "6ff05505484b941eca585639b34e1a518578a73c68693ac5a6dc2f8b2aceb997",
-  "sizeBytes": 25212051,
-  "notes": "Implements the Plan your workout flow with Custom, Daily, and Weekly modes; body-area and equipment choices; selectable exercises; adjustable weight, sets, reps, and rest; and locally saved plans."
+  "versionCode": 16,
+  "versionName": "2.5",
+  "publishedAt": "2026-10-15T13:24:24Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v2.5/app-release.apk",
+  "sha256": "6e0dcabf6c8bb39df07518ecc14f2838d7f6d4654dc4c1b6a10167f45d927f17",
+  "sizeBytes": 22005097,
+  "notes": "Replaces unstable exercise GIFs with smooth local 30 fps MP4 loops, fixes account resume and sign-out data clearing, and refines media layout."
 }
