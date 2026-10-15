@@ -10,10 +10,10 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity-alias>
-        <activity-alias android:name=".MiaLauncher" android:enabled="false" android:exported="true" android:icon="@drawable/mia_dumbbell_press" android:label="My Personal Trainer · Mia" android:targetActivity=".MainActivity">
+        <activity-alias android:name=".MiaLauncher" android:enabled="false" android:exported="true" android:icon="@drawable/mia_launcher" android:label="My Personal Trainer · Mia" android:targetActivity=".MainActivity">
             <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
         </activity-alias>
-        <activity-alias android:name=".LeoLauncher" android:enabled="false" android:exported="true" android:icon="@drawable/leo_dumbbell_press" android:label="My Personal Trainer · Leo" android:targetActivity=".MainActivity">
+        <activity-alias android:name=".LeoLauncher" android:enabled="false" android:exported="true" android:icon="@drawable/leo_launcher" android:label="My Personal Trainer · Leo" android:targetActivity=".MainActivity">
             <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
         </activity-alias>
         <provider

@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 8,
-  "versionName": "1.7",
-  "publishedAt": "2026-10-15T06:05:23Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v1.7/My-Personal-Trainer-1.7.apk",
-  "sha256": "7f34602434b55f9b14bc8af08c1633344ca4417d048406443446ca5b2c9d48f3",
-  "sizeBytes": 21484703,
-  "notes": "Adds separate Welcome, Sign In, Create Account, Home, Account and four-step plan setup pages. The launcher icon follows the selected coach."
+  "versionCode": 9,
+  "versionName": "1.8",
+  "publishedAt": "2026-10-15T06:34:08Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v1.8/My-Personal-Trainer-1.8.apk",
+  "sha256": "d47b632eceabbfa2dcdabf521ff792100cf5ab074cbad8fb54c3b71690034864",
+  "sizeBytes": 25194975,
+  "notes": "A new Welcome experience presents both coaches, signed-in pages carry your selected coach at the left, and the launcher icon now uses polished coach artwork."
 }

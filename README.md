@@ -38,3 +38,7 @@ Coach GIFs now use smoother ping-pong motion with blended in-between frames. The
 ## 1.7 complete account and planning flow
 
 The app now opens at a dedicated Welcome page with separate Sign In and Create Account paths. Plan setup is a four-step wizard: goal, workout focus with an animated preview, training context and duration, then a review screen. After a coach is selected, the device launcher uses that coach’s visual as the My Personal Trainer app icon.
+
+## 1.8 coach-led visual experience
+
+The Welcome page now introduces Coach Mia and Coach Leo side by side beneath “Your Health is Your Wealth.” After sign-in, a persistent left-side coach rail identifies the selected trainer throughout the app. The launcher icon uses the selected coach’s polished portrait artwork.

@@ -42,7 +42,13 @@ public final class MainActivity extends Activity {
     private int dp(int n) { return (int)(n*getResources().getDisplayMetrics().density+.5f); }
     private TextView text(String value, int sp, int color) { TextView t=new TextView(this); t.setText(value); t.setTextSize(sp); t.setTextColor(color); t.setLineSpacing(dp(3),1); return t; }
     private GradientDrawable surface(int fill, int radius, int stroke, int strokeColor) { GradientDrawable bg=new GradientDrawable();bg.setColor(fill);bg.setCornerRadius(dp(radius));if(stroke>0)bg.setStroke(dp(stroke),strokeColor);return bg; }
-    private LinearLayout page() { LinearLayout body=new LinearLayout(this); body.setOrientation(LinearLayout.VERTICAL); body.setPadding(dp(22),dp(24),dp(22),dp(32)); body.setBackgroundColor(paper); ScrollView s=new ScrollView(this); s.addView(body); setContentView(s); return body; }
+    private LinearLayout page() { return page(true); }
+    private LinearLayout page(boolean includeCoachRail) {
+        LinearLayout body=new LinearLayout(this); body.setOrientation(LinearLayout.VERTICAL); body.setPadding(dp(22),dp(24),dp(22),dp(32)); body.setBackgroundColor(paper);
+        ScrollView scroll=new ScrollView(this);scroll.addView(body);
+        if(includeCoachRail&&AccountStore.exists(this)) { LinearLayout shell=new LinearLayout(this);shell.setOrientation(LinearLayout.HORIZONTAL);shell.setBackgroundColor(navy);LinearLayout rail=new LinearLayout(this);rail.setOrientation(LinearLayout.VERTICAL);rail.setGravity(Gravity.CENTER_HORIZONTAL);rail.setPadding(dp(8),dp(24),dp(8),dp(8));String trainer=AccountStore.get(this).trainer;ImageView portrait=new ImageView(this);portrait.setImageResource("Male".equals(trainer)?R.drawable.leo_launcher:R.drawable.mia_launcher);portrait.setScaleType(ImageView.ScaleType.CENTER_CROP);portrait.setBackground(surface(mint,99,2,Color.WHITE));portrait.setClipToOutline(true);rail.addView(portrait,new LinearLayout.LayoutParams(dp(62),dp(62)));gap(rail,6);TextView coach=text("Coach\n"+("Male".equals(trainer)?"Leo":"Mia"),11,Color.WHITE);coach.setGravity(Gravity.CENTER);rail.addView(coach,new LinearLayout.LayoutParams(-1,-2));View line=new View(this);line.setBackgroundColor(mint);LinearLayout.LayoutParams lineParams=new LinearLayout.LayoutParams(dp(4),dp(44));lineParams.topMargin=dp(22);rail.addView(line,lineParams);shell.addView(rail,new LinearLayout.LayoutParams(dp(86),-1));shell.addView(scroll,new LinearLayout.LayoutParams(0,-1,1));setContentView(shell); }
+        else setContentView(scroll);return body;
+    }
     private void gap(LinearLayout box, int n) { View v=new View(this); box.addView(v,new LinearLayout.LayoutParams(1,dp(n))); }
     private Button button(String label) { Button b=new Button(this); b.setText(label); b.setAllCaps(false); b.setTextSize(16); b.setTextColor(Color.WHITE); b.setBackground(surface(coral,14,0,Color.TRANSPARENT)); b.setElevation(dp(3)); b.setPadding(dp(12),dp(10),dp(12),dp(10)); b.setLayoutParams(new LinearLayout.LayoutParams(-1,dp(52))); b.setOnTouchListener((v,event)->{if(event.getAction()==0)v.animate().scaleX(.975f).scaleY(.975f).setDuration(80).start();else if(event.getAction()==1||event.getAction()==3)v.animate().scaleX(1f).scaleY(1f).setDuration(130).setInterpolator(new DecelerateInterpolator()).start();return false;}); return b; }
     private void tint(Button b,int color) { b.setBackground(surface(color,14,0,Color.TRANSPARENT)); }
@@ -92,20 +98,19 @@ public final class MainActivity extends Activity {
     }
 
     private void showWelcome() {
-        LinearLayout b=page(); header(b,"WELCOME","Your trainer. Your plan.","Choose a coach and build a focused plan for the way you train.");
-        ImageView cast=new ImageView(this);cast.setImageResource(R.drawable.trainer_cast);cast.setScaleType(ImageView.ScaleType.CENTER_CROP);b.addView(cast,new LinearLayout.LayoutParams(-1,dp(210)));gap(b,18);
-        if(AccountStore.exists(this)){Button login=button("Sign in");login.setOnClickListener(v->showLogin());b.addView(login);gap(b,9);Button newAccount=button("Create a different local account");tint(newAccount,navy);newAccount.setOnClickListener(v->showRegistration());b.addView(newAccount);}
-        else {Button create=button("Create my account");create.setOnClickListener(v->showRegistration());b.addView(create);gap(b,9);b.addView(text("Already have a profile on this device? Sign in to continue.",14,Color.rgb(71,83,108)));}
+        LinearLayout b=page(false);b.setBackgroundColor(navy);gap(b,20);TextView welcome=text("Welcome",42,Color.WHITE);welcome.setGravity(Gravity.CENTER);b.addView(welcome,new LinearLayout.LayoutParams(-1,-2));gap(b,6);TextView motto=text("Your Health is Your Wealth",17,mint);motto.setGravity(Gravity.CENTER);b.addView(motto,new LinearLayout.LayoutParams(-1,-2));gap(b,28);
+        LinearLayout coaches=new LinearLayout(this);coaches.setOrientation(LinearLayout.HORIZONTAL);String[] names={"Mia","Leo"};int[] portraits={R.drawable.mia_launcher,R.drawable.leo_launcher};for(int i=0;i<2;i++){LinearLayout person=new LinearLayout(this);person.setOrientation(LinearLayout.VERTICAL);person.setGravity(Gravity.CENTER);ImageView image=new ImageView(this);image.setImageResource(portraits[i]);image.setScaleType(ImageView.ScaleType.CENTER_CROP);image.setBackground(surface(Color.rgb(25,57,71),99,2,mint));image.setClipToOutline(true);person.addView(image,new LinearLayout.LayoutParams(dp(132),dp(132)));gap(person,8);TextView name=text("Coach "+names[i],15,Color.WHITE);name.setGravity(Gravity.CENTER);person.addView(name);coaches.addView(person,new LinearLayout.LayoutParams(0,-2,1));}b.addView(coaches);gap(b,30);
+        Button login=button("Sign in");login.setOnClickListener(v->showLogin());b.addView(login);gap(b,10);Button create=button("Create account");tint(create,Color.rgb(26,58,72));create.setOnClickListener(v->showRegistration());b.addView(create);
     }
 
     private void showLogin() {
-        LinearLayout b=page();header(b,"SIGN IN","Welcome back.","Sign in to open your local plan and selected coach.");
+        LinearLayout b=page(false);b.setBackgroundColor(navy);gap(b,36);TextView title=text("Welcome back",32,Color.WHITE);b.addView(title);gap(b,7);b.addView(text("Your coach and plan are ready when you are.",16,mint));gap(b,24);
         EditText email=input("Email address",InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);b.addView(email);gap(b,9);EditText password=input("Password",InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD);b.addView(password);gap(b,16);
-        Button login=button("Sign in");login.setOnClickListener(v->{if(AccountStore.authenticate(this,email.getText().toString(),password.getText().toString())){LauncherIconManager.apply(this,AccountStore.get(this).trainer);showHome();}else toast("That email or password does not match this local profile.");});b.addView(login);gap(b,9);Button back=button("Back");tint(back,navy);back.setOnClickListener(v->showWelcome());b.addView(back);
+        Button login=button("Sign in");login.setOnClickListener(v->{if(AccountStore.authenticate(this,email.getText().toString(),password.getText().toString())){LauncherIconManager.apply(this,AccountStore.get(this).trainer);showHome();}else toast("That email or password does not match this local profile.");});b.addView(login);gap(b,9);Button back=button("Back");tint(back,Color.rgb(26,58,72));back.setOnClickListener(v->showWelcome());b.addView(back);
     }
 
     private void showRegistration() {
-        LinearLayout b=page(); header(b,"WELCOME","Create your trainer profile","Your email, username and password stay on this device in this version. Choose the coach persona you prefer.");
+        LinearLayout b=page(false); header(b,"WELCOME","Create your trainer profile","Your email, username and password stay on this device in this version. Choose the coach persona you prefer.");
         ImageView cast=new ImageView(this); cast.setImageResource(R.drawable.trainer_cast); cast.setScaleType(ImageView.ScaleType.CENTER_CROP); b.addView(cast,new LinearLayout.LayoutParams(-1,dp(190))); gap(b,16);
         EditText email=input("Email address",InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS); b.addView(email); gap(b,9);
         EditText username=input("Username",InputType.TYPE_CLASS_TEXT); b.addView(username); gap(b,9);
