@@ -3,7 +3,7 @@
   "versionCode": 12,
   "versionName": "2.1",
   "publishedAt": "2026-10-15T08:06:54Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v2.1/My-Personal-Trainer-2.1.apk",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v2.1/app-release.apk",
   "sha256": "bd6c6fe9521fc5eb5ad70c9b665c6cd5ba938d12c1abab5fb95f6fe444cc0798",
   "sizeBytes": 25201383,
   "notes": "Unifies every screen under the coach-rail design, fixes the full-height welcome canvas and navigation state, restores every exercise demonstration, and uses Android's modern animated-image renderer on supported devices."
