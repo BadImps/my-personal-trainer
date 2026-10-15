@@ -71,6 +71,44 @@ public final class Coach {
         return bodyweightOptions(target);
     }
 
+    /**
+     * Combines one or two selected focus areas without duplicating a movement.  The wizard uses
+     * this for Daily plans and for the active day of a Weekly plan.
+     */
+    public static List<Exercise> planOptions(List<String> targets, String equipment) {
+        LinkedHashMap<String, Exercise> combined = new LinkedHashMap<>();
+        if (targets != null) {
+            for (String target : targets) {
+                for (Exercise exercise : planOptions(target, equipment)) {
+                    combined.put(exercise.name + "|" + exercise.target, exercise);
+                }
+            }
+        }
+        if (combined.isEmpty()) {
+            for (Exercise exercise : planOptions("Full Body", equipment)) {
+                combined.put(exercise.name + "|" + exercise.target, exercise);
+            }
+        }
+        return new ArrayList<>(combined.values());
+    }
+
+    /** The default shortlist fills a chosen session without forcing every catalogue item into it. */
+    public static List<Exercise> recommendedForDuration(List<Exercise> options, int minutes) {
+        int idealCount = minutes <= 45 ? 4 : minutes <= 60 ? 6 : minutes <= 110 ? 8 : 10;
+        ArrayList<Exercise> recommendation = new ArrayList<>();
+        if (options == null) return recommendation;
+        for (Exercise exercise : options) {
+            if (recommendation.size() >= idealCount) break;
+            recommendation.add(exercise);
+        }
+        return recommendation;
+    }
+
+    public static String durationSummary(int minutes) {
+        int movements = minutes <= 45 ? 4 : minutes <= 60 ? 6 : minutes <= 110 ? 8 : 10;
+        return movements + " recommended movements · 3–5 min recovery";
+    }
+
     /** Creates a session-specific copy without mutating the offline exercise catalogue. */
     public static Exercise prescribe(Exercise exercise, int sets, int reps, int restSeconds) {
         return new Exercise(exercise.name, exercise.target, sets, reps, restSeconds, exercise.cue, exercise.description);

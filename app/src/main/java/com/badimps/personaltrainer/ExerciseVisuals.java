@@ -21,11 +21,9 @@ public final class ExerciseVisuals {
         else if ("Push-up".equals(exerciseName)) slug = "pushup";
         else if ("Step-up".equals(exerciseName)) slug = "stepup";
         else if ("Backpack Floor Press".equals(exerciseName)) slug = "floor_press";
-        else if ("Pec Deck Fly".equals(exerciseName)) slug = "chest_fly";
         else if ("Seated Cable Press".equals(exerciseName)) slug = "machine_chest_press";
         else if ("Assisted Dip".equals(exerciseName)) slug = "bench_dip";
         else if ("Seated Leg Curl".equals(exerciseName)) slug = "romanian_deadlift";
-        else if ("Leg Extension".equals(exerciseName)) slug = "bodyweight_squat";
         else if ("Cable Biceps Curl".equals(exerciseName)) slug = "biceps_curl";
         else if ("Cable Triceps Pressdown".equals(exerciseName)) slug = "overhead_triceps_extension";
         else if ("Machine Shoulder Press".equals(exerciseName)) slug = "dumbbell_press";

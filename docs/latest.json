@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 17,
-  "versionName": "2.6",
-  "publishedAt": "2026-10-15T16:01:45Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v2.6/app-release.apk",
-  "sha256": "74d49b440380eb450fa51793055075b85e44603d60f5368d2d83a11d87a3ecfc",
-  "sizeBytes": 22011405,
-  "notes": "Adds a five-step Daily, Weekly, and Custom workout builder with workout/rest scheduling, exercise selection, working-set controls, and expanded machine-assisted options."
+  "versionCode": 18,
+  "versionName": "2.7",
+  "publishedAt": "2026-10-15T19:42:11Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v2.7/app-release.apk",
+  "sha256": "9c7d63bd5cdded4de8049e2aff7e6d4f1c3a70c24bba8ad8217aec31beb46dad",
+  "sizeBytes": 23349713,
+  "notes": "Adds calendar-based Weekly and Daily planning, one- or two-focus workouts, duration-aware recommendations, persisted per-day weekly templates, 3–5 minute pauseable recovery, and a confirmed emergency stop."
 }

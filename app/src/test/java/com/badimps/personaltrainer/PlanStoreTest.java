@@ -34,4 +34,25 @@ public final class PlanStoreTest {
             PlanStore.clear(context);
         }
     }
+
+    @Test public void weeklyAssignmentsAndDailyCalendarChoiceSurvivePlanSave() {
+        Context context = RuntimeEnvironment.getApplication();
+        PlanStore.clear(context);
+        try {
+            List<Coach.Exercise> exercises = Coach.planOptions("Chest", "Machine-assisted");
+            boolean[] schedule = {true, false, true, false, true, false, false};
+            PlanStore.save(context, "Weekly", "Chest", "Machine-assisted", 60, 20, 3, 10, 180, schedule,
+                    "Chest|Arms", "Chest; ;Chest|Arms; ;Legs; ; ", "Machine Chest Press|Pec Deck Fly;;Cable Biceps Curl", 2, 1, exercises);
+
+            PlanStore.SavedPlan saved = PlanStore.load(context);
+            assertNotNull(saved);
+            assertEquals("Chest|Arms", saved.focusTargets);
+            assertEquals(2, saved.scheduledDay);
+            assertEquals(1, saved.weekOffset);
+            assertEquals(180, saved.restSeconds);
+            assertEquals("Machine Chest Press|Pec Deck Fly;;Cable Biceps Curl", saved.weeklyExerciseNames);
+        } finally {
+            PlanStore.clear(context);
+        }
+    }
 }

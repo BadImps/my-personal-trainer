@@ -12,6 +12,7 @@ import android.speech.tts.TextToSpeech;
 import android.text.InputType;
 import android.view.Gravity;
 import android.view.View;
+import android.view.WindowInsets;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.FrameLayout;
@@ -25,8 +26,11 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
+import java.text.SimpleDateFormat;
 
 /** The complete on-device My Personal Trainer experience. */
 public final class MainActivity extends Activity {
@@ -38,6 +42,8 @@ public final class MainActivity extends Activity {
     private final int ink = Color.rgb(43, 52, 77);
     private final int muted = Color.rgb(107, 122, 147);
     private final int cardLine = Color.rgb(218, 226, 233);
+    /** The six image-led targets in the approved plan-flow reference. */
+    private static final String[] WIZARD_TARGETS = {"Upper", "Lower", "Arms", "Chest", "Legs", "Full Body"};
 
     private String goal = Coach.GOALS[1];
     private String target = "Full Body";
@@ -45,15 +51,23 @@ public final class MainActivity extends Activity {
     private String selectedTrainer = "Female";
     private String planMode = Coach.PLAN_MODES[0];
     private String equipmentType = Coach.EQUIPMENT_TYPES[0];
-    private int sessionMinutes = 30;
+    private int sessionMinutes = 45;
+    private boolean customDuration;
     private int trainingDays = 3;
     private int workingWeightKg = 20;
     private int planSets = 3;
     private int planReps = 10;
-    private int planRestSeconds = 90;
+    private int planRestSeconds = 180;
     private final String[] weekDays = {"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"};
     /** Monday / Wednesday / Friday is the default weekly rhythm; unselected days are explicit rest days. */
     private boolean[] weeklyWorkoutDays = {true, false, true, false, true, false, false};
+    /** Daily plans use one date; Weekly plans retain one or two focus areas for each training day. */
+    private final List<String> selectedTargets = new ArrayList<>();
+    private final List<List<String>> weeklyDayTargets = new ArrayList<>();
+    private final List<List<Coach.Exercise>> weeklySessions = new ArrayList<>();
+    private int activeScheduleDay = 2;
+    private int dailyScheduledDay = 2;
+    private int selectedWeekOffset = 1;
     private List<Coach.Exercise> session = new ArrayList<>();
     private List<Coach.Exercise> availableExercises = new ArrayList<>();
     private List<Coach.Exercise> selectedExercises = new ArrayList<>();
@@ -71,6 +85,7 @@ public final class MainActivity extends Activity {
             selectedTrainer = AccountStore.get(this).trainer;
             LauncherIconManager.apply(this, selectedTrainer);
         }
+        initialisePlanSelections();
         restoreSavedPlan();
         if (hasLocalAccount) {
             showHome();
@@ -87,6 +102,95 @@ public final class MainActivity extends Activity {
 
     private int dp(int value) {
         return (int) (value * getResources().getDisplayMetrics().density + .5f);
+    }
+
+    private void initialisePlanSelections() {
+        if (selectedTargets.isEmpty()) selectedTargets.add(target);
+        while (weeklyDayTargets.size() < 7) weeklyDayTargets.add(new ArrayList<>());
+        while (weeklySessions.size() < 7) weeklySessions.add(new ArrayList<>());
+        for (int i = 0; i < weeklyWorkoutDays.length; i++) {
+            if (weeklyWorkoutDays[i] && weeklyDayTargets.get(i).isEmpty()) {
+                weeklyDayTargets.get(i).add(target);
+            }
+        }
+    }
+
+    private List<String> activeTargets() {
+        initialisePlanSelections();
+        return "Weekly".equals(planMode) ? weeklyDayTargets.get(activeScheduleDay) : selectedTargets;
+    }
+
+    private String focusSummary(List<String> focuses) {
+        if (focuses == null || focuses.isEmpty()) return "Choose a focus";
+        return String.join(" + ", focuses);
+    }
+
+    private void syncPrimaryTarget() {
+        List<String> focuses = activeTargets();
+        if (!focuses.isEmpty()) target = focuses.get(0);
+    }
+
+    private Calendar selectedWeekStart() {
+        Calendar week = Calendar.getInstance();
+        week.setFirstDayOfWeek(Calendar.MONDAY);
+        week.set(Calendar.HOUR_OF_DAY, 0);
+        week.set(Calendar.MINUTE, 0);
+        week.set(Calendar.SECOND, 0);
+        week.set(Calendar.MILLISECOND, 0);
+        int daysSinceMonday = (week.get(Calendar.DAY_OF_WEEK) - Calendar.MONDAY + 7) % 7;
+        week.add(Calendar.DAY_OF_YEAR, -daysSinceMonday + (selectedWeekOffset * 7));
+        return week;
+    }
+
+    private Calendar selectedWeekDate(int index) {
+        Calendar date = selectedWeekStart();
+        date.add(Calendar.DAY_OF_YEAR, index);
+        return date;
+    }
+
+    private String selectedWeekTitle() {
+        Calendar start = selectedWeekStart();
+        Calendar end = selectedWeekDate(6);
+        SimpleDateFormat monthDay = new SimpleDateFormat("MMM d", Locale.getDefault());
+        return "Week of " + monthDay.format(start.getTime()) + "–" + monthDay.format(end.getTime());
+    }
+
+    private String scheduleDayLabel(int index) {
+        return weekDays[index] + " " + selectedWeekDate(index).get(Calendar.DAY_OF_MONTH);
+    }
+
+    private String scheduledDateSummary(int index) {
+        return new SimpleDateFormat("EEEE, MMM d", Locale.getDefault()).format(selectedWeekDate(index).getTime());
+    }
+
+    private String[] wizardLabels() {
+        if ("Weekly".equals(planMode)) return new String[]{"Plan", "Week", "Train", "Equipment", "Exercises", "Sets"};
+        if ("Daily".equals(planMode)) return new String[]{"Plan", "Day", "Train", "Time", "Equipment", "Exercises", "Sets"};
+        return new String[]{"Plan", "Train", "Time", "Equipment", "Exercises", "Sets"};
+    }
+
+    private int wizardStep(String label) {
+        String[] labels = wizardLabels();
+        for (int i = 0; i < labels.length; i++) if (label.equals(labels[i])) return i + 1;
+        return 1;
+    }
+
+    /** The supplied reference was composed around a compact phone. Modern Android phones are taller. */
+    private boolean hasTallPlanViewport() {
+        float heightDp = getResources().getDisplayMetrics().heightPixels / getResources().getDisplayMetrics().density;
+        return heightDp >= 820f;
+    }
+
+    private int planGridGap() { return hasTallPlanViewport() ? 8 : 5; }
+    private int planTargetTileHeight() { return hasTallPlanViewport() ? 150 : 110; }
+    private int planEquipmentTileHeight() { return hasTallPlanViewport() ? 184 : 145; }
+    private int planExercisePosterSize() { return hasTallPlanViewport() ? 84 : 72; }
+    private int planActionHeight() { return hasTallPlanViewport() ? 56 : 47; }
+    private int planBackHeight() { return hasTallPlanViewport() ? 40 : 34; }
+
+    private void elevatePlanSurface(View view, boolean selected) {
+        view.setElevation(dp(selected ? 5 : 3));
+        view.setTranslationZ(dp(selected ? 1 : 0));
     }
 
     private GradientDrawable surface(int fill, int radius, int stroke, int strokeColor) {
@@ -162,6 +266,104 @@ public final class MainActivity extends Activity {
         shell.addView(scroll, new LinearLayout.LayoutParams(0, -1, 1));
         setContentView(shell);
         return body;
+    }
+
+    /**
+     * The compact 360-unit composition approved for the workout wizard. Keeping this separate
+     * from the broader home/profile shell prevents a wizard visual refit from changing those
+     * screens or introducing a second navigation style.
+     */
+    private LinearLayout planPage() {
+        setSystemBars();
+        ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(true);
+        scroll.setClipToPadding(false);
+        scroll.setBackgroundColor(navy);
+        LinearLayout body = new LinearLayout(this);
+        body.setOrientation(LinearLayout.VERTICAL);
+        body.setBackgroundColor(navy);
+        body.setPadding(dp(8), dp(hasTallPlanViewport() ? 18 : 10), dp(12), dp(32));
+        scroll.addView(body, new ScrollView.LayoutParams(-1, -2));
+
+        LinearLayout shell = new LinearLayout(this);
+        shell.setOrientation(LinearLayout.HORIZONTAL);
+        shell.setBackgroundColor(navy);
+        // Android 15 draws edge-to-edge by default; keep the coach and wizard clear of system text.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            shell.setOnApplyWindowInsetsListener((view, insets) -> {
+                android.graphics.Insets bars = insets.getInsets(WindowInsets.Type.systemBars());
+                view.setPadding(0, bars.top, 0, bars.bottom);
+                return insets;
+            });
+        }
+        shell.addView(planCoachRail(), new LinearLayout.LayoutParams(dp(76), -1));
+        shell.addView(scroll, new LinearLayout.LayoutParams(0, -1, 1));
+        setContentView(shell);
+        return body;
+    }
+
+    private LinearLayout planCoachRail() {
+        AccountStore.Profile profile = AccountStore.get(this);
+        String trainerName = "Male".equals(profile.trainer) ? "Leo" : "Mia";
+        LinearLayout rail = new LinearLayout(this);
+        rail.setOrientation(LinearLayout.VERTICAL);
+        rail.setGravity(Gravity.CENTER_HORIZONTAL);
+        rail.setPadding(dp(7), dp(hasTallPlanViewport() ? 13 : 7), dp(7), dp(12));
+        rail.setBackgroundColor(navy);
+
+        ImageView portrait = new ImageView(this);
+        portrait.setImageResource("Male".equals(profile.trainer) ? R.drawable.leo_launcher : R.drawable.mia_launcher);
+        portrait.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        portrait.setBackground(surface(navyPanel, 99, 1, mint));
+        portrait.setClipToOutline(true);
+        portrait.setContentDescription("Coach " + trainerName);
+        int portraitSize = hasTallPlanViewport() ? 54 : 48;
+        rail.addView(portrait, new LinearLayout.LayoutParams(dp(portraitSize), dp(portraitSize)));
+
+        TextView coach = text("Coach\n" + trainerName, 9, Color.WHITE);
+        coach.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams coachParams = new LinearLayout.LayoutParams(-1, -2);
+        coachParams.topMargin = dp(3);
+        rail.addView(coach, coachParams);
+
+        View divider = new View(this);
+        divider.setBackgroundColor(mint);
+        LinearLayout.LayoutParams dividerParams = new LinearLayout.LayoutParams(dp(3), dp(hasTallPlanViewport() ? 46 : 36));
+        dividerParams.topMargin = dp(hasTallPlanViewport() ? 18 : 13);
+        dividerParams.bottomMargin = dp(planGridGap());
+        rail.addView(divider, dividerParams);
+
+        addPlanRailItem(rail, "Home", R.drawable.ic_nav_home, false, view -> showHome());
+        addPlanRailItem(rail, "Workouts", R.drawable.ic_nav_plan, true, view -> showPlans());
+        addPlanRailItem(rail, "Progress", R.drawable.ic_nav_progress, false, view -> showProgress());
+        addPlanRailItem(rail, "Nutrition", R.drawable.ic_nav_nutrition, false, view -> showMeals());
+        addPlanRailItem(rail, "Settings", R.drawable.ic_nav_settings, false, view -> showProfile());
+        return rail;
+    }
+
+    private void addPlanRailItem(LinearLayout rail, String label, int icon, boolean selected, View.OnClickListener listener) {
+        LinearLayout item = new LinearLayout(this);
+        item.setOrientation(LinearLayout.VERTICAL);
+        item.setGravity(Gravity.CENTER);
+        item.setClickable(true);
+        item.setFocusable(true);
+        item.setContentDescription(selected ? label + ", current screen" : "Open " + label);
+        item.setOnClickListener(listener);
+        item.setBackground(surface(selected ? mint : navyPanel, 14, selected ? 2 : 1, selected ? coral : Color.rgb(31, 76, 91)));
+        elevatePlanSurface(item, selected);
+        ImageView symbol = new ImageView(this);
+        symbol.setImageResource(icon);
+        symbol.setImageTintList(ColorStateList.valueOf(selected ? navy : mint));
+        symbol.setContentDescription(null);
+        item.addView(symbol, new LinearLayout.LayoutParams(dp(21), dp(21)));
+        TextView caption = text(label, 8, selected ? navy : mint);
+        caption.setGravity(Gravity.CENTER);
+        caption.setSingleLine(true);
+        caption.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
+        item.addView(caption, new LinearLayout.LayoutParams(-1, -2));
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(dp(60), dp(hasTallPlanViewport() ? 54 : 48));
+        params.topMargin = dp(hasTallPlanViewport() ? 10 : 7);
+        rail.addView(item, params);
     }
 
     private LinearLayout coachRail(String activeScreen) {
@@ -250,6 +452,62 @@ public final class MainActivity extends Activity {
             body.addView(text(copy, 16, Color.rgb(211, 225, 233)));
         }
         gap(body, 20);
+    }
+
+    /** Typography, rhythm and spacing from the supplied 360-unit wizard artwork. */
+    private void planTitle(LinearLayout body, String eyebrow, String main, String copy) {
+        TextView label = heading(eyebrow.toUpperCase(Locale.ROOT), hasTallPlanViewport() ? 10 : 9, mint);
+        label.setLetterSpacing(.07f);
+        body.addView(label);
+        gap(body, hasTallPlanViewport() ? 5 : 3);
+        TextView headline = heading(main, hasTallPlanViewport() ? 30 : 26, Color.WHITE);
+        headline.setLineSpacing(dp(0), .95f);
+        body.addView(headline);
+        if (copy != null && !copy.isEmpty()) {
+            gap(body, hasTallPlanViewport() ? 8 : 5);
+            TextView description = text(copy, hasTallPlanViewport() ? 14 : 12, Color.rgb(211, 225, 233));
+            description.setLineSpacing(dp(2), 1f);
+            body.addView(description);
+        }
+        gap(body, hasTallPlanViewport() ? 18 : 12);
+    }
+
+    private Button planPrimary(String label) {
+        Button button = action(label, coral, navy);
+        button.setTextSize(hasTallPlanViewport() ? 15 : 13);
+        button.setBackground(surface(coral, 15, 0, Color.TRANSPARENT));
+        button.setElevation(dp(4));
+        button.setMinHeight(0);
+        return button;
+    }
+
+    private Button planBack() {
+        Button button = new Button(this);
+        button.setText("Back");
+        button.setContentDescription("Back");
+        button.setAllCaps(false);
+        button.setTextSize(hasTallPlanViewport() ? 14 : 12);
+        button.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
+        button.setTextColor(mint);
+        button.setGravity(Gravity.CENTER);
+        button.setPadding(0, 0, 0, 0);
+        button.setBackgroundColor(Color.TRANSPARENT);
+        button.setMinHeight(0);
+        return button;
+    }
+
+    private void addPlanButton(LinearLayout body, Button button) {
+        body.addView(button, new LinearLayout.LayoutParams(-1, dp(planActionHeight())));
+    }
+
+    private void addPlanBack(LinearLayout body, Button button) {
+        body.addView(button, new LinearLayout.LayoutParams(-1, dp(planBackHeight())));
+    }
+
+    private ReferenceArtworkView referenceArtwork(int source, int left, int top, int right, int bottom) {
+        ReferenceArtworkView artwork = new ReferenceArtworkView(this);
+        artwork.setArtwork(source, left, top, right, bottom);
+        return artwork;
     }
 
     private LinearLayout card() {
@@ -585,9 +843,9 @@ public final class MainActivity extends Activity {
 
     /** Step 1: choose a planning rhythm before choosing movements. */
     private void showPlanType() {
-        LinearLayout body = appPage("Workouts");
-        title(body, "PLAN YOUR WORKOUT", "Build it your way", "Choose a schedule, body area, and equipment. Then select only the exercises you want.");
-        addWizardProgress(body, 1);
+        LinearLayout body = planPage();
+        planTitle(body, "PLAN YOUR WORKOUT", "Build it your way", "Choose a schedule, body area, and equipment. Then select only the exercises you want.");
+        addWizardProgress(body, wizardStep("Plan"));
         body.addView(heading("Choose your plan type", 21, Color.WHITE));
         gap(body, 10);
         body.addView(planTypeTile("Weekly", "Schedule workouts and rest days", R.drawable.ic_plan_weekly, true));
@@ -596,9 +854,25 @@ public final class MainActivity extends Activity {
         gap(body, 9);
         body.addView(planTypeTile("Custom", "Choose every detail yourself", R.drawable.ic_plan_custom, false));
         gap(body, 15);
-        Button next = primary("Next");
-        next.setOnClickListener(view -> showPlanTarget());
-        addButton(body, next);
+        Button next = planPrimary("Next");
+        next.setOnClickListener(view -> {
+            if ("Daily".equals(planMode)) {
+                if (sessionMinutes < 45) {
+                    sessionMinutes = 60;
+                    customDuration = false;
+                }
+                showPlanSchedule();
+            } else if ("Weekly".equals(planMode)) {
+                if (sessionMinutes < 45) {
+                    sessionMinutes = 45;
+                    customDuration = false;
+                }
+                showPlanSchedule();
+            } else {
+                showPlanTarget();
+            }
+        });
+        addPlanButton(body, next);
         gap(body, 8);
         Button library = secondary("Browse exercise library");
         library.setOnClickListener(item -> showLibrary());
@@ -606,26 +880,40 @@ public final class MainActivity extends Activity {
     }
 
     private void addWizardProgress(LinearLayout body, int activeStep) {
-        LinearLayout row = new LinearLayout(this);
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        String[] labels = {"Plan", "Train", "Equipment", "Exercises", "Sets"};
+        LinearLayout rail = new LinearLayout(this);
+        rail.setOrientation(LinearLayout.VERTICAL);
+        String[] labels = wizardLabels();
+        LinearLayout markers = new LinearLayout(this);
+        markers.setOrientation(LinearLayout.HORIZONTAL);
+        markers.setGravity(Gravity.CENTER_VERTICAL);
         for (int i = 0; i < labels.length; i++) {
-            final int step = i + 1;
-            LinearLayout item = new LinearLayout(this);
-            item.setOrientation(LinearLayout.VERTICAL);
-            item.setGravity(Gravity.CENTER);
-            TextView marker = heading(step < activeStep ? "✓" : String.valueOf(step), 13, step <= activeStep ? navy : Color.rgb(205, 215, 231));
+            int step = i + 1;
+            int markerSize = hasTallPlanViewport() ? 28 : 23;
+            TextView marker = heading(step < activeStep ? "✓" : String.valueOf(step), hasTallPlanViewport() ? 15 : 13, step <= activeStep ? navy : Color.rgb(205, 215, 231));
             marker.setGravity(Gravity.CENTER);
-            marker.setBackground(surface(step <= activeStep ? mint : navyPanel, 99, step <= activeStep ? 0 : 1, Color.rgb(161, 178, 203)));
-            item.addView(marker, new LinearLayout.LayoutParams(dp(31), dp(31)));
-            TextView label = text(labels[i], 9, step == activeStep ? mint : Color.rgb(205, 215, 231));
+            marker.setBackground(surface(step <= activeStep ? mint : navyPanel, 99, step <= activeStep ? 0 : 1, Color.rgb(95, 113, 139)));
+            markers.addView(marker, new LinearLayout.LayoutParams(dp(markerSize), dp(markerSize)));
+            if (i < labels.length - 1) {
+                View connector = new View(this);
+                connector.setBackgroundColor(step < activeStep ? mint : Color.rgb(75, 91, 117));
+                LinearLayout.LayoutParams connectorParams = new LinearLayout.LayoutParams(0, dp(hasTallPlanViewport() ? 2 : 1), 1);
+                connectorParams.leftMargin = dp(hasTallPlanViewport() ? 5 : 4);
+                connectorParams.rightMargin = dp(hasTallPlanViewport() ? 5 : 4);
+                markers.addView(connector, connectorParams);
+            }
+        }
+        rail.addView(markers, new LinearLayout.LayoutParams(-1, dp(hasTallPlanViewport() ? 30 : 24)));
+        LinearLayout names = new LinearLayout(this);
+        names.setOrientation(LinearLayout.HORIZONTAL);
+        for (int i = 0; i < labels.length; i++) {
+            TextView label = text(labels[i], hasTallPlanViewport() ? 9 : 8, i + 1 == activeStep ? mint : Color.rgb(205, 215, 231));
             label.setGravity(Gravity.CENTER);
             label.setSingleLine(true);
-            item.addView(label, new LinearLayout.LayoutParams(-1, -2));
-            row.addView(item, new LinearLayout.LayoutParams(0, dp(53), 1));
+            names.addView(label, new LinearLayout.LayoutParams(0, dp(hasTallPlanViewport() ? 21 : 17), 1));
         }
-        body.addView(row);
-        gap(body, 10);
+        rail.addView(names, new LinearLayout.LayoutParams(-1, dp(hasTallPlanViewport() ? 21 : 17)));
+        body.addView(rail);
+        gap(body, hasTallPlanViewport() ? 14 : 9);
     }
 
     private LinearLayout planTypeTile(String mode, String copy, int icon, boolean recommended) {
@@ -661,68 +949,343 @@ public final class MainActivity extends Activity {
         return tile;
     }
 
-    /** Step 2: training area tiles; machine-assisted remains an equipment choice, never a body area. */
+    /** Step 2 for Weekly and Daily plans: a real week picker before workout details. */
+    private void showPlanSchedule() {
+        boolean weekly = "Weekly".equals(planMode);
+        LinearLayout body = planPage();
+        planTitle(body, weekly ? "WEEKLY PLAN" : "DAILY PLAN", weekly ? "Choose your\ntraining week" : "Choose your\nworkout day", weekly
+                ? "Pick a week, select your workout days, then assign each day a focus. Unselected days are Rest Days."
+                : "Choose one date in the upcoming week. Your daily plan will be scheduled only for that day.");
+        addWizardProgress(body, wizardStep(weekly ? "Week" : "Day"));
+
+        LinearLayout picker = card();
+        picker.setPadding(dp(14), dp(14), dp(14), dp(14));
+        LinearLayout pickerHeader = new LinearLayout(this);
+        pickerHeader.setGravity(Gravity.CENTER_VERTICAL);
+        Button previous = compactControl("‹");
+        previous.setTextSize(24);
+        previous.setContentDescription("Show the previous week");
+        previous.setOnClickListener(view -> { selectedWeekOffset--; showPlanSchedule(); });
+        pickerHeader.addView(previous, new LinearLayout.LayoutParams(dp(44), dp(44)));
+        TextView weekTitle = heading(selectedWeekTitle(), 17, ink);
+        weekTitle.setGravity(Gravity.CENTER);
+        pickerHeader.addView(weekTitle, new LinearLayout.LayoutParams(0, dp(44), 1));
+        Button following = compactControl("›");
+        following.setTextSize(24);
+        following.setContentDescription("Show the next week");
+        following.setOnClickListener(view -> { selectedWeekOffset++; showPlanSchedule(); });
+        pickerHeader.addView(following, new LinearLayout.LayoutParams(dp(44), dp(44)));
+        picker.addView(pickerHeader);
+        picker.addView(text(weekly ? "Tap a day to mark Train or Rest." : "Tap one day for your workout.", 12, muted));
+        gap(picker, 10);
+
+        LinearLayout days = new LinearLayout(this);
+        days.setOrientation(LinearLayout.HORIZONTAL);
+        for (int i = 0; i < weekDays.length; i++) {
+            final int dayIndex = i;
+            boolean selected = weekly ? weeklyWorkoutDays[i] : dailyScheduledDay == i;
+            LinearLayout day = new LinearLayout(this);
+            day.setOrientation(LinearLayout.VERTICAL);
+            day.setGravity(Gravity.CENTER);
+            day.setClickable(true);
+            day.setFocusable(true);
+            day.setContentDescription(scheduleDayLabel(i) + (selected ? ", selected workout day" : weekly ? ", rest day" : ", available workout day"));
+            day.setBackground(surface(selected ? mint : Color.rgb(232, 236, 244), 12, selected ? 1 : 0, selected ? mint : Color.TRANSPARENT));
+            TextView weekday = heading(weekDays[i], 9, selected ? navy : ink);
+            weekday.setGravity(Gravity.CENTER);
+            TextView date = heading(String.valueOf(selectedWeekDate(i).get(Calendar.DAY_OF_MONTH)), 15, selected ? navy : ink);
+            date.setGravity(Gravity.CENTER);
+            TextView state = text(selected ? "Train" : weekly ? "Rest" : "Open", 8, selected ? navy : muted);
+            state.setGravity(Gravity.CENTER);
+            day.addView(weekday, new LinearLayout.LayoutParams(-1, dp(17)));
+            day.addView(date, new LinearLayout.LayoutParams(-1, dp(21)));
+            day.addView(state, new LinearLayout.LayoutParams(-1, dp(16)));
+            day.setOnClickListener(view -> {
+                if (weekly) {
+                    weeklyWorkoutDays[dayIndex] = !weeklyWorkoutDays[dayIndex];
+                    if (weeklyWorkoutDays[dayIndex] && weeklyDayTargets.get(dayIndex).isEmpty()) {
+                        weeklyDayTargets.get(dayIndex).add(target);
+                    }
+                    activeScheduleDay = dayIndex;
+                    syncTrainingDays();
+                } else {
+                    dailyScheduledDay = dayIndex;
+                }
+                showPlanSchedule();
+            });
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(58), 1);
+            params.rightMargin = i == weekDays.length - 1 ? 0 : dp(3);
+            days.addView(day, params);
+        }
+        picker.addView(days);
+        body.addView(picker);
+        gap(body, 10);
+
+        if (weekly) {
+            LinearLayout rhythm = card();
+            rhythm.addView(heading("How many days this week?", 17, ink));
+            rhythm.addView(text("Start with a rhythm, then place those days exactly where you want them.", 12, muted));
+            LinearLayout counts = new LinearLayout(this);
+            counts.setOrientation(LinearLayout.HORIZONTAL);
+            for (int count : new int[]{2, 3, 4, 5}) {
+                Button option = count == trainingDays ? action(count + " days", mint, navy) : action(count + " days", Color.rgb(232, 236, 244), ink);
+                option.setTextSize(11);
+                option.setOnClickListener(view -> { applyTrainingDayCount(count); showPlanSchedule(); });
+                LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(42), 1);
+                params.rightMargin = count == 5 ? 0 : dp(5);
+                counts.addView(option, params);
+            }
+            LinearLayout.LayoutParams countsParams = new LinearLayout.LayoutParams(-1, -2);
+            countsParams.topMargin = dp(9);
+            rhythm.addView(counts, countsParams);
+            body.addView(rhythm);
+            gap(body, 12);
+        }
+
+        Button next = planPrimary(weekly ? "Next: assign workouts" : "Next: choose training areas");
+        next.setOnClickListener(view -> {
+            if (weekly && trainingDays == 0) {
+                toast("Choose at least one workout day.");
+                return;
+            }
+            showPlanTarget();
+        });
+        addPlanButton(body, next);
+        Button back = planBack();
+        back.setOnClickListener(view -> showPlanType());
+        addPlanBack(body, back);
+    }
+
+    private void applyTrainingDayCount(int count) {
+        boolean[] defaultRhythm = {true, false, true, false, true, false, false};
+        for (int i = 0; i < weeklyWorkoutDays.length; i++) weeklyWorkoutDays[i] = false;
+        int selected = 0;
+        for (int i = 0; i < defaultRhythm.length && selected < count; i++) {
+            if (defaultRhythm[i]) { weeklyWorkoutDays[i] = true; selected++; }
+        }
+        for (int i = 0; i < weeklyWorkoutDays.length && selected < count; i++) {
+            if (!weeklyWorkoutDays[i]) { weeklyWorkoutDays[i] = true; selected++; }
+        }
+        syncTrainingDays();
+        initialisePlanSelections();
+    }
+
+    /** Assign one or two focus areas to the single Daily date or the active Weekly date. */
     private void showPlanTarget() {
-        LinearLayout body = appPage("Workouts");
-        title(body, "PLAN YOUR WORKOUT", "What do you want to train?", "Choose an area and we’ll recommend movements that fit your plan.");
-        addWizardProgress(body, 2);
-        for (int index = 0; index < Coach.TARGETS.length; index += 2) {
+        initialisePlanSelections();
+        boolean weekly = "Weekly".equals(planMode);
+        if (weekly && !weeklyWorkoutDays[activeScheduleDay]) {
+            for (int i = 0; i < weeklyWorkoutDays.length; i++) {
+                if (weeklyWorkoutDays[i]) { activeScheduleDay = i; break; }
+            }
+        }
+        List<String> focuses = activeTargets();
+        LinearLayout body = planPage();
+        String eyebrow = weekly ? "WEEKLY PLAN · " + scheduleDayLabel(activeScheduleDay).toUpperCase(Locale.ROOT)
+                : "Daily".equals(planMode) ? "DAILY PLAN · " + scheduleDayLabel(dailyScheduledDay).toUpperCase(Locale.ROOT)
+                : "CUSTOM PLAN";
+        planTitle(body, eyebrow, "What do you want\nto train?", "Choose up to two focus areas. We’ll recommend movements that fit this workout.");
+        addWizardProgress(body, wizardStep("Train"));
+        if (weekly) addWeeklyAssignmentStrip(body);
+        for (int index = 0; index < WIZARD_TARGETS.length; index += 2) {
             LinearLayout row = new LinearLayout(this);
             row.setOrientation(LinearLayout.HORIZONTAL);
-            for (int offset = 0; offset < 2 && index + offset < Coach.TARGETS.length; offset++) {
-                String choice = Coach.TARGETS[index + offset];
-                LinearLayout tile = targetTile(choice, choice.equals(target));
+            for (int offset = 0; offset < 2; offset++) {
+                String choice = WIZARD_TARGETS[index + offset];
+                LinearLayout tile = targetTile(choice, focuses.contains(choice));
                 tile.setOnClickListener(view -> {
-                    target = choice;
+                    toggleActiveTarget(choice);
                     session.clear();
                     resetExerciseSelection();
                     showPlanTarget();
                 });
-                LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(126), 1);
-                params.rightMargin = offset == 0 ? dp(8) : 0;
+                LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(planTargetTileHeight()), 1);
+                params.rightMargin = offset == 0 ? dp(planGridGap()) : 0;
                 row.addView(tile, params);
             }
-            if (index + 1 >= Coach.TARGETS.length) row.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1));
             body.addView(row);
-            gap(body, 8);
+            gap(body, planGridGap());
         }
-        Button next = primary("Next: choose equipment");
-        next.setOnClickListener(view -> showPlanEquipment());
-        addButton(body, next);
+        LinearLayout selection = card();
+        selection.setPadding(dp(13), dp(11), dp(13), dp(11));
+        selection.addView(heading(weekly ? scheduledDateSummary(activeScheduleDay) : scheduledDateSummary(dailyScheduledDay), 14, ink));
+        selection.addView(text("Selected: " + focusSummary(focuses), 13, muted));
+        body.addView(selection);
+        gap(body, 10);
+        Button next = planPrimary(("Daily".equals(planMode) || "Custom".equals(planMode)) ? "Next: choose workout length" : "Next: choose equipment");
+        next.setOnClickListener(view -> {
+            if (activeTargets().isEmpty()) {
+                toast("Choose at least one training area.");
+                return;
+            }
+            syncPrimaryTarget();
+            if ("Daily".equals(planMode) || "Custom".equals(planMode)) showPlanDuration();
+            else showPlanEquipment();
+        });
+        addPlanButton(body, next);
+        Button back = planBack();
+        back.setOnClickListener(view -> {
+            if ("Weekly".equals(planMode) || "Daily".equals(planMode)) showPlanSchedule();
+            else showPlanType();
+        });
+        addPlanBack(body, back);
+    }
+
+    private void addWeeklyAssignmentStrip(LinearLayout body) {
+        HorizontalScrollView scroll = new HorizontalScrollView(this);
+        scroll.setHorizontalScrollBarEnabled(false);
+        LinearLayout days = new LinearLayout(this);
+        days.setOrientation(LinearLayout.HORIZONTAL);
+        for (int i = 0; i < weeklyWorkoutDays.length; i++) {
+            if (!weeklyWorkoutDays[i]) continue;
+            final int dayIndex = i;
+            boolean active = activeScheduleDay == i;
+            Button day = action(scheduleDayLabel(i) + "\n" + focusSummary(weeklyDayTargets.get(i)), active ? mint : navyPanel, active ? navy : mint);
+            day.setAllCaps(false);
+            day.setTextSize(10);
+            day.setGravity(Gravity.CENTER);
+            day.setContentDescription(scheduleDayLabel(i) + ", " + focusSummary(weeklyDayTargets.get(i)) + (active ? ", currently editing" : ", edit this day"));
+            day.setOnClickListener(view -> { activeScheduleDay = dayIndex; syncPrimaryTarget(); showPlanTarget(); });
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(dp(106), dp(52));
+            params.rightMargin = dp(7);
+            days.addView(day, params);
+        }
+        scroll.addView(days, new HorizontalScrollView.LayoutParams(-2, -2));
+        body.addView(scroll, new LinearLayout.LayoutParams(-1, dp(57)));
         gap(body, 8);
-        Button back = secondary("Back");
-        back.setOnClickListener(view -> showPlanType());
-        addButton(body, back);
+    }
+
+    private void toggleActiveTarget(String choice) {
+        List<String> focuses = activeTargets();
+        if (focuses.contains(choice)) {
+            focuses.remove(choice);
+        } else if (focuses.size() >= 2) {
+            toast("Choose up to two training areas for one workout.");
+        } else {
+            focuses.add(choice);
+        }
+        syncPrimaryTarget();
     }
 
     private String targetLabel(String value) {
         if ("Upper".equals(value)) return "Upper body";
         if ("Lower".equals(value)) return "Lower body";
+        if ("Full Body".equals(value)) return "Full body";
         return value;
     }
 
     private LinearLayout targetTile(String choice, boolean selected) {
         LinearLayout tile = new LinearLayout(this);
         tile.setOrientation(LinearLayout.VERTICAL);
-        tile.setPadding(dp(7), dp(7), dp(7), dp(8));
         tile.setClickable(true);
         tile.setFocusable(true);
         tile.setContentDescription((selected ? "Selected training area: " : "Choose training area: ") + targetLabel(choice));
-        tile.setBackground(surface(paper, 17, selected ? 2 : 1, selected ? mint : cardLine));
-        List<Coach.Exercise> examples = Coach.planOptions(choice, "Bodyweight");
-        if (!examples.isEmpty()) tile.addView(exercisePoster(AccountStore.get(this).trainer, examples.get(0)), new LinearLayout.LayoutParams(-1, dp(76)));
-        TextView name = heading((selected ? "✓  " : "") + targetLabel(choice), 12, ink);
+        tile.setBackground(surface(paper, 16, selected ? 2 : 1, selected ? mint : cardLine));
+        tile.setClipToOutline(true);
+        elevatePlanSurface(tile, selected);
+        FrameLayout imageArea = new FrameLayout(this);
+        ReferenceArtworkView artwork;
+        if ("Upper".equals(choice)) artwork = referenceArtwork(R.drawable.reference_train_page, 88, 223, 202, 307);
+        else if ("Lower".equals(choice)) artwork = referenceArtwork(R.drawable.reference_train_page, 205, 223, 320, 307);
+        else if ("Arms".equals(choice)) artwork = referenceArtwork(R.drawable.reference_train_page, 88, 337, 202, 421);
+        else if ("Chest".equals(choice)) artwork = referenceArtwork(R.drawable.reference_train_page, 205, 337, 320, 421);
+        else if ("Legs".equals(choice)) artwork = referenceArtwork(R.drawable.reference_train_page, 88, 449, 202, 533);
+        else artwork = referenceArtwork(R.drawable.reference_train_page, 205, 449, 320, 533);
+        imageArea.addView(artwork, new FrameLayout.LayoutParams(-1, -1));
+        if (selected) {
+            TextView check = heading("✓", hasTallPlanViewport() ? 14 : 12, navy);
+            check.setGravity(Gravity.CENTER);
+            check.setBackground(surface(mint, 99, 0, Color.TRANSPARENT));
+            int checkSize = hasTallPlanViewport() ? 25 : 21;
+            FrameLayout.LayoutParams checkParams = new FrameLayout.LayoutParams(dp(checkSize), dp(checkSize), Gravity.RIGHT | Gravity.TOP);
+            checkParams.topMargin = dp(hasTallPlanViewport() ? 7 : 4);
+            checkParams.rightMargin = dp(hasTallPlanViewport() ? 7 : 4);
+            imageArea.addView(check, checkParams);
+        }
+        tile.addView(imageArea, new LinearLayout.LayoutParams(-1, 0, 1));
+        TextView name = heading(targetLabel(choice), hasTallPlanViewport() ? 13 : 11, ink);
         name.setGravity(Gravity.CENTER);
         name.setSingleLine(true);
-        tile.addView(name, new LinearLayout.LayoutParams(-1, -2));
+        tile.addView(name, new LinearLayout.LayoutParams(-1, dp(hasTallPlanViewport() ? 34 : 25)));
         return tile;
     }
 
     /** Step 3: only equipment choices. This keeps the requested Machine-assisted category distinct and discoverable. */
+    /** Daily and Custom plans size the recommendation before choosing equipment. */
+    private void showPlanDuration() {
+        LinearLayout body = planPage();
+        planTitle(body, planMode.toUpperCase(Locale.ROOT) + " PLAN · " + focusSummary(activeTargets()).toUpperCase(Locale.ROOT), "How long do you\nwant to train?", "We’ll recommend a balanced range of movements that fits this time without rushing recovery.");
+        addWizardProgress(body, wizardStep("Time"));
+
+        LinearLayout lengthCard = card();
+        lengthCard.addView(heading("Workout length", 19, ink));
+        lengthCard.addView(text("Choose a time frame. You can still select every movement yourself on the next screens.", 13, muted));
+        gap(lengthCard, 10);
+        LinearLayout options = new LinearLayout(this);
+        options.setOrientation(LinearLayout.HORIZONTAL);
+        int[] minutes = {45, 60, 110};
+        String[] labels = {"45 min", "60 min", "1 hr 50 min"};
+        for (int i = 0; i < minutes.length; i++) {
+            final int value = minutes[i];
+            Button option = !customDuration && sessionMinutes == value ? action(labels[i], mint, navy) : action(labels[i], Color.rgb(232, 236, 244), ink);
+            option.setTextSize(10);
+            option.setOnClickListener(view -> { sessionMinutes = value; customDuration = false; resetExerciseSelection(); showPlanDuration(); });
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(48), 1);
+            params.rightMargin = dp(i == minutes.length - 1 ? 0 : 5);
+            options.addView(option, params);
+        }
+        lengthCard.addView(options);
+        Button custom = customDuration ? action("Custom · " + sessionMinutes + " min", mint, navy) : action("Custom", navyPanel, mint);
+        custom.setTextSize(12);
+        LinearLayout.LayoutParams customParams = new LinearLayout.LayoutParams(-1, dp(46));
+        customParams.topMargin = dp(7);
+        custom.setOnClickListener(view -> {
+            customDuration = true;
+            if (sessionMinutes == 45 || sessionMinutes == 60 || sessionMinutes == 110) sessionMinutes = 75;
+            showPlanDuration();
+        });
+        lengthCard.addView(custom, customParams);
+        if (customDuration) addDurationStepper(lengthCard);
+        body.addView(lengthCard);
+        gap(body, 10);
+
+        LinearLayout capacity = card();
+        capacity.setPadding(dp(14), dp(12), dp(14), dp(12));
+        capacity.addView(heading("Up to " + Coach.durationSummary(sessionMinutes), 16, ink));
+        capacity.addView(text("Your exercise page starts with a time-appropriate shortlist. Add or remove movements freely.", 13, muted));
+        body.addView(capacity);
+        gap(body, 12);
+        Button next = planPrimary("Next: choose equipment");
+        next.setOnClickListener(view -> showPlanEquipment());
+        addPlanButton(body, next);
+        Button back = planBack();
+        back.setOnClickListener(view -> showPlanTarget());
+        addPlanBack(body, back);
+    }
+
+    private void addDurationStepper(LinearLayout container) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.addView(heading("Custom minutes", 15, ink), new LinearLayout.LayoutParams(0, dp(44), 1));
+        Button minus = compactControl("−");
+        minus.setContentDescription("Decrease custom workout length by five minutes");
+        minus.setOnClickListener(view -> { sessionMinutes = Math.max(20, sessionMinutes - 5); resetExerciseSelection(); showPlanDuration(); });
+        row.addView(minus, new LinearLayout.LayoutParams(dp(42), dp(42)));
+        TextView minutes = heading(sessionMinutes + " min", 14, ink);
+        minutes.setGravity(Gravity.CENTER);
+        row.addView(minutes, new LinearLayout.LayoutParams(dp(76), dp(42)));
+        Button plus = compactControl("+");
+        plus.setContentDescription("Increase custom workout length by five minutes");
+        plus.setOnClickListener(view -> { sessionMinutes = Math.min(180, sessionMinutes + 5); resetExerciseSelection(); showPlanDuration(); });
+        row.addView(plus, new LinearLayout.LayoutParams(dp(42), dp(42)));
+        container.addView(row);
+    }
+
     private void showPlanEquipment() {
-        LinearLayout body = appPage("Workouts");
-        title(body, "PLAN YOUR WORKOUT", "Choose your equipment", "We’ll tailor your " + target.toLowerCase(Locale.ROOT) + " session to what you have available.");
-        addWizardProgress(body, 3);
+        LinearLayout body = planPage();
+        planTitle(body, "PLAN YOUR WORKOUT", "Choose your\nequipment", "We’ll tailor your " + focusSummary(activeTargets()).toLowerCase(Locale.ROOT) + " session to what you have available.");
+        addWizardProgress(body, wizardStep("Equipment"));
         for (int index = 0; index < Coach.EQUIPMENT_TYPES.length; index += 2) {
             LinearLayout row = new LinearLayout(this);
             row.setOrientation(LinearLayout.HORIZONTAL);
@@ -735,30 +1298,33 @@ public final class MainActivity extends Activity {
                     resetExerciseSelection();
                     showPlanEquipment();
                 });
-                LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(145), 1);
-                params.rightMargin = offset == 0 ? dp(8) : 0;
+                LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(planEquipmentTileHeight()), 1);
+                params.rightMargin = offset == 0 ? dp(planGridGap()) : 0;
                 row.addView(tile, params);
             }
             body.addView(row);
-            gap(body, 8);
+            gap(body, planGridGap());
         }
         if ("Machine-assisted".equals(equipmentType)) {
             LinearLayout supported = new LinearLayout(this);
             supported.setOrientation(LinearLayout.VERTICAL);
-            supported.setPadding(dp(14), dp(12), dp(14), dp(12));
-            supported.setBackground(surface(navyPanel, 16, 1, Color.rgb(45, 90, 102)));
-            supported.addView(heading("Machine-assisted options", 15, mint));
-            supported.addView(text(machineOptionsSummary(), 12, Color.rgb(221, 236, 239)));
+            supported.setPadding(dp(14), dp(11), dp(14), dp(11));
+            supported.setBackground(surface(navyPanel, 15, 1, Color.rgb(45, 90, 102)));
+            supported.setElevation(dp(2));
+            supported.addView(heading("Machine-assisted options", hasTallPlanViewport() ? 13 : 11, mint));
+            supported.addView(text(machineOptionsSummary(), hasTallPlanViewport() ? 10 : 8, Color.rgb(221, 236, 239)));
             body.addView(supported);
-            gap(body, 10);
+            gap(body, hasTallPlanViewport() ? 12 : 8);
         }
-        Button next = primary("Next: choose exercises");
+        Button next = planPrimary("Next: choose exercises");
         next.setOnClickListener(view -> showExerciseSelection());
-        addButton(body, next);
-        gap(body, 8);
-        Button back = secondary("Back");
-        back.setOnClickListener(view -> showPlanTarget());
-        addButton(body, back);
+        addPlanButton(body, next);
+        Button back = planBack();
+        back.setOnClickListener(view -> {
+            if ("Daily".equals(planMode) || "Custom".equals(planMode)) showPlanDuration();
+            else showPlanTarget();
+        });
+        addPlanBack(body, back);
     }
 
     private String machineOptionsSummary() {
@@ -784,22 +1350,39 @@ public final class MainActivity extends Activity {
         else copy = "No equipment";
         LinearLayout tile = new LinearLayout(this);
         tile.setOrientation(LinearLayout.VERTICAL);
-        tile.setPadding(dp(8), dp(8), dp(8), dp(8));
         tile.setClickable(true);
         tile.setFocusable(true);
         tile.setContentDescription((selected ? "Selected equipment: " : "Choose equipment: ") + label + ". " + copy);
-        tile.setBackground(surface(paper, 17, selected ? 2 : 1, selected ? mint : cardLine));
-        List<Coach.Exercise> examples = Coach.planOptions(target, label);
-        if (!examples.isEmpty()) {
-            tile.addView(exercisePoster(AccountStore.get(this).trainer, examples.get(0)), new LinearLayout.LayoutParams(-1, dp(72)));
-            gap(tile, 5);
+        tile.setBackground(surface(paper, 16, selected ? 2 : 1, selected ? mint : cardLine));
+        tile.setClipToOutline(true);
+        elevatePlanSurface(tile, selected);
+        FrameLayout imageArea = new FrameLayout(this);
+        ReferenceArtworkView artwork;
+        if ("Dumbbells".equals(label)) artwork = referenceArtwork(R.drawable.reference_equipment_page, 87, 209, 201, 302);
+        else if ("At home".equals(label)) artwork = referenceArtwork(R.drawable.reference_equipment_page, 207, 209, 321, 302);
+        else if ("Machine-assisted".equals(label)) artwork = referenceArtwork(R.drawable.reference_equipment_page, 87, 364, 201, 457);
+        else artwork = referenceArtwork(R.drawable.reference_equipment_page, 207, 364, 321, 457);
+        imageArea.addView(artwork, new FrameLayout.LayoutParams(-1, -1));
+        if (selected) {
+            TextView check = heading("✓", hasTallPlanViewport() ? 14 : 12, navy);
+            check.setGravity(Gravity.CENTER);
+            check.setBackground(surface(mint, 99, 0, Color.TRANSPARENT));
+            int checkSize = hasTallPlanViewport() ? 25 : 21;
+            FrameLayout.LayoutParams checkParams = new FrameLayout.LayoutParams(dp(checkSize), dp(checkSize), Gravity.RIGHT | Gravity.TOP);
+            checkParams.topMargin = dp(hasTallPlanViewport() ? 7 : 4);
+            checkParams.rightMargin = dp(hasTallPlanViewport() ? 7 : 4);
+            imageArea.addView(check, checkParams);
         }
-        TextView name = heading((selected ? "✓ " : "") + label, 12, ink);
+        tile.addView(imageArea, new LinearLayout.LayoutParams(-1, 0, 1));
+        TextView name = heading(label, hasTallPlanViewport() ? 13 : 11, ink);
+        name.setGravity(Gravity.CENTER);
         name.setSingleLine(true);
-        tile.addView(name);
-        TextView detail = text(copy, 10, muted);
-        detail.setSingleLine(true);
-        tile.addView(detail);
+        tile.addView(name, new LinearLayout.LayoutParams(-1, dp(hasTallPlanViewport() ? 26 : 19)));
+        TextView detail = text(copy, hasTallPlanViewport() ? 10 : 9, muted);
+        detail.setGravity(Gravity.CENTER);
+        detail.setMaxLines(2);
+        detail.setLineSpacing(0f, 0.95f);
+        tile.addView(detail, new LinearLayout.LayoutParams(-1, dp(hasTallPlanViewport() ? 32 : 24)));
         return tile;
     }
 
@@ -819,18 +1402,99 @@ public final class MainActivity extends Activity {
         workingWeightKg = saved.weightKg;
         planSets = saved.sets;
         planReps = saved.reps;
-        planRestSeconds = saved.restSeconds;
+        planRestSeconds = Math.max(180, Math.min(300, saved.restSeconds));
         weeklyWorkoutDays = decodeWeeklyDays(saved.weeklyDays);
+        selectedWeekOffset = saved.weekOffset;
+        dailyScheduledDay = Math.max(0, Math.min(6, saved.scheduledDay));
+        activeScheduleDay = dailyScheduledDay;
+        selectedTargets.clear();
+        selectedTargets.addAll(decodeFocusTargets(saved.focusTargets, saved.target));
+        restoreWeeklyTargets(saved.weeklyTargets, saved.target);
+        customDuration = sessionMinutes != 45 && sessionMinutes != 60 && sessionMinutes != 110;
         syncTrainingDays();
-        List<Coach.Exercise> choices = Coach.planOptions(target, equipmentType);
-        session = new ArrayList<>();
-        for (String name : saved.exerciseNames) {
+        syncPrimaryTarget();
+        if ("Weekly".equals(planMode)) {
+            restoreWeeklySessions(saved.weeklyExerciseNames);
+            if (!weeklyWorkoutDays[activeScheduleDay]) {
+                for (int i = 0; i < weeklyWorkoutDays.length; i++) if (weeklyWorkoutDays[i]) { activeScheduleDay = i; break; }
+            }
+            session = new ArrayList<>(weeklySessions.get(activeScheduleDay));
+        } else {
+            session = prescribeNames(saved.exerciseNames, Coach.planOptions(activeTargets(), equipmentType));
+        }
+    }
+
+    private List<String> decodeFocusTargets(String encoded, String fallback) {
+        ArrayList<String> focuses = new ArrayList<>();
+        if (encoded != null && !encoded.isEmpty()) {
+            for (String value : encoded.split("\\|", -1)) {
+                if (!value.isEmpty() && focuses.size() < 2) focuses.add(value);
+            }
+        }
+        if (focuses.isEmpty()) focuses.add(fallback == null || fallback.isEmpty() ? "Full Body" : fallback);
+        return focuses;
+    }
+
+    private void restoreWeeklyTargets(String encoded, String fallback) {
+        initialisePlanSelections();
+        String[] days = encoded == null ? new String[0] : encoded.split(";", -1);
+        for (int i = 0; i < weeklyDayTargets.size(); i++) {
+            weeklyDayTargets.get(i).clear();
+            if (i < days.length) weeklyDayTargets.get(i).addAll(decodeFocusTargets(days[i], fallback));
+            else if (weeklyWorkoutDays[i]) weeklyDayTargets.get(i).add(fallback);
+        }
+    }
+
+    private String encodeFocusTargets(List<String> focuses) {
+        return focuses == null ? "" : String.join("|", focuses);
+    }
+
+    private String encodeWeeklyTargets() {
+        ArrayList<String> encoded = new ArrayList<>();
+        for (List<String> focuses : weeklyDayTargets) encoded.add(encodeFocusTargets(focuses));
+        return String.join(";", encoded);
+    }
+
+    private String encodeWeeklySessionNames() {
+        ArrayList<String> days = new ArrayList<>();
+        for (List<Coach.Exercise> exercises : weeklySessions) {
+            ArrayList<String> names = new ArrayList<>();
+            for (Coach.Exercise exercise : exercises) names.add(exercise.name);
+            days.add(String.join("|", names));
+        }
+        return String.join(";", days);
+    }
+
+    private List<Coach.Exercise> prescribeNames(List<String> names, List<Coach.Exercise> choices) {
+        ArrayList<Coach.Exercise> restored = new ArrayList<>();
+        if (names == null) return restored;
+        for (String name : names) {
             for (Coach.Exercise exercise : choices) {
                 if (exercise.name.equals(name)) {
-                    session.add(Coach.prescribe(exercise, planSets, planReps, planRestSeconds));
+                    restored.add(Coach.prescribe(exercise, planSets, planReps, planRestSeconds));
                     break;
                 }
             }
+        }
+        return restored;
+    }
+
+    private void restoreWeeklySessions(String encoded) {
+        initialisePlanSelections();
+        String[] days = encoded == null ? new String[0] : encoded.split(";", -1);
+        for (int i = 0; i < weeklySessions.size(); i++) {
+            weeklySessions.get(i).clear();
+            if (!weeklyWorkoutDays[i]) continue;
+            List<Coach.Exercise> choices = Coach.planOptions(weeklyDayTargets.get(i), equipmentType);
+            List<String> names = i < days.length && !days[i].isEmpty()
+                    ? java.util.Arrays.asList(days[i].split("\\|", -1)) : Collections.emptyList();
+            List<Coach.Exercise> restored = prescribeNames(names, choices);
+            if (restored.isEmpty()) {
+                for (Coach.Exercise exercise : Coach.recommendedForDuration(choices, sessionMinutes)) {
+                    restored.add(Coach.prescribe(exercise, planSets, planReps, planRestSeconds));
+                }
+            }
+            weeklySessions.get(i).addAll(restored);
         }
     }
 
@@ -856,11 +1520,11 @@ public final class MainActivity extends Activity {
     }
 
     private void prepareExerciseSelection() {
-        String key = target + "|" + equipmentType;
+        String key = String.join("|", activeTargets()) + "|" + equipmentType + "|" + sessionMinutes;
         if (key.equals(selectionKey) && !availableExercises.isEmpty()) return;
         selectionKey = key;
-        availableExercises = Coach.planOptions(target, equipmentType);
-        selectedExercises = new ArrayList<>(availableExercises);
+        availableExercises = Coach.planOptions(activeTargets(), equipmentType);
+        selectedExercises = Coach.recommendedForDuration(availableExercises, sessionMinutes);
     }
 
     private boolean isSelected(Coach.Exercise exercise) {
@@ -881,37 +1545,52 @@ public final class MainActivity extends Activity {
 
     private void showExerciseSelection() {
         prepareExerciseSelection();
-        LinearLayout body = appPage("Workouts");
-        title(body, planMode.toUpperCase(Locale.ROOT) + " PLAN · " + target.toUpperCase(Locale.ROOT), "Choose your exercises", "Pick every movement you want. You can keep the recommendation or make it your own.");
-        addWizardProgress(body, 4);
+        LinearLayout body = planPage();
+        planTitle(body, planMode.toUpperCase(Locale.ROOT) + " PLAN · " + focusSummary(activeTargets()).toUpperCase(Locale.ROOT), "Choose your\nexercises", "Your " + sessionMinutes + " minute recommendation is preselected. Add or remove movements to make it your own.");
+        addWizardProgress(body, wizardStep("Exercises"));
 
         LinearLayout selectionBar = new LinearLayout(this);
         selectionBar.setOrientation(LinearLayout.HORIZONTAL);
         selectionBar.setGravity(Gravity.CENTER_VERTICAL);
-        Button all = selectedExercises.size() == availableExercises.size() ? secondary("Clear all") : lightAction("Select all");
+        Button all = new Button(this);
+        all.setText(selectedExercises.size() == availableExercises.size() ? "Clear all" : "Select all");
+        all.setContentDescription(all.getText());
+        all.setAllCaps(false);
+        all.setTextSize(hasTallPlanViewport() ? 12 : 10);
+        all.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
+        all.setTextColor(mint);
+        all.setPadding(dp(7), 0, dp(7), 0);
+        all.setMinHeight(0);
+        all.setBackground(surface(navy, 99, 1, mint));
         all.setOnClickListener(view -> {
             if (selectedExercises.size() == availableExercises.size()) selectedExercises.clear();
             else selectedExercises = new ArrayList<>(availableExercises);
             showExerciseSelection();
         });
-        selectionBar.addView(all, new LinearLayout.LayoutParams(0, dp(46), 1));
-        TextView selectionCount = heading(selectedExercises.size() + " selected", 12, navy);
+        selectionBar.addView(all, new LinearLayout.LayoutParams(dp(hasTallPlanViewport() ? 94 : 82), dp(hasTallPlanViewport() ? 36 : 27)));
+        TextView selectionCount = heading(selectedExercises.size() + " selected", hasTallPlanViewport() ? 12 : 10, navy);
         selectionCount.setGravity(Gravity.CENTER);
         selectionCount.setPadding(dp(10), 0, dp(10), 0);
         selectionCount.setBackground(surface(mint, 99, 0, Color.TRANSPARENT));
-        LinearLayout.LayoutParams countParams = new LinearLayout.LayoutParams(-2, dp(34));
-        countParams.leftMargin = dp(10);
+        LinearLayout.LayoutParams countParams = new LinearLayout.LayoutParams(dp(hasTallPlanViewport() ? 84 : 68), dp(hasTallPlanViewport() ? 32 : 24));
+        countParams.leftMargin = dp(0);
+        countParams.weight = 1;
+        selectionBar.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1));
         selectionBar.addView(selectionCount, countParams);
         body.addView(selectionBar);
-        gap(body, 9);
+        gap(body, hasTallPlanViewport() ? 12 : 7);
 
-        for (Coach.Exercise exercise : availableExercises) {
+        for (int index = 0; index < availableExercises.size(); index++) {
+            Coach.Exercise exercise = availableExercises.get(index);
             boolean selected = isSelected(exercise);
             LinearLayout row = new LinearLayout(this);
             row.setOrientation(LinearLayout.HORIZONTAL);
             row.setGravity(Gravity.CENTER_VERTICAL);
-            row.setPadding(dp(15), dp(13), dp(12), dp(13));
-            row.setBackground(surface(selected ? Color.rgb(231, 250, 246) : paper, 18, selected ? 2 : 1, selected ? mint : cardLine));
+            int rowPadding = hasTallPlanViewport() ? 8 : 5;
+            row.setPadding(dp(rowPadding), dp(rowPadding), dp(rowPadding), dp(rowPadding));
+            row.setBackground(surface(paper, 16, selected ? 2 : 1, selected ? mint : cardLine));
+            row.setClipToOutline(true);
+            elevatePlanSurface(row, selected);
             row.setClickable(true);
             row.setFocusable(true);
             row.setContentDescription((selected ? "Selected " : "Not selected ") + exercise.name + ". " + exercise.description);
@@ -921,22 +1600,31 @@ public final class MainActivity extends Activity {
             });
             LinearLayout details = new LinearLayout(this);
             details.setOrientation(LinearLayout.VERTICAL);
-            ImageView poster = exercisePoster(AccountStore.get(this).trainer, exercise);
-            LinearLayout.LayoutParams posterParams = new LinearLayout.LayoutParams(dp(58), dp(74));
-            posterParams.rightMargin = dp(11);
+            View poster = exerciseSelectionArtwork(exercise, index);
+            int posterSize = planExercisePosterSize();
+            LinearLayout.LayoutParams posterParams = new LinearLayout.LayoutParams(dp(posterSize), dp(posterSize));
+            posterParams.rightMargin = dp(hasTallPlanViewport() ? 11 : 7);
             row.addView(poster, posterParams);
-            details.addView(heading(exercise.name, 16, ink));
-            details.addView(text(exercise.target + "  ·  " + exercise.description, 12, muted));
-            details.addView(text(exercise.cue, 12, muted));
+            details.addView(heading(exercise.name, hasTallPlanViewport() ? 13 : 11, ink));
+            TextView area = text(exercise.target + "  ·  " + exercise.description, hasTallPlanViewport() ? 10 : 8, muted);
+            area.setMaxLines(2);
+            details.addView(area);
+            TextView cue = text(exercise.cue, hasTallPlanViewport() ? 10 : 8, muted);
+            cue.setMaxLines(2);
+            details.addView(cue);
             row.addView(details, new LinearLayout.LayoutParams(0, -2, 1));
-            TextView check = heading(selected ? "✓" : "○", 25, selected ? mint : muted);
+            TextView check = heading(selected ? "✓" : "○", hasTallPlanViewport() ? 15 : 12, selected ? navy : muted);
             check.setGravity(Gravity.CENTER);
-            row.addView(check, new LinearLayout.LayoutParams(dp(38), dp(42)));
+            check.setBackground(surface(selected ? mint : Color.TRANSPARENT, 99, selected ? 0 : 1, muted));
+            int checkSize = hasTallPlanViewport() ? 29 : 22;
+            LinearLayout.LayoutParams checkParams = new LinearLayout.LayoutParams(dp(checkSize), dp(checkSize));
+            checkParams.leftMargin = dp(hasTallPlanViewport() ? 6 : 3);
+            row.addView(check, checkParams);
             body.addView(row);
-            gap(body, 8);
+            gap(body, planGridGap());
         }
 
-        Button next = primary("Next: set up workout");
+        Button next = planPrimary("Next: set up workout");
         next.setOnClickListener(view -> {
             if (selectedExercises.isEmpty()) {
                 toast("Select at least one exercise before continuing.");
@@ -944,22 +1632,30 @@ public final class MainActivity extends Activity {
                 showPlanSetup();
             }
         });
-        addButton(body, next);
-        gap(body, 8);
-        Button back = secondary("Back");
+        addPlanButton(body, next);
+        Button back = planBack();
         back.setOnClickListener(view -> showPlanEquipment());
-        addButton(body, back);
+        addPlanBack(body, back);
+    }
+
+    /** Exact image crops supplied for the default Chest → Machine-assisted reference state. */
+    private View exerciseSelectionArtwork(Coach.Exercise exercise, int index) {
+        if ("Chest".equals(target) && "Machine-assisted".equals(equipmentType) && index < 4) {
+            int top = 263 + (index * 88);
+            return referenceArtwork(R.drawable.reference_exercises_page, 80, top, 154, top + 80);
+        }
+        return exercisePoster(AccountStore.get(this).trainer, exercise);
     }
 
     /** Step 5: weekly days and working-set controls stay together before the irreversible build action. */
     private void showPlanSetup() {
-        LinearLayout body = appPage("Workouts");
-        title(body, planMode.toUpperCase(Locale.ROOT) + " PLAN · " + target.toUpperCase(Locale.ROOT), "Set up your plan", "Choose your training days, then tailor the work to your comfort and goal.");
-        addWizardProgress(body, 5);
+        LinearLayout body = planPage();
+        planTitle(body, planMode.toUpperCase(Locale.ROOT) + " PLAN · " + focusSummary(activeTargets()).toUpperCase(Locale.ROOT), "Set up your\nplan", "Review your schedule, then tailor the work to your comfort and goal.");
+        addWizardProgress(body, wizardStep("Sets"));
         if ("Weekly".equals(planMode)) {
             LinearLayout schedule = card();
             schedule.addView(heading("Weekly schedule", 21, ink));
-            schedule.addView(text("Tap days to schedule workouts. Unselected days are Rest Days.", 13, muted));
+            schedule.addView(text(selectedWeekTitle() + " · " + trainingDays + " training days · " + (7 - trainingDays) + " rest days", 13, muted));
             gap(schedule, 10);
             LinearLayout dayRow = new LinearLayout(this);
             dayRow.setOrientation(LinearLayout.HORIZONTAL);
@@ -1011,25 +1707,26 @@ public final class MainActivity extends Activity {
         rest.addView(restTitle);
         LinearLayout restOptions = new LinearLayout(this);
         restOptions.setOrientation(LinearLayout.HORIZONTAL);
-        for (int seconds : new int[]{60, 90, 120}) {
-            Button option = seconds == planRestSeconds ? action(seconds + " sec", mint, navy) : action(seconds + " sec", Color.rgb(232, 236, 244), ink);
+        for (int seconds : new int[]{180, 240, 300}) {
+            Button option = seconds == planRestSeconds ? action((seconds / 60) + " min", mint, navy) : action((seconds / 60) + " min", Color.rgb(232, 236, 244), ink);
             option.setTextSize(12);
             option.setOnClickListener(view -> { planRestSeconds = seconds; showPlanSetup(); });
             LinearLayout.LayoutParams optionParams = new LinearLayout.LayoutParams(0, dp(43), 1);
-            optionParams.rightMargin = seconds == 120 ? 0 : dp(6);
+            optionParams.rightMargin = seconds == 300 ? 0 : dp(6);
             restOptions.addView(option, optionParams);
         }
         rest.addView(restOptions);
         settings.addView(rest);
         body.addView(settings);
         gap(body, 12);
-        Button build = primary("Build my " + target.toLowerCase(Locale.ROOT) + " " + planMode.toLowerCase(Locale.ROOT) + " plan");
+        Button build = planPrimary("Build my " + focusSummary(activeTargets()).toLowerCase(Locale.ROOT) + " " + planMode.toLowerCase(Locale.ROOT) + " plan");
         build.setOnClickListener(view -> buildSelectedPlan());
-        addButton(body, build);
-        gap(body, 8);
-        Button back = secondary("Back to exercise choices");
+        addPlanButton(body, build);
+        Button back = planBack();
+        back.setText("Back to exercise choices");
+        back.setContentDescription("Back to exercise choices");
         back.setOnClickListener(view -> showExerciseSelection());
-        addButton(body, back);
+        addPlanBack(body, back);
     }
 
     private void addWorkingStepper(LinearLayout container, String label, String value, Runnable decrease, Runnable increase) {
@@ -1075,28 +1772,52 @@ public final class MainActivity extends Activity {
             toast("Choose at least one weekly workout day.");
             return;
         }
-        session = new ArrayList<>();
-        for (Coach.Exercise exercise : selectedExercises) {
-            session.add(Coach.prescribe(exercise, planSets, planReps, planRestSeconds));
+        if ("Weekly".equals(planMode)) {
+            buildWeeklySessions();
+            session = new ArrayList<>(weeklySessions.get(activeScheduleDay));
+        } else {
+            session = prescribeExercises(selectedExercises);
         }
-        PlanStore.save(this, planMode, target, equipmentType, sessionMinutes, workingWeightKg, planSets, planReps, planRestSeconds, weeklyWorkoutDays, session);
+        PlanStore.save(this, planMode, target, equipmentType, sessionMinutes, workingWeightKg, planSets, planReps, planRestSeconds, weeklyWorkoutDays, encodeFocusTargets(activeTargets()), encodeWeeklyTargets(), encodeWeeklySessionNames(), "Weekly".equals(planMode) ? activeScheduleDay : dailyScheduledDay, selectedWeekOffset, session);
         showPlanReady();
     }
 
+    private List<Coach.Exercise> prescribeExercises(List<Coach.Exercise> choices) {
+        ArrayList<Coach.Exercise> prescribed = new ArrayList<>();
+        for (Coach.Exercise exercise : choices) prescribed.add(Coach.prescribe(exercise, planSets, planReps, planRestSeconds));
+        return prescribed;
+    }
+
+    private void buildWeeklySessions() {
+        initialisePlanSelections();
+        for (int i = 0; i < weeklySessions.size(); i++) {
+            weeklySessions.get(i).clear();
+            if (!weeklyWorkoutDays[i]) continue;
+            List<Coach.Exercise> choices;
+            if (i == activeScheduleDay) choices = selectedExercises;
+            else choices = Coach.recommendedForDuration(Coach.planOptions(weeklyDayTargets.get(i), equipmentType), sessionMinutes);
+            weeklySessions.get(i).addAll(prescribeExercises(choices));
+        }
+    }
+
     private String planSchedule() {
-        if ("Daily".equals(planMode)) return "daily plan";
-        if ("Weekly".equals(planMode)) return trainingDays + " sessions this week";
+        if ("Daily".equals(planMode)) return "scheduled for " + scheduledDateSummary(dailyScheduledDay);
+        if ("Weekly".equals(planMode)) return trainingDays + " sessions in " + selectedWeekTitle();
         return "custom session";
     }
 
     private void showPlanReady() {
-        LinearLayout body = appPage("Workouts");
-        title(body, "PLAN READY", "Your " + target.toLowerCase(Locale.ROOT) + " plan is ready", session.size() + " selected movements  •  " + sessionMinutes + " min  •  " + equipmentType);
+        LinearLayout body = planPage();
+        planTitle(body, "PLAN READY", "Your " + focusSummary(activeTargets()).toLowerCase(Locale.ROOT) + " plan is ready", session.size() + " selected movements  •  " + sessionMinutes + " min  •  " + equipmentType);
         LinearLayout schedule = card();
-        schedule.addView(heading("Today", 18, ink));
+        schedule.addView(heading("Weekly".equals(planMode) ? "Your weekly templates" : "Scheduled workout", 18, ink));
         schedule.addView(text("Ready when you are  •  " + planSchedule(), 14, muted));
         body.addView(schedule);
         gap(body, 10);
+        if ("Weekly".equals(planMode)) {
+            addWeeklySessionPicker(body);
+            gap(body, 10);
+        }
         for (Coach.Exercise exercise : session) {
             LinearLayout item = card();
             item.setOrientation(LinearLayout.HORIZONTAL);
@@ -1118,13 +1839,13 @@ public final class MainActivity extends Activity {
         cue.addView(text("Move with control, choose a comfortable load, and stop if you feel pain.", 14, muted));
         body.addView(cue);
         gap(body, 12);
-        Button start = primary("Start guided workout");
+        Button start = planPrimary("Start guided workout");
         start.setOnClickListener(view -> showActive(0, 1));
-        addButton(body, start);
+        addPlanButton(body, start);
         gap(body, 10);
         Button scheduleLater = secondary("Schedule for later");
         scheduleLater.setOnClickListener(view -> {
-            PlanStore.save(this, planMode, target, equipmentType, sessionMinutes, workingWeightKg, planSets, planReps, planRestSeconds, weeklyWorkoutDays, session);
+            PlanStore.save(this, planMode, target, equipmentType, sessionMinutes, workingWeightKg, planSets, planReps, planRestSeconds, weeklyWorkoutDays, encodeFocusTargets(activeTargets()), encodeWeeklyTargets(), encodeWeeklySessionNames(), "Weekly".equals(planMode) ? activeScheduleDay : dailyScheduledDay, selectedWeekOffset, session);
             toast("Your " + planSchedule() + " is saved on this device.");
         });
         addButton(body, scheduleLater);
@@ -1132,6 +1853,43 @@ public final class MainActivity extends Activity {
         Button edit = lightAction("Edit plan");
         edit.setOnClickListener(view -> showExerciseSelection());
         addButton(body, edit);
+    }
+
+    private void addWeeklySessionPicker(LinearLayout body) {
+        LinearLayout picker = card();
+        picker.setPadding(dp(12), dp(10), dp(12), dp(10));
+        picker.addView(text("Open a day to review or start its saved workout.", 13, muted));
+        for (int i = 0; i < weeklyWorkoutDays.length; i++) {
+            if (!weeklyWorkoutDays[i]) continue;
+            final int dayIndex = i;
+            boolean active = dayIndex == activeScheduleDay;
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setPadding(dp(11), dp(8), dp(11), dp(8));
+            row.setClickable(true);
+            row.setFocusable(true);
+            row.setBackground(surface(active ? Color.rgb(226, 249, 243) : Color.rgb(240, 243, 248), 12, active ? 1 : 0, mint));
+            row.setContentDescription(scheduleDayLabel(i) + ", " + focusSummary(weeklyDayTargets.get(i)) + ", " + weeklySessions.get(i).size() + " movements" + (active ? ", currently open" : ", open this day"));
+            LinearLayout copy = new LinearLayout(this);
+            copy.setOrientation(LinearLayout.VERTICAL);
+            copy.addView(heading(scheduleDayLabel(i) + " · " + focusSummary(weeklyDayTargets.get(i)), 15, ink));
+            copy.addView(text(weeklySessions.get(i).size() + " movements · " + sessionMinutes + " min", 12, muted));
+            row.addView(copy, new LinearLayout.LayoutParams(0, -2, 1));
+            TextView open = heading(active ? "Open" : "View", 12, active ? navy : mint);
+            open.setGravity(Gravity.CENTER);
+            row.addView(open, new LinearLayout.LayoutParams(dp(48), dp(38)));
+            row.setOnClickListener(view -> {
+                activeScheduleDay = dayIndex;
+                syncPrimaryTarget();
+                session = new ArrayList<>(weeklySessions.get(dayIndex));
+                showPlanReady();
+            });
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
+            params.topMargin = dp(7);
+            picker.addView(row, params);
+        }
+        body.addView(picker);
     }
 
     private void showProgress() {
@@ -1382,6 +2140,10 @@ public final class MainActivity extends Activity {
         Button callout = secondary("Hear rep guidance");
         callout.setOnClickListener(view -> say("Set " + set + ". Complete " + exercise.reps + " controlled reps. " + exercise.cue));
         addButton(body, callout);
+        gap(body, 10);
+        Button emergency = emergencyStopButton();
+        emergency.setOnClickListener(view -> showEmergencyStopConfirmation(index, set));
+        addButton(body, emergency);
     }
 
     private void addCounter(LinearLayout row, String label, String value) {
@@ -1397,28 +2159,51 @@ public final class MainActivity extends Activity {
     }
 
     private void startRest(int index, int set, Coach.Exercise exercise) {
+        showRest(index, set, exercise, exercise.restSeconds, true, true);
+    }
+
+    private void showRest(int index, int set, Coach.Exercise exercise, int secondsRemaining, boolean running, boolean announce) {
         LinearLayout body = appPage("Workouts");
         title(body, "REST CLOCK", "Recover, then go again", "Your next set begins when the timer ends.");
         LinearLayout timerCard = card();
-        TextView timer = heading(format(exercise.restSeconds), 52, ink);
+        TextView timer = heading(format(secondsRemaining), 52, ink);
         timer.setGravity(Gravity.CENTER);
-        timer.setContentDescription("Rest time remaining " + exercise.restSeconds + " seconds");
+        timer.setContentDescription("Rest time remaining " + secondsRemaining + " seconds");
         timerCard.addView(timer, new LinearLayout.LayoutParams(-1, dp(98)));
-        TextView reminder = text("Breathe slowly. At 10 seconds, Coach Mia will count you in.", 15, muted);
+        TextView reminder = text(running ? "Breathe slowly. At 10 seconds, your coach will count you in." : "Countdown paused. Resume when you are ready.", 15, muted);
         reminder.setGravity(Gravity.CENTER);
         timerCard.addView(reminder);
         body.addView(timerCard);
-        gap(body, 18);
-        Button skip = primary("Skip rest and continue");
+        gap(body, 14);
+        final int[] remaining = {secondsRemaining};
+        LinearLayout controls = new LinearLayout(this);
+        controls.setOrientation(LinearLayout.HORIZONTAL);
+        Button pause = running ? secondary("Pause") : action("Resume", mint, navy);
+        pause.setContentDescription(running ? "Pause rest countdown" : "Resume rest countdown");
+        pause.setOnClickListener(view -> {
+            if (restTimer != null) restTimer.cancel();
+            showRest(index, set, exercise, remaining[0], !running, false);
+        });
+        LinearLayout.LayoutParams pauseParams = new LinearLayout.LayoutParams(0, dp(52), 1);
+        pauseParams.rightMargin = dp(7);
+        controls.addView(pause, pauseParams);
+        Button skip = lightAction("Skip rest");
         skip.setOnClickListener(view -> {
             if (restTimer != null) restTimer.cancel();
             advance(index, set, exercise);
         });
-        addButton(body, skip);
-        say("Set complete. Rest for " + exercise.restSeconds + " seconds.");
-        restTimer = new CountDownTimer(exercise.restSeconds * 1000L, 1000) {
+        controls.addView(skip, new LinearLayout.LayoutParams(0, dp(52), 1));
+        body.addView(controls);
+        gap(body, 12);
+        Button emergency = emergencyStopButton();
+        emergency.setOnClickListener(view -> showEmergencyStopConfirmation(index, set));
+        addButton(body, emergency);
+        if (announce) say("Set complete. Rest for " + Math.max(1, secondsRemaining / 60) + " minutes.");
+        if (!running) return;
+        restTimer = new CountDownTimer(secondsRemaining * 1000L, 1000) {
             @Override public void onTick(long left) {
                 int seconds = (int) Math.ceil(left / 1000d);
+                remaining[0] = seconds;
                 timer.setText(format(seconds));
                 timer.setContentDescription("Rest time remaining " + seconds + " seconds");
                 if (seconds <= 10 && seconds >= 1) say(String.valueOf(seconds));
@@ -1429,6 +2214,32 @@ public final class MainActivity extends Activity {
                 advance(index, set, exercise);
             }
         }.start();
+    }
+
+    private Button emergencyStopButton() {
+        Button button = action("Emergency stop", navy, coral);
+        button.setBackground(surface(navy, 14, 1, coral));
+        button.setTextSize(14);
+        button.setContentDescription("Emergency stop. Ends the current guided workout after confirmation.");
+        return button;
+    }
+
+    private void showEmergencyStopConfirmation(int index, int set) {
+        if (restTimer != null) restTimer.cancel();
+        LinearLayout body = appPage("Workouts");
+        title(body, "EMERGENCY STOP", "End this guided\nworkout?", "This stops the current session. Your saved Daily or Weekly plan will remain available to restart later.");
+        LinearLayout notice = card();
+        notice.addView(heading("Your progress in this session will not be marked complete.", 17, ink));
+        notice.addView(text("If you feel pain, dizziness, or unwell, stop safely and seek appropriate help.", 14, muted));
+        body.addView(notice);
+        gap(body, 16);
+        Button end = primary("End guided workout");
+        end.setOnClickListener(view -> showHome());
+        addButton(body, end);
+        gap(body, 10);
+        Button continueWorkout = secondary("Keep working out");
+        continueWorkout.setOnClickListener(view -> showActive(index, set));
+        addButton(body, continueWorkout);
     }
 
     private void advance(int index, int set, Coach.Exercise exercise) {

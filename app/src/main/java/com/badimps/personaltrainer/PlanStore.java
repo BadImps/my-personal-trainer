@@ -14,12 +14,13 @@ public final class PlanStore {
     private static final String DAYS_SEPARATOR = ",";
 
     public static final class SavedPlan {
-        public final String mode, target, equipment;
+        public final String mode, target, equipment, focusTargets, weeklyTargets, weeklyExerciseNames;
         public final int minutes, weightKg, sets, reps, restSeconds;
         public final String weeklyDays;
+        public final int scheduledDay, weekOffset;
         public final List<String> exerciseNames;
 
-        SavedPlan(String mode, String target, String equipment, int minutes, int weightKg, int sets, int reps, int restSeconds, String weeklyDays, List<String> exerciseNames) {
+        SavedPlan(String mode, String target, String equipment, int minutes, int weightKg, int sets, int reps, int restSeconds, String weeklyDays, String focusTargets, String weeklyTargets, String weeklyExerciseNames, int scheduledDay, int weekOffset, List<String> exerciseNames) {
             this.mode = mode;
             this.target = target;
             this.equipment = equipment;
@@ -29,11 +30,26 @@ public final class PlanStore {
             this.reps = reps;
             this.restSeconds = restSeconds;
             this.weeklyDays = weeklyDays;
+            this.focusTargets = focusTargets;
+            this.weeklyTargets = weeklyTargets;
+            this.weeklyExerciseNames = weeklyExerciseNames;
+            this.scheduledDay = scheduledDay;
+            this.weekOffset = weekOffset;
             this.exerciseNames = exerciseNames;
         }
     }
 
     public static void save(Context context, String mode, String target, String equipment, int minutes, int weightKg, int sets, int reps, int restSeconds, boolean[] weeklyDays, List<Coach.Exercise> exercises) {
+        save(context, mode, target, equipment, minutes, weightKg, sets, reps, restSeconds, weeklyDays, target, "", 2, 1, exercises);
+    }
+
+    /** Stores calendar and one/two-focus assignments alongside the existing local-only plan. */
+    public static void save(Context context, String mode, String target, String equipment, int minutes, int weightKg, int sets, int reps, int restSeconds, boolean[] weeklyDays, String focusTargets, String weeklyTargets, int scheduledDay, int weekOffset, List<Coach.Exercise> exercises) {
+        save(context, mode, target, equipment, minutes, weightKg, sets, reps, restSeconds, weeklyDays, focusTargets, weeklyTargets, "", scheduledDay, weekOffset, exercises);
+    }
+
+    /** Persists the separately generated templates for each selected Weekly day. */
+    public static void save(Context context, String mode, String target, String equipment, int minutes, int weightKg, int sets, int reps, int restSeconds, boolean[] weeklyDays, String focusTargets, String weeklyTargets, String weeklyExerciseNames, int scheduledDay, int weekOffset, List<Coach.Exercise> exercises) {
         ArrayList<String> names = new ArrayList<>();
         for (Coach.Exercise exercise : exercises) names.add(exercise.name);
         preferences(context).edit()
@@ -47,6 +63,11 @@ public final class PlanStore {
                 .putInt("reps", reps)
                 .putInt("rest", restSeconds)
                 .putString("weekly_days", encodeWeeklyDays(weeklyDays))
+                .putString("focus_targets", focusTargets)
+                .putString("weekly_targets", weeklyTargets)
+                .putString("weekly_exercises", weeklyExerciseNames)
+                .putInt("scheduled_day", scheduledDay)
+                .putInt("week_offset", weekOffset)
                 .putString("names", String.join(NAMES_SEPARATOR, names))
                 .apply();
     }
@@ -66,6 +87,11 @@ public final class PlanStore {
                 preferences.getInt("reps", 10),
                 preferences.getInt("rest", 90),
                 preferences.getString("weekly_days", "1,0,1,0,1,0,0"),
+                preferences.getString("focus_targets", preferences.getString("target", "Full Body")),
+                preferences.getString("weekly_targets", ""),
+                preferences.getString("weekly_exercises", ""),
+                preferences.getInt("scheduled_day", 2),
+                preferences.getInt("week_offset", 1),
                 names);
     }
 

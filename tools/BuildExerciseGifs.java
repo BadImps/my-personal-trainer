@@ -20,19 +20,23 @@ import java.awt.Color;
 
 /** Converts a generated 3-by-4 motion sheet into four looping Android GIF resources. */
 public final class BuildExerciseGifs {
-    private static final int FRAME_W = 180, FRAME_H = 240, TRIM = 4;
+    private static final int FRAME_W = 360, FRAME_H = 480, TRIM = 4;
 
     public static void main(String[] args) throws Exception {
         if (args.length == 1) { smoothExisting(new File(args[0])); return; }
-        if (args.length != 4) throw new IllegalArgumentException("sheet outputDir exerciseA exerciseB");
+        if (args.length != 4 && args.length != 5) {
+            throw new IllegalArgumentException("sheet outputDir exerciseA exerciseB [framesPerExercise]");
+        }
         BufferedImage sheet = ImageIO.read(new File(args[0]));
         File output = new File(args[1]);
         if (!output.isDirectory() && !output.mkdirs()) throw new IllegalStateException("Cannot create " + output);
-        int cellW = sheet.getWidth() / 3, cellH = sheet.getHeight() / 4;
-        write(sheet, cellW, cellH, 0, new File(output, "mia_" + args[2] + ".gif"));
-        write(sheet, cellW, cellH, 1, new File(output, "mia_" + args[3] + ".gif"));
-        write(sheet, cellW, cellH, 2, new File(output, "leo_" + args[2] + ".gif"));
-        write(sheet, cellW, cellH, 3, new File(output, "leo_" + args[3] + ".gif"));
+        int framesPerExercise = args.length == 5 ? Integer.parseInt(args[4]) : 3;
+        if (framesPerExercise < 3) throw new IllegalArgumentException("framesPerExercise must be at least 3");
+        int cellW = sheet.getWidth() / framesPerExercise, cellH = sheet.getHeight() / 4;
+        write(sheet, cellW, cellH, framesPerExercise, 0, new File(output, "mia_" + args[2] + ".gif"));
+        write(sheet, cellW, cellH, framesPerExercise, 1, new File(output, "mia_" + args[3] + ".gif"));
+        write(sheet, cellW, cellH, framesPerExercise, 2, new File(output, "leo_" + args[2] + ".gif"));
+        write(sheet, cellW, cellH, framesPerExercise, 3, new File(output, "leo_" + args[3] + ".gif"));
     }
 
     /**
@@ -69,18 +73,21 @@ public final class BuildExerciseGifs {
         graphics.setComposite(AlphaComposite.SrcOver.derive(1f - amount)); graphics.drawImage(from, 0, 0, null); graphics.setComposite(AlphaComposite.SrcOver.derive(amount)); graphics.drawImage(to, 0, 0, null); graphics.dispose(); return output;
     }
 
-    private static void write(BufferedImage sheet, int cellW, int cellH, int row, File out) throws Exception {
-        try (ImageOutputStream stream = new FileImageOutputStream(out); GifWriter gif = new GifWriter(stream, 320, true)) {
-            for (int col = 0; col < 3; col++) {
-                BufferedImage cell = sheet.getSubimage(col * cellW + TRIM, row * cellH + TRIM, cellW - TRIM * 2, cellH - TRIM * 2);
-                BufferedImage frame = new BufferedImage(FRAME_W, FRAME_H, BufferedImage.TYPE_INT_RGB);
-                Graphics2D graphics = frame.createGraphics();
-                graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
-                graphics.drawImage(cell, 0, 0, FRAME_W, FRAME_H, null);
-                graphics.dispose();
-                gif.write(frame);
-            }
+    private static void write(BufferedImage sheet, int cellW, int cellH, int framesPerExercise, int row, File out) throws Exception {
+        try (ImageOutputStream stream = new FileImageOutputStream(out); GifWriter gif = new GifWriter(stream, 180, true)) {
+            for (int col = 0; col < framesPerExercise; col++) gif.write(frame(sheet, cellW, cellH, row, col));
+            for (int col = framesPerExercise - 2; col > 0; col--) gif.write(frame(sheet, cellW, cellH, row, col));
         }
+    }
+
+    private static BufferedImage frame(BufferedImage sheet, int cellW, int cellH, int row, int column) {
+        BufferedImage cell = sheet.getSubimage(column * cellW + TRIM, row * cellH + TRIM, cellW - TRIM * 2, cellH - TRIM * 2);
+        BufferedImage frame = new BufferedImage(FRAME_W, FRAME_H, BufferedImage.TYPE_INT_RGB);
+        Graphics2D graphics = frame.createGraphics();
+        graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+        graphics.drawImage(cell, 0, 0, FRAME_W, FRAME_H, null);
+        graphics.dispose();
+        return frame;
     }
 
     private static final class GifWriter implements AutoCloseable {
