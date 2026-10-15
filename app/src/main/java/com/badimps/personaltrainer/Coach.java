@@ -8,7 +8,7 @@ import java.util.Map;
 
 /** Offline training templates. These are general fitness suggestions, not medical advice. */
 public final class Coach {
-    public static final String[] TARGETS = {"Upper", "Lower", "Arms", "Chest", "Legs", "Back & Core", "Cardio", "Mobility", "Full Body"};
+    public static final String[] TARGETS = {"Upper", "Lower", "Arms", "Chest", "Legs", "Back & Core", "Cardio", "Mobility", "Full Body", "Machines"};
     public static final String[] GOALS = {"Build strength", "Build muscle", "Reduce body fat", "Improve endurance", "Move & feel good"};
     public static final String[] ENVIRONMENTS = {"Gym", "Home — no equipment", "Home — dumbbells", "Outdoors"};
 
@@ -32,6 +32,7 @@ public final class Coach {
         add("Cardio", ex("Brisk March", "Cardio", "Land softly and swing your arms.", "Low-impact heart-rate work."), ex("Mountain Climber", "Cardio", "Keep shoulders stacked over hands.", "Core and conditioning."), ex("Step-up", "Cardio", "Use a stable step and drive through the whole foot.", "Leg and cardio conditioning."), ex("Jumping Jack", "Cardio", "Choose a step-out version if needed.", "Simple full-body cardio."));
         add("Mobility", ex("Cat Cow", "Mobility", "Move slowly with your breath.", "Gentle spinal mobility."), ex("World's Greatest Stretch", "Mobility", "Keep the range comfortable.", "Hips, hamstrings and upper back."), ex("90/90 Hip Switch", "Mobility", "Use your hands for support if needed.", "Hip rotation control."), ex("Shoulder Wall Slide", "Mobility", "Keep ribs soft and arms smooth.", "Shoulder mobility."));
         add("Full Body", ex("Squat to Press", "Full Body", "Stand strongly, then press overhead.", "Legs and shoulders together."), ex("Burpee", "Full Body", "Choose a step-back option when needed.", "Full-body conditioning."), ex("Renegade Row", "Full Body", "Resist twisting through your hips.", "Core and upper back."), ex("Mountain Climber", "Full Body", "Keep shoulders stacked over hands.", "Full-body conditioning."));
+        add("Machines", ex("Machine Chest Press", "Machines", "Set the seat so handles meet mid-chest; stop short of locking out.", "Guided pressing with a machine."), ex("Lat Pulldown", "Machines", "Keep ribs down and pull toward your upper chest.", "Machine-assisted upper-back work."), ex("Leg Press", "Machines", "Keep your feet planted and do not lock your knees.", "Guided lower-body pressing."), ex("Seated Cable Row", "Machines", "Stay tall and pull the handle toward your ribs.", "Machine-assisted rowing."));
     }
     private static Exercise ex(String name, String target, String cue, String description) { return new Exercise(name, target, 3, 10, 60, cue, description); }
     @SafeVarargs private static void add(String group, Exercise... items) { LIBRARY.put(group, Arrays.asList(items)); }

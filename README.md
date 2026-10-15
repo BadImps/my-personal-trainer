@@ -1,8 +1,8 @@
 # My Personal Trainer
 
-## 1.3 exercise visuals
+## 1.4 animated exercise library
 
-The guided workout and exercise library now show coach-specific, full-form visuals for every prescribed movement, including the no-equipment substitutions. Coach Mia and Coach Leo each have their own visual set. These are form-reference images; follow the written cue, use a comfortable range, and stop if anything hurts.
+The guided workout and exercise library now play coach-specific, looping three-phase GIF demonstrations for every prescribed movement, including the no-equipment substitutions. Coach Mia and Coach Leo each have their own animation set. A Machines category adds Machine Chest Press, Lat Pulldown, Leg Press, and Seated Cable Row. These are form-reference animations; follow the written cue, use a comfortable range, and stop if anything hurts.
 
 An independent, offline Android fitness coach. It builds a guided workout from a chosen goal and focus, gives movement cues and spoken rep guidance, runs a rest countdown after every set, and includes meal ideas.
 

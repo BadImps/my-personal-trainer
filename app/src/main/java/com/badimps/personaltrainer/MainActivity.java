@@ -118,7 +118,7 @@ public final class MainActivity extends Activity {
         if (index >= session.size()) { showComplete(); return; }
         Coach.Exercise e=session.get(index); LinearLayout b=page(); header(b,"GUIDED WORKOUT",""+e.name,"Exercise "+(index+1)+" of "+session.size()+"  •  Set "+set+" of "+e.sets);
         int visual=ExerciseVisuals.forExercise(this,AccountStore.get(this).trainer,e.name);
-        if(visual!=0){ImageView demo=new ImageView(this);demo.setImageResource(visual);demo.setScaleType(ImageView.ScaleType.CENTER_CROP);b.addView(demo,new LinearLayout.LayoutParams(-1,dp(240)));}
+        if(visual!=0){AnimatedGifView demo=new AnimatedGifView(this,visual);b.addView(demo,new LinearLayout.LayoutParams(-1,dp(240)));}
         else {ExerciseAnimationView demo=new ExerciseAnimationView(this);b.addView(demo,new LinearLayout.LayoutParams(-1,dp(240)));}
         gap(b,12);
         b.addView(text(e.sets+" sets × "+e.reps+" reps",24,navy)); gap(b,5); b.addView(text(e.description+"\nCoach cue: "+e.cue,16,Color.rgb(71,83,108))); gap(b,14);
@@ -143,8 +143,8 @@ public final class MainActivity extends Activity {
 
     private void showLibrary() {
         String trainer=AccountStore.get(this).trainer;
-        LinearLayout b=page(); header(b,"EXERCISE LIBRARY","Every move, visualized.","Each move has a Coach "+("Male".equals(trainer)?"Leo":"Mia")+" form visual. Choose a movement that matches your equipment and ability.");
-        for (String group:Coach.TARGETS) { b.addView(text(group,21,navy)); gap(b,5); for(Coach.Exercise e:Coach.library().get(group)) { LinearLayout card=new LinearLayout(this);card.setOrientation(LinearLayout.HORIZONTAL);card.setPadding(dp(10),dp(10),dp(10),dp(10));card.setBackgroundColor(Color.WHITE);int visual=ExerciseVisuals.forExercise(this,trainer,e.name);if(visual!=0){ImageView image=new ImageView(this);image.setImageResource(visual);image.setScaleType(ImageView.ScaleType.CENTER_CROP);card.addView(image,new LinearLayout.LayoutParams(dp(136),dp(102)));}TextView details=text(e.name+"\n"+e.description+"\n"+e.cue,14,Color.rgb(71,83,108));details.setPadding(dp(12),0,0,0);card.addView(details,new LinearLayout.LayoutParams(0,-2,1));b.addView(card);gap(b,10); } gap(b,9); }
+        LinearLayout b=page(); header(b,"EXERCISE LIBRARY","Every move, animated.","Each move has a looping Coach "+("Male".equals(trainer)?"Leo":"Mia")+" demonstration. Choose a movement that matches your equipment and ability.");
+        for (String group:Coach.TARGETS) { b.addView(text(group,21,navy)); gap(b,5); for(Coach.Exercise e:Coach.library().get(group)) { LinearLayout card=new LinearLayout(this);card.setOrientation(LinearLayout.HORIZONTAL);card.setPadding(dp(10),dp(10),dp(10),dp(10));card.setBackgroundColor(Color.WHITE);int visual=ExerciseVisuals.forExercise(this,trainer,e.name);if(visual!=0){AnimatedGifView image=new AnimatedGifView(this,visual);card.addView(image,new LinearLayout.LayoutParams(dp(136),dp(102)));}TextView details=text(e.name+"\n"+e.description+"\n"+e.cue,14,Color.rgb(71,83,108));details.setPadding(dp(12),0,0,0);card.addView(details,new LinearLayout.LayoutParams(0,-2,1));b.addView(card);gap(b,10); } gap(b,9); }
         Button home=button("Back to home"); home.setOnClickListener(v->showHome()); b.addView(home);
     }
     private void showMeals() {
