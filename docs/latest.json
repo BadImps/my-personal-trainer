@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 5,
-  "versionName": "1.4",
-  "publishedAt": "2026-10-15T05:00:00Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v1.4/My-Personal-Trainer-1.4.apk",
-  "sha256": "9868adef3e31c5665caa880c7bb9871edd680c71d629ef8f6fcb65fb6eb599e0",
-  "sizeBytes": 11931067,
-  "notes": "Looping coach-specific exercise GIFs now play in the guided workout and library. A new Machines category adds chest press, lat pulldown, leg press and seated cable row."
+  "versionCode": 6,
+  "versionName": "1.5",
+  "publishedAt": "2026-10-15T05:30:00Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v1.5/My-Personal-Trainer-1.5.apk",
+  "sha256": "f2e50fff263943ff798f44900d5890b573a5a413b838dbfd5f8a0a3c990a8a84",
+  "sizeBytes": 11932331,
+  "notes": "A new original Today, Plans, Library, Progress and Profile structure makes planning, guided training and progress tracking easier to navigate."
 }

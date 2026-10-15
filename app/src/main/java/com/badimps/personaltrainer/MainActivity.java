@@ -42,18 +42,46 @@ public final class MainActivity extends Activity {
     private Button button(String label) { Button b=new Button(this); b.setText(label); b.setAllCaps(false); b.setTextSize(16); b.setTextColor(Color.WHITE); b.setBackgroundColor(coral); b.setPadding(dp(12),dp(10),dp(12),dp(10)); b.setLayoutParams(new LinearLayout.LayoutParams(-1,dp(52))); return b; }
     private TextView badge(String value) { TextView t=text(value,13,navy); t.setPadding(dp(12),dp(8),dp(12),dp(8)); t.setBackgroundColor(mint); return t; }
     private void header(LinearLayout b, String eyebrow, String title, String subtitle) { b.addView(text(eyebrow.toUpperCase(Locale.ROOT),12,coral)); gap(b,5); b.addView(text(title,30,navy)); gap(b,8); b.addView(text(subtitle,16,Color.rgb(71,83,108))); gap(b,20); }
+    private void nav(LinearLayout b, String active) {
+        gap(b,22); LinearLayout row=new LinearLayout(this); row.setOrientation(LinearLayout.HORIZONTAL);
+        String[] labels={"Today","Plans","Library","Progress","Profile"};
+        for(String label:labels){Button item=new Button(this);item.setText(label);item.setAllCaps(false);item.setTextSize(11);item.setTextColor(label.equals(active)?navy:Color.WHITE);item.setBackgroundColor(label.equals(active)?mint:navy);item.setOnClickListener(v->{if(label.equals("Today"))showHome();else if(label.equals("Plans"))showPlans();else if(label.equals("Library"))showLibrary();else if(label.equals("Progress"))showProgress();else showProfile();});row.addView(item,new LinearLayout.LayoutParams(0,dp(46),1));} b.addView(row);
+    }
 
     private void showHome() {
         AccountStore.Profile profile=AccountStore.get(this);
         String coach=profile.trainer.equals("Male") ? "Coach Leo" : "Coach Mia";
-        LinearLayout b=page(); header(b,"MY PERSONAL TRAINER","Hi, "+profile.username+".",coach+" is ready to build a plan. Choose a focus and goal for your offline session.");
-        TextView today=badge("TODAY  •  " + target + "  •  " + environment); b.addView(today); gap(b,18);
-        Button start=button("Build my workout"); start.setOnClickListener(v->showWizard()); b.addView(start); gap(b,10);
-        Button library=button("Explore exercise library"); library.setBackgroundColor(navy); library.setOnClickListener(v->showLibrary()); b.addView(library); gap(b,10);
-        Button fuel=button("Meal ideas for my goal"); fuel.setBackgroundColor(Color.rgb(45,91,101)); fuel.setOnClickListener(v->showMeals()); b.addView(fuel); gap(b,22);
-        Button weight=button("Weight trend check-in"); weight.setBackgroundColor(Color.rgb(76,108,151)); weight.setOnClickListener(v->showWeightTracker()); b.addView(weight); gap(b,10);
-        Button updates=button("Check for OTA update"); updates.setBackgroundColor(Color.rgb(91,102,126)); updates.setOnClickListener(v->showUpdate()); b.addView(updates); gap(b,22);
-        b.addView(text("A note from your coach",18,navy)); gap(b,6); b.addView(text("Adjust load, range, pace or rest when needed. Stop if you feel pain, and get qualified medical or coaching advice for injuries, conditions or nutrition needs.",14,Color.rgb(71,83,108)));
+        LinearLayout b=page(); header(b,"TODAY","Hi, "+profile.username+".",coach+" is ready. Choose a session, follow it, then record your progress.");
+        TextView today=badge("TODAY  •  " + target + "  •  " + environment); b.addView(today); gap(b,16);
+        b.addView(text("Your next session",20,navy)); gap(b,5); b.addView(text(goal+" • "+target+" • about 32 minutes",15,Color.rgb(71,83,108))); gap(b,10);
+        Button start=button("Start my personalized workout"); start.setOnClickListener(v->showWizard()); b.addView(start); gap(b,18);
+        b.addView(text("Explore",20,navy)); gap(b,7);
+        Button plans=button("Plans for home, gym & machines"); plans.setBackgroundColor(navy);plans.setOnClickListener(v->showPlans());b.addView(plans);gap(b,9);
+        Button library=button("Animated exercise library"); library.setBackgroundColor(Color.rgb(45,91,101)); library.setOnClickListener(v->showLibrary()); b.addView(library);gap(b,9);
+        Button progress=button("Progress & weight trend"); progress.setBackgroundColor(Color.rgb(76,108,151));progress.setOnClickListener(v->showProgress());b.addView(progress);
+        nav(b,"Today");
+    }
+
+    private void showPlans() {
+        LinearLayout b=page(); header(b,"PLANS","Train your way.","Choose a goal, focus and equipment. Your plan is built around the options you select.");
+        b.addView(text("Quick starts",20,navy)); gap(b,7);
+        for(String choice:new String[]{"Full Body","Upper","Lower","Machines"}) { Button pick=button(choice+" plan");pick.setBackgroundColor(choice.equals("Machines")?Color.rgb(45,91,101):navy);pick.setOnClickListener(v->{target=choice;showWizard();});b.addView(pick);gap(b,8); }
+        gap(b,6); b.addView(text("Your current setup",18,navy));gap(b,5);b.addView(text(goal+" • "+environment+"\nChange goals, focus and equipment in the plan builder.",15,Color.rgb(71,83,108)));gap(b,12);Button custom=button("Customize my plan");custom.setOnClickListener(v->showWizard());b.addView(custom);nav(b,"Plans");
+    }
+
+    private void showProgress() {
+        LinearLayout b=page(); header(b,"PROGRESS","Build consistency.","Track a private weight trend, revisit your food ideas, and keep your next workout simple.");
+        if(WeightStore.configured(this)) b.addView(badge(WeightStore.summary(this))); else b.addView(badge("SET A PRIVATE STARTING POINT"));gap(b,15);
+        Button weight=button("Weight trend check-in");weight.setOnClickListener(v->showWeightTracker());b.addView(weight);gap(b,9);
+        Button fuel=button("Fuel ideas for "+goal);fuel.setBackgroundColor(Color.rgb(45,91,101));fuel.setOnClickListener(v->showMeals());b.addView(fuel);gap(b,15);
+        b.addView(text("Keep it useful",18,navy));gap(b,5);b.addView(text("Use trends as a personal check-in, not as a diagnosis. Adjust load, range, pace or rest when needed.",15,Color.rgb(71,83,108)));nav(b,"Progress");
+    }
+
+    private void showProfile() {
+        AccountStore.Profile profile=AccountStore.get(this); String coach="Male".equals(profile.trainer)?"Coach Leo":"Coach Mia";
+        LinearLayout b=page();header(b,"PROFILE",""+profile.username,"Your trainer, preferences, and updates stay on this device.");
+        b.addView(badge(coach+"  •  "+profile.email));gap(b,16);b.addView(text("Privacy",19,navy));gap(b,5);b.addView(text("This version stores your profile locally and does not send your registration details to a server.",15,Color.rgb(71,83,108)));gap(b,14);
+        Button updates=button("Check for OTA update");updates.setBackgroundColor(Color.rgb(91,102,126));updates.setOnClickListener(v->showUpdate());b.addView(updates);gap(b,9);Button plans=button("Adjust workout preferences");plans.setOnClickListener(v->showWizard());b.addView(plans);nav(b,"Profile");
     }
 
     private void showRegistration() {
@@ -82,13 +110,13 @@ public final class MainActivity extends Activity {
             Button check=button("Save check-in"); check.setOnClickListener(v->{try{float value=Float.parseFloat(current.getText().toString());if(value<=0)throw new NumberFormatException();WeightStore.checkIn(this,value);showWeightTracker();}catch(Exception e){toast("Enter a positive weight to check in.");}}); b.addView(check); gap(b,16);
             b.addView(text("If weight changes unexpectedly, or food and weight are causing distress, pause the goal and speak with a qualified healthcare professional.",14,Color.rgb(71,83,108)));
         }
-        gap(b,20); Button home=button("Back to home");home.setBackgroundColor(navy);home.setOnClickListener(v->showHome());b.addView(home);
+        nav(b,"Progress");
     }
 
     private void showUpdate() {
         LinearLayout b=page(); header(b,"APP UPDATES","Keep your coach current.","Updates are checked over HTTPS. A download must match its published SHA-256, then Android verifies the signing identity before it installs.");
         TextView status=text("Checking the update channel…",17,navy); b.addView(status);
-        Button home=button("Back to home"); home.setBackgroundColor(navy); gap(b,20); b.addView(home); home.setOnClickListener(v->showHome());
+        Button home=button("Back to profile"); home.setBackgroundColor(navy); gap(b,20); b.addView(home); home.setOnClickListener(v->showProfile());
         new Thread(()-> { try { UpdateManager.Info info=UpdateManager.check(); runOnUiThread(()-> { if(info==null){status.setText("You already have the latest published version.");return;} status.setText("Version "+info.name+" is ready to download."); Button install=button("Download and install "+info.name); install.setOnClickListener(v->downloadUpdate(info,status)); b.addView(install,1); }); } catch(Exception e) { runOnUiThread(()->status.setText("No update is published yet. Check again after the OTA channel is released.")); } }).start();
     }
     private void downloadUpdate(UpdateManager.Info info, TextView status) { status.setText("Downloading and verifying update…"); new Thread(()-> { try { UpdateManager.downloadAndInstall(this,info); runOnUiThread(()->status.setText("Verified. Android will now ask you to confirm the install.")); } catch(Exception e) { runOnUiThread(()->status.setText("Update could not be verified: "+e.getMessage())); } }).start(); }
@@ -145,13 +173,13 @@ public final class MainActivity extends Activity {
         String trainer=AccountStore.get(this).trainer;
         LinearLayout b=page(); header(b,"EXERCISE LIBRARY","Every move, animated.","Each move has a looping Coach "+("Male".equals(trainer)?"Leo":"Mia")+" demonstration. Choose a movement that matches your equipment and ability.");
         for (String group:Coach.TARGETS) { b.addView(text(group,21,navy)); gap(b,5); for(Coach.Exercise e:Coach.library().get(group)) { LinearLayout card=new LinearLayout(this);card.setOrientation(LinearLayout.HORIZONTAL);card.setPadding(dp(10),dp(10),dp(10),dp(10));card.setBackgroundColor(Color.WHITE);int visual=ExerciseVisuals.forExercise(this,trainer,e.name);if(visual!=0){AnimatedGifView image=new AnimatedGifView(this,visual);card.addView(image,new LinearLayout.LayoutParams(dp(136),dp(102)));}TextView details=text(e.name+"\n"+e.description+"\n"+e.cue,14,Color.rgb(71,83,108));details.setPadding(dp(12),0,0,0);card.addView(details,new LinearLayout.LayoutParams(0,-2,1));b.addView(card);gap(b,10); } gap(b,9); }
-        Button home=button("Back to home"); home.setOnClickListener(v->showHome()); b.addView(home);
+        nav(b,"Library");
     }
     private void showMeals() {
         LinearLayout b=page(); header(b,"FUEL IDEAS","Simple meals for "+goal,"Food recommendations are flexible ideas — adjust portions and ingredients to your preferences, budget, allergies and dietary needs.");
         for(String meal:Coach.meals(goal)) { TextView item=text("•  "+meal,17,navy); item.setPadding(dp(15),dp(14),dp(15),dp(14)); item.setBackgroundColor(Color.WHITE); b.addView(item); gap(b,8); }
         gap(b,8); b.addView(text("General fuel suggestion",19,navy)); gap(b,5); b.addView(text("Aim for protein and colourful plants across the day, carbohydrates around training if useful, and regular hydration. For medical nutrition or weight-change targets, consult a registered dietitian.",15,Color.rgb(71,83,108))); gap(b,20);
-        Button home=button("Back to home"); home.setOnClickListener(v->showHome()); b.addView(home);
+        nav(b,"Progress");
     }
     private void showComplete() { LinearLayout b=page(); header(b,"SESSION COMPLETE","Strong work.","You completed your "+target+" plan. Save the feeling, hydrate, and let your next session start with a fresh choice."); Button home=button("Return home"); home.setOnClickListener(v->showHome()); b.addView(home); }
 }
