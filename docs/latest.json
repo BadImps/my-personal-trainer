@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 18,
-  "versionName": "2.7",
-  "publishedAt": "2026-10-15T19:42:11Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v2.7/app-release.apk",
-  "sha256": "9c7d63bd5cdded4de8049e2aff7e6d4f1c3a70c24bba8ad8217aec31beb46dad",
-  "sizeBytes": 23349713,
-  "notes": "Adds calendar-based Weekly and Daily planning, one- or two-focus workouts, duration-aware recommendations, persisted per-day weekly templates, 3–5 minute pauseable recovery, and a confirmed emergency stop."
+  "versionCode": 19,
+  "versionName": "2.8",
+  "publishedAt": "2026-10-15T20:20:22Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v2.8/app-release.apk",
+  "sha256": "f31325885ec81c1e4e551f7cddd9a27701f11b3e5ec788988980c5e8d6b7b938",
+  "sizeBytes": 23355841,
+  "notes": "Adds Mia or Leo's spoken 5-to-1 workout opening, a live ascending timer for every rep, visible rep records, pace-aware 10-second recovery increases capped at five minutes, Coach completion callouts, Olivia's between-exercise handoff, and a spoken 10-to-1 restart count-in."
 }
