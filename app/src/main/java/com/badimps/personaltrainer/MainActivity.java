@@ -15,7 +15,6 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.HorizontalScrollView;
-import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.RadioButton;
@@ -177,24 +176,41 @@ public final class MainActivity extends Activity {
         rail.addView(divider, dividerParams);
 
         addRailItem(rail, "Home", R.drawable.ic_nav_home, activeScreen, view -> showHome());
-        addRailItem(rail, "Plans", R.drawable.ic_nav_plan, activeScreen, view -> showPlans());
-        addRailItem(rail, "Library", R.drawable.ic_nav_library, activeScreen, view -> showLibrary());
+        addRailItem(rail, "Workouts", R.drawable.ic_nav_plan, activeScreen, view -> showPlans());
         addRailItem(rail, "Progress", R.drawable.ic_nav_progress, activeScreen, view -> showProgress());
-        addRailItem(rail, "Account", R.drawable.ic_nav_account, activeScreen, view -> showProfile());
+        addRailItem(rail, "Nutrition", R.drawable.ic_nav_nutrition, activeScreen, view -> showMeals());
+        addRailItem(rail, "Settings", R.drawable.ic_nav_settings, activeScreen, view -> showProfile());
         return rail;
     }
 
     private void addRailItem(LinearLayout rail, String label, int icon, String activeScreen, View.OnClickListener listener) {
         boolean selected = label.equals(activeScreen);
-        ImageButton item = new ImageButton(this);
-        item.setImageResource(icon);
-        item.setImageTintList(ColorStateList.valueOf(selected ? navy : mint));
+        LinearLayout item = new LinearLayout(this);
+        item.setOrientation(LinearLayout.VERTICAL);
+        item.setGravity(Gravity.CENTER);
         item.setBackground(surface(selected ? mint : navyPanel, 15, selected ? 2 : 1, selected ? coral : Color.rgb(35, 53, 78)));
         item.setContentDescription(selected ? label + ", current screen" : "Open " + label);
         item.setTooltipText(label);
-        item.setPadding(dp(12), dp(12), dp(12), dp(12));
+        item.setClickable(true);
+        item.setFocusable(true);
         item.setOnClickListener(listener);
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(dp(54), dp(52));
+
+        ImageView symbol = new ImageView(this);
+        symbol.setImageResource(icon);
+        symbol.setImageTintList(ColorStateList.valueOf(selected ? navy : mint));
+        symbol.setContentDescription(null);
+        symbol.setPadding(dp(2), dp(2), dp(2), dp(2));
+        item.addView(symbol, new LinearLayout.LayoutParams(dp(26), dp(26)));
+
+        TextView caption = text(label, 9, selected ? navy : mint);
+        caption.setGravity(Gravity.CENTER);
+        caption.setSingleLine(true);
+        caption.setTypeface(Typeface.create("sans-serif", selected ? Typeface.BOLD : Typeface.NORMAL));
+        LinearLayout.LayoutParams captionParams = new LinearLayout.LayoutParams(-1, -2);
+        captionParams.topMargin = dp(1);
+        item.addView(caption, captionParams);
+
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(dp(64), dp(61));
         params.topMargin = dp(7);
         rail.addView(item, params);
     }
@@ -517,7 +533,7 @@ public final class MainActivity extends Activity {
 
     private void showPlans() {
         if (session.isEmpty()) session = Coach.recommendation(target, goal, environment);
-        LinearLayout body = appPage("Plans");
+        LinearLayout body = appPage("Workouts");
         title(body, "MY PLAN", "Your weekly rhythm", "A focused " + sessionMinutes + "-minute " + target.toLowerCase(Locale.ROOT) + " session for " + goal.toLowerCase(Locale.ROOT) + ".");
 
         HorizontalScrollView dayScroller = new HorizontalScrollView(this);
@@ -570,6 +586,10 @@ public final class MainActivity extends Activity {
         Button adjust = secondary("Adjust this plan");
         adjust.setOnClickListener(item -> showWizard());
         addButton(body, adjust);
+        gap(body, 10);
+        Button library = lightAction("Browse exercise library");
+        library.setOnClickListener(item -> showLibrary());
+        addButton(body, library);
     }
 
     private void showProgress() {
@@ -604,7 +624,7 @@ public final class MainActivity extends Activity {
     private void showProfile() {
         AccountStore.Profile profile = AccountStore.get(this);
         String coach = "Male".equals(profile.trainer) ? "Coach Leo" : "Coach Mia";
-        LinearLayout body = appPage("Account");
+        LinearLayout body = appPage("Settings");
         title(body, "ACCOUNT", profile.username, "Your trainer, preferences, and update controls live here.");
 
         LinearLayout identity = card();
@@ -645,7 +665,7 @@ public final class MainActivity extends Activity {
     }
 
     private void showPlanGoal() {
-        LinearLayout body = appPage("Plans");
+        LinearLayout body = appPage("Workouts");
         wizardTitle(body, 1, "Choose your goal", "Your goal adjusts rep targets, rest, and coaching emphasis.");
         RadioGroup options = new RadioGroup(this);
         options.setOrientation(RadioGroup.VERTICAL);
@@ -676,7 +696,7 @@ public final class MainActivity extends Activity {
     }
 
     private void showPlanFocus() {
-        LinearLayout body = appPage("Plans");
+        LinearLayout body = appPage("Workouts");
         wizardTitle(body, 2, "Choose a workout focus", "Pick what you want to train. Your selected coach will demonstrate compatible movements.");
         List<Coach.Exercise> choices = Coach.library().get(target);
         if (choices != null && !choices.isEmpty()) {
@@ -713,7 +733,7 @@ public final class MainActivity extends Activity {
     }
 
     private void showPlanContext() {
-        LinearLayout body = appPage("Plans");
+        LinearLayout body = appPage("Workouts");
         wizardTitle(body, 3, "Set your training context", "Only compatible movements are recommended for the place where you plan to train.");
         body.addView(heading("Where will you train?", 18, Color.WHITE));
         gap(body, 7);
@@ -754,7 +774,7 @@ public final class MainActivity extends Activity {
 
     private void showPlanReview() {
         session = Coach.recommendation(target, goal, environment);
-        LinearLayout body = appPage("Plans");
+        LinearLayout body = appPage("Workouts");
         wizardTitle(body, 4, "Your plan is ready", "Review it before you begin. You can revisit these choices whenever you need.");
         body.addView(chip(goal + "  •  " + environment + "  •  " + sessionMinutes + " min"));
         gap(body, 14);
@@ -784,7 +804,7 @@ public final class MainActivity extends Activity {
             return;
         }
         Coach.Exercise exercise = session.get(index);
-        LinearLayout body = appPage("Plans");
+        LinearLayout body = appPage("Workouts");
         title(body, "GUIDED WORKOUT", exercise.target, "Exercise " + (index + 1) + " of " + session.size() + "  •  Set " + set + " of " + exercise.sets);
 
         int visual = ExerciseVisuals.forExercise(this, AccountStore.get(this).trainer, exercise.name);
@@ -839,7 +859,7 @@ public final class MainActivity extends Activity {
     }
 
     private void startRest(int index, int set, Coach.Exercise exercise) {
-        LinearLayout body = appPage("Plans");
+        LinearLayout body = appPage("Workouts");
         title(body, "REST CLOCK", "Recover, then go again", "Your next set begins when the timer ends.");
         LinearLayout timerCard = card();
         TextView timer = heading(format(exercise.restSeconds), 52, ink);
@@ -891,7 +911,7 @@ public final class MainActivity extends Activity {
     private void showLibrary() {
         String trainer = AccountStore.get(this).trainer;
         String trainerName = "Male".equals(trainer) ? "Leo" : "Mia";
-        LinearLayout body = appPage("Library");
+        LinearLayout body = appPage("Workouts");
         title(body, "EXERCISE LIBRARY", "Every move, animated", "Each exercise includes a looping Coach " + trainerName + " demonstration and a concise form cue.");
         for (String group : Coach.TARGETS) {
             body.addView(heading(group, 22, Color.WHITE));
@@ -996,7 +1016,7 @@ public final class MainActivity extends Activity {
     }
 
     private void showMeals() {
-        LinearLayout body = appPage("Progress");
+        LinearLayout body = appPage("Nutrition");
         title(body, "FUEL IDEAS", "Simple meals for " + goal, "Use these as flexible ideas. Adjust portions and ingredients to your preferences, budget, allergies, and dietary needs.");
         for (String meal : Coach.meals(goal)) {
             LinearLayout mealCard = card();
@@ -1012,7 +1032,7 @@ public final class MainActivity extends Activity {
     }
 
     private void showUpdate() {
-        LinearLayout body = appPage("Account");
+        LinearLayout body = appPage("Settings");
         title(body, "APP UPDATES", "Keep your coach current", "Updates are checked over HTTPS, verified against the published SHA-256, and then verified again by Android's signing identity.");
         LinearLayout statusCard = card();
         TextView status = heading("Checking the update channel…", 18, ink);
@@ -1056,7 +1076,7 @@ public final class MainActivity extends Activity {
     }
 
     private void showComplete() {
-        LinearLayout body = appPage("Plans");
+        LinearLayout body = appPage("Workouts");
         title(body, "SESSION COMPLETE", "Strong work", "You completed your " + target + " plan. Hydrate, recover, and let your next session start with a fresh choice.");
         Button home = primary("Return home");
         home.setOnClickListener(view -> showHome());
