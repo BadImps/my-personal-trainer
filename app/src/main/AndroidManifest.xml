@@ -3,12 +3,19 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <application android:allowBackup="true" android:label="My Personal Trainer" android:supportsRtl="true" android:theme="@style/AppTheme">
-        <activity android:name=".MainActivity" android:exported="true">
+        <activity android:name=".MainActivity" android:exported="true" />
+        <activity-alias android:name=".DefaultLauncher" android:enabled="true" android:exported="true" android:icon="@drawable/trainer_cast" android:label="My Personal Trainer" android:targetActivity=".MainActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-        </activity>
+        </activity-alias>
+        <activity-alias android:name=".MiaLauncher" android:enabled="false" android:exported="true" android:icon="@drawable/mia_dumbbell_press" android:label="My Personal Trainer · Mia" android:targetActivity=".MainActivity">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".LeoLauncher" android:enabled="false" android:exported="true" android:icon="@drawable/leo_dumbbell_press" android:label="My Personal Trainer · Leo" android:targetActivity=".MainActivity">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.files"

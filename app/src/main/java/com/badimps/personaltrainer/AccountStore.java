@@ -16,7 +16,15 @@ public final class AccountStore {
         byte[] salt=new byte[16]; new SecureRandom().nextBytes(salt);
         c.getSharedPreferences(FILE,Context.MODE_PRIVATE).edit().putBoolean("created",true).putString("email",email.trim()).putString("username",username.trim()).putString("trainer",trainer).putString("salt",hex(salt)).putString("passwordHash",hash(salt,password)).apply();
     }
+    public static boolean authenticate(Context c,String email,String password) {
+        SharedPreferences p=c.getSharedPreferences(FILE,Context.MODE_PRIVATE);
+        if (!p.getBoolean("created",false) || !p.getString("email","").equalsIgnoreCase(email.trim())) return false;
+        try { return hash(unhex(p.getString("salt","")),password).equals(p.getString("passwordHash","")); }
+        catch(Exception ignored) { return false; }
+    }
+    public static void clear(Context c) { c.getSharedPreferences(FILE,Context.MODE_PRIVATE).edit().clear().apply(); }
     private static String hash(byte[] salt,String value) { try { MessageDigest d=MessageDigest.getInstance("SHA-256"); d.update(salt); return hex(d.digest(value.getBytes(StandardCharsets.UTF_8))); } catch(Exception e) { throw new IllegalStateException(e); } }
     private static String hex(byte[] bytes) { StringBuilder b=new StringBuilder(); for(byte x:bytes)b.append(String.format("%02x",x)); return b.toString(); }
+    private static byte[] unhex(String value) { byte[] out=new byte[value.length()/2];for(int i=0;i<out.length;i++)out[i]=(byte)Integer.parseInt(value.substring(i*2,i*2+2),16);return out; }
     private AccountStore() {}
 }

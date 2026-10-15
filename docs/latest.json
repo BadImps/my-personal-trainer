@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 7,
-  "versionName": "1.6",
-  "publishedAt": "2026-10-15T05:46:45Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v1.6/My-Personal-Trainer-1.6.apk",
-  "sha256": "6fa9b64ddf0e21da3e3c33bc9d3d091a223dddb0d63775f84f025839d6a84088",
-  "sizeBytes": 21481431,
-  "notes": "Smoother coach motion, an animated exercise preview while choosing a workout, and a more polished icon-and-card interface."
+  "versionCode": 8,
+  "versionName": "1.7",
+  "publishedAt": "2026-10-15T06:05:23Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v1.7/My-Personal-Trainer-1.7.apk",
+  "sha256": "7f34602434b55f9b14bc8af08c1633344ca4417d048406443446ca5b2c9d48f3",
+  "sizeBytes": 21484703,
+  "notes": "Adds separate Welcome, Sign In, Create Account, Home, Account and four-step plan setup pages. The launcher icon follows the selected coach."
 }

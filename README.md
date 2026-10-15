@@ -34,3 +34,7 @@ This app provides general fitness and meal ideas, not medical or dietary treatme
 ## 1.6 polished motion and workout selection
 
 Coach GIFs now use smoother ping-pong motion with blended in-between frames. The workout wizard adds a live animated movement preview for the currently selected focus, while polished surfaces, icons, tactile buttons, and elevated cards make the native Android experience easier to scan and use.
+
+## 1.7 complete account and planning flow
+
+The app now opens at a dedicated Welcome page with separate Sign In and Create Account paths. Plan setup is a four-step wizard: goal, workout focus with an animated preview, training context and duration, then a review screen. After a coach is selected, the device launcher uses that coach’s visual as the My Personal Trainer app icon.
