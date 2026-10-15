@@ -1,0 +1,5 @@
+My Personal Trainer 1.1
+
+- Create a private, on-device profile using an email address, username and password.
+- Select Coach Mia or Coach Leo as your trainer persona.
+- Check for new verified updates from the app. Downloads are SHA-256 checked before Android confirms installation.
