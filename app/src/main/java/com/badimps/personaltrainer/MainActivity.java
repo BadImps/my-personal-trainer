@@ -58,6 +58,7 @@ public final class MainActivity extends Activity {
 
     private void showRegistration() {
         LinearLayout b=page(); header(b,"WELCOME","Create your trainer profile","Your email, username and password stay on this device in this version. Choose the coach persona you prefer.");
+        ImageView cast=new ImageView(this); cast.setImageResource(R.drawable.trainer_cast); cast.setScaleType(ImageView.ScaleType.CENTER_CROP); b.addView(cast,new LinearLayout.LayoutParams(-1,dp(190))); gap(b,16);
         EditText email=input("Email address",InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS); b.addView(email); gap(b,9);
         EditText username=input("Username",InputType.TYPE_CLASS_TEXT); b.addView(username); gap(b,9);
         EditText password=input("Password (8 or more characters)",InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD); b.addView(password); gap(b,16);
@@ -116,7 +117,10 @@ public final class MainActivity extends Activity {
     private void showActive(int index, int set) {
         if (index >= session.size()) { showComplete(); return; }
         Coach.Exercise e=session.get(index); LinearLayout b=page(); header(b,"GUIDED WORKOUT",""+e.name,"Exercise "+(index+1)+" of "+session.size()+"  •  Set "+set+" of "+e.sets);
-        ExerciseAnimationView demo=new ExerciseAnimationView(this); b.addView(demo,new LinearLayout.LayoutParams(-1,dp(240))); gap(b,12);
+        int visual=ExerciseVisuals.forExercise(this,AccountStore.get(this).trainer,e.name);
+        if(visual!=0){ImageView demo=new ImageView(this);demo.setImageResource(visual);demo.setScaleType(ImageView.ScaleType.CENTER_CROP);b.addView(demo,new LinearLayout.LayoutParams(-1,dp(240)));}
+        else {ExerciseAnimationView demo=new ExerciseAnimationView(this);b.addView(demo,new LinearLayout.LayoutParams(-1,dp(240)));}
+        gap(b,12);
         b.addView(text(e.sets+" sets × "+e.reps+" reps",24,navy)); gap(b,5); b.addView(text(e.description+"\nCoach cue: "+e.cue,16,Color.rgb(71,83,108))); gap(b,14);
         Button callout=button("Call out rep guidance"); callout.setBackgroundColor(navy); callout.setOnClickListener(v->say("Set "+set+". Complete "+e.reps+" controlled reps. "+e.cue)); b.addView(callout); gap(b,9);
         Button done=button("I finished this set"); done.setOnClickListener(v->startRest(index,set,e)); b.addView(done); gap(b,9);
@@ -138,9 +142,9 @@ public final class MainActivity extends Activity {
     private void say(String words) { if(voice!=null) voice.speak(words,TextToSpeech.QUEUE_FLUSH,null,"coach"); }
 
     private void showLibrary() {
-        LinearLayout b=page(); header(b,"EXERCISE LIBRARY","Every move, explained.","Choose movements that match your equipment and ability. The animated demonstration is shown during guided sessions.");
-        ImageView art=new ImageView(this); art.setImageResource(com.badimps.personaltrainer.R.drawable.workout_library); art.setScaleType(ImageView.ScaleType.CENTER_CROP); b.addView(art,new LinearLayout.LayoutParams(-1,dp(210))); gap(b,16);
-        for (String group:Coach.TARGETS) { b.addView(text(group,21,navy)); gap(b,5); for(Coach.Exercise e:Coach.library().get(group)) { b.addView(text(e.name+" — "+e.description+"\n"+e.cue,15,Color.rgb(71,83,108))); gap(b,10); } gap(b,9); }
+        String trainer=AccountStore.get(this).trainer;
+        LinearLayout b=page(); header(b,"EXERCISE LIBRARY","Every move, visualized.","Each move has a Coach "+("Male".equals(trainer)?"Leo":"Mia")+" form visual. Choose a movement that matches your equipment and ability.");
+        for (String group:Coach.TARGETS) { b.addView(text(group,21,navy)); gap(b,5); for(Coach.Exercise e:Coach.library().get(group)) { LinearLayout card=new LinearLayout(this);card.setOrientation(LinearLayout.HORIZONTAL);card.setPadding(dp(10),dp(10),dp(10),dp(10));card.setBackgroundColor(Color.WHITE);int visual=ExerciseVisuals.forExercise(this,trainer,e.name);if(visual!=0){ImageView image=new ImageView(this);image.setImageResource(visual);image.setScaleType(ImageView.ScaleType.CENTER_CROP);card.addView(image,new LinearLayout.LayoutParams(dp(136),dp(102)));}TextView details=text(e.name+"\n"+e.description+"\n"+e.cue,14,Color.rgb(71,83,108));details.setPadding(dp(12),0,0,0);card.addView(details,new LinearLayout.LayoutParams(0,-2,1));b.addView(card);gap(b,10); } gap(b,9); }
         Button home=button("Back to home"); home.setOnClickListener(v->showHome()); b.addView(home);
     }
     private void showMeals() {

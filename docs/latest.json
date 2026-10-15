@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 3,
-  "versionName": "1.2",
-  "publishedAt": "2026-10-15T02:10:00Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v1.2/My-Personal-Trainer-1.2.apk",
-  "sha256": "193023bbc432aa3259600134fe56a925fca3ec321278e1ba7a1dc44ef1c528b9",
-  "sizeBytes": 3013415,
-  "notes": "Choose your training environment, explore Back & Core, Cardio and Mobility sessions, set new goal types, and log a private weight trend check-in."
+  "versionCode": 4,
+  "versionName": "1.3",
+  "publishedAt": "2026-10-15T03:00:00Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v1.3/My-Personal-Trainer-1.3.apk",
+  "sha256": "c41982b185b9ca8ee34e1f18fadf38383439237f202baf63f93ff008e3138731",
+  "sizeBytes": 16470764,
+  "notes": "Every exercise now has a coach-specific, full-form visual in the guided workout and library, including no-equipment substitutions."
 }

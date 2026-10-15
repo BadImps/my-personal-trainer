@@ -1,5 +1,9 @@
 # My Personal Trainer
 
+## 1.3 exercise visuals
+
+The guided workout and exercise library now show coach-specific, full-form visuals for every prescribed movement, including the no-equipment substitutions. Coach Mia and Coach Leo each have their own visual set. These are form-reference images; follow the written cue, use a comfortable range, and stop if anything hurts.
+
 An independent, offline Android fitness coach. It builds a guided workout from a chosen goal and focus, gives movement cues and spoken rep guidance, runs a rest countdown after every set, and includes meal ideas.
 
 ## Included workout focuses
