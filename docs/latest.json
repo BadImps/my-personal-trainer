@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 2,
-  "versionName": "1.1",
-  "publishedAt": "2026-10-15T01:35:00Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v1.1/My-Personal-Trainer-1.1.apk",
-  "sha256": "6cbf029555e7284eed98874014cf596e886cb70f56e5a7828ec0a510fb7e385d",
-  "sizeBytes": 3008515,
-  "notes": "Create a local trainer profile with email, username and password, choose Coach Mia or Coach Leo, and check future updates through the verified OTA channel."
+  "versionCode": 3,
+  "versionName": "1.2",
+  "publishedAt": "2026-10-15T02:10:00Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v1.2/My-Personal-Trainer-1.2.apk",
+  "sha256": "193023bbc432aa3259600134fe56a925fca3ec321278e1ba7a1dc44ef1c528b9",
+  "sizeBytes": 3013415,
+  "notes": "Choose your training environment, explore Back & Core, Cardio and Mobility sessions, set new goal types, and log a private weight trend check-in."
 }

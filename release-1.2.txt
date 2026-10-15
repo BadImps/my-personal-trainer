@@ -1,0 +1,6 @@
+My Personal Trainer 1.2
+
+- Choose Gym, Home without equipment, Home with dumbbells, or Outdoors before building a plan.
+- New workout focuses: Back & Core, Cardio, and Mobility.
+- New goals: reduce body fat and improve endurance, with a clear summary of what each plan is designed to develop.
+- Add a private, local weight trend check-in that compares your direction with your own target.

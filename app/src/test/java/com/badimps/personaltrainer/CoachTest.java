@@ -23,4 +23,11 @@ public class CoachTest {
     @Test public void everyGoalHasMealIdeas() {
         for (String goal : Coach.GOALS) assertFalse(Coach.meals(goal).isEmpty());
     }
+    @Test public void homePlanSubstitutesGymOnlyMove() {
+        Coach.Exercise exercise = Coach.recommendation("Upper", "Build muscle", "Home — no equipment").get(0);
+        assertEquals("Pike Push-up", exercise.name);
+    }
+    @Test public void eachGoalHasAnOutcomeSummary() {
+        for (String goal : Coach.GOALS) assertFalse(Coach.goalSummary(goal).isEmpty());
+    }
 }

@@ -2,6 +2,10 @@
     <item name="goal_strength" type="id" />
     <item name="goal_muscle" type="id" />
     <item name="goal_wellbeing" type="id" />
+    <item name="goal_fat_loss" type="id" />
+    <item name="goal_endurance" type="id" />
     <item name="trainer_female" type="id" />
     <item name="trainer_male" type="id" />
+    <item name="unit_kg" type="id" />
+    <item name="unit_lb" type="id" />
 </resources>
