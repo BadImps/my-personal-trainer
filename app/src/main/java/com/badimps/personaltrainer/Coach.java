@@ -11,6 +11,8 @@ public final class Coach {
     public static final String[] TARGETS = {"Upper", "Lower", "Arms", "Chest", "Legs", "Back & Core", "Cardio", "Mobility", "Full Body", "Machines"};
     public static final String[] GOALS = {"Build strength", "Build muscle", "Reduce body fat", "Improve endurance", "Move & feel good"};
     public static final String[] ENVIRONMENTS = {"Gym", "Home — no equipment", "Home — dumbbells", "Outdoors"};
+    public static final String[] PLAN_MODES = {"Custom", "Daily", "Weekly"};
+    public static final String[] EQUIPMENT_TYPES = {"Dumbbells", "Home & household", "Machine assisted", "Bodyweight"};
 
     public static final class Exercise {
         public final String name, target, cue, description;
@@ -58,6 +60,112 @@ public final class Coach {
             else if(name.equals("Biceps Curl")||name.equals("Hammer Curl")){name="Isometric Towel Curl";cue="Pull steadily against the towel.";description="A simple no-equipment arm option.";}
         }
         return new Exercise(name,e.target,sets,reps,rest,cue,description);
+    }
+
+    /** Returns equipment-specific movements for the plan builder. */
+    public static List<Exercise> planOptions(String target, String equipment) {
+        if ("Dumbbells".equals(equipment)) return dumbbellOptions(target);
+        if ("Home & household".equals(equipment)) return householdOptions(target);
+        if ("Machine assisted".equals(equipment)) return machineOptions(target);
+        return bodyweightOptions(target);
+    }
+
+    /** Creates a session-specific copy without mutating the offline exercise catalogue. */
+    public static Exercise prescribe(Exercise exercise, int sets, int reps, int restSeconds) {
+        return new Exercise(exercise.name, exercise.target, sets, reps, restSeconds, exercise.cue, exercise.description);
+    }
+
+    private static List<Exercise> dumbbellOptions(String target) {
+        if ("Chest".equals(target)) return options(
+                ex("Floor Press", "Chest", "Pause lightly, then press smoothly.", "Dumbbell chest pressing from the floor."),
+                ex("Chest Fly", "Chest", "Hug a big tree; use a light load.", "Dumbbell chest isolation."),
+                ex("Dumbbell Press", "Chest", "Keep wrists stacked over elbows.", "Dumbbell pressing for chest and shoulders."));
+        if ("Legs".equals(target) || "Lower".equals(target)) return options(
+                ex("Goblet Squat", target, "Sit between your heels; stand tall.", "Dumbbell leg strength."),
+                ex("Romanian Deadlift", target, "Hips travel back; keep the load close.", "Dumbbell hamstring and glute work."),
+                ex("Reverse Lunge", target, "Step softly back; drive through the front foot.", "Single-leg dumbbell control."));
+        if ("Arms".equals(target)) return options(
+                ex("Biceps Curl", target, "Keep elbows beside your ribs.", "Dumbbell biceps work."),
+                ex("Hammer Curl", target, "Keep palms facing in.", "Forearm and biceps work."),
+                ex("Overhead Triceps Extension", target, "Keep elbows aimed forward.", "Dumbbell triceps work."));
+        if ("Upper".equals(target)) return options(
+                ex("Dumbbell Press", target, "Press tall; ribs stay down.", "Dumbbell shoulders and triceps."),
+                ex("One-arm Row", target, "Pull elbow toward your hip.", "Dumbbell upper-back strength."),
+                ex("Band Pull-apart", target, "Open your chest; squeeze shoulder blades.", "Upper-back posture support."));
+        if ("Full Body".equals(target)) return options(
+                ex("Squat to Press", target, "Stand strongly, then press overhead.", "Dumbbell full-body strength."),
+                ex("Renegade Row", target, "Resist twisting through your hips.", "Dumbbell core and upper-back work."),
+                ex("Goblet Squat", target, "Knees follow your toes.", "Dumbbell leg strength."));
+        return copyLibrary(target);
+    }
+
+    private static List<Exercise> householdOptions(String target) {
+        if ("Chest".equals(target)) return options(
+                ex("Push-up", target, "Brace your core; press the floor away.", "No-equipment chest pressing."),
+                ex("Incline Push-up", target, "Body moves as one unit.", "Use a sturdy counter or bench."),
+                ex("Backpack Floor Press", target, "Keep the backpack secure and move slowly.", "A household-weight chest press."));
+        if ("Legs".equals(target) || "Lower".equals(target)) return options(
+                ex("Bodyweight Squat", target, "Knees follow your toes.", "Use a backpack only if it feels stable."),
+                ex("Step-up", target, "Use a stable step and drive through the whole foot.", "A household step-up."),
+                ex("Glute Bridge", target, "Ribs down; squeeze at the top.", "A floor-based hip exercise."));
+        if ("Arms".equals(target)) return options(
+                ex("Isometric Towel Curl", target, "Pull steadily against the towel.", "Use a towel for resistance."),
+                ex("Bench Dip", target, "Shoulders stay away from ears.", "Use a stable chair or bench."),
+                ex("Overhead Triceps Extension", target, "Move slowly and keep elbows forward.", "Use a light household object."));
+        return copyLibrary(target);
+    }
+
+    private static List<Exercise> machineOptions(String target) {
+        if ("Chest".equals(target)) return options(
+                ex("Machine Chest Press", target, "Set handles at mid-chest; stop short of locking out.", "Guided machine pressing."),
+                ex("Pec Deck Fly", target, "Keep a soft elbow and squeeze your chest.", "Machine-assisted chest isolation."),
+                ex("Cable Chest Press", target, "Press forward without shrugging.", "Controlled cable chest pressing."));
+        if ("Legs".equals(target) || "Lower".equals(target)) return options(
+                ex("Leg Press", target, "Keep your feet planted; do not lock your knees.", "Guided lower-body pressing."),
+                ex("Seated Leg Curl", target, "Move slowly and control the return.", "Machine hamstring work."),
+                ex("Calf Raise", target, "Pause high; lower slowly.", "Machine or supported calf work."));
+        if ("Arms".equals(target)) return options(
+                ex("Cable Biceps Curl", target, "Keep elbows beside your ribs.", "Cable biceps resistance."),
+                ex("Cable Triceps Pressdown", target, "Keep elbows close to your body.", "Cable triceps resistance."),
+                ex("Seated Cable Row", target, "Stay tall and pull toward your ribs.", "Machine-assisted upper-body pulling."));
+        if ("Upper".equals(target)) return options(
+                ex("Lat Pulldown", target, "Keep ribs down and pull toward your upper chest.", "Machine-assisted upper back."),
+                ex("Seated Cable Row", target, "Stay tall and pull toward your ribs.", "Cable upper-back work."),
+                ex("Machine Shoulder Press", target, "Keep ribs down and press smoothly.", "Guided shoulder pressing."));
+        return options(
+                ex("Lat Pulldown", target, "Keep ribs down and pull toward your upper chest.", "Machine-assisted movement."),
+                ex("Leg Press", target, "Keep your feet planted; do not lock your knees.", "Guided lower-body movement."),
+                ex("Seated Cable Row", target, "Stay tall and pull toward your ribs.", "Controlled cable movement."));
+    }
+
+    private static List<Exercise> bodyweightOptions(String target) {
+        if ("Chest".equals(target)) return options(
+                ex("Push-up", target, "Brace your core; press the floor away.", "Bodyweight chest pressing."),
+                ex("Incline Push-up", target, "Body moves as one unit.", "A scalable bodyweight press."),
+                ex("Bench Dip", target, "Shoulders stay away from ears.", "Supported pressing for chest and triceps."));
+        if ("Legs".equals(target) || "Lower".equals(target)) return options(
+                ex("Bodyweight Squat", target, "Knees follow your toes.", "Bodyweight leg strength."),
+                ex("Walking Lunge", target, "Stay tall as you step.", "Leg strength and balance."),
+                ex("Wall Sit", target, "Press your back into the wall.", "Lower-body endurance."));
+        if ("Arms".equals(target)) return options(
+                ex("Bench Dip", target, "Shoulders stay away from ears.", "Bodyweight triceps work."),
+                ex("Push-up", target, "Keep your elbows controlled.", "Chest and triceps pressing."),
+                ex("Isometric Towel Curl", target, "Pull steadily against the towel.", "Simple arm resistance."));
+        if ("Full Body".equals(target)) return options(
+                ex("Burpee", target, "Choose a step-back option when needed.", "Full-body conditioning."),
+                ex("Mountain Climber", target, "Keep shoulders stacked over hands.", "Core and conditioning."),
+                ex("Squat to Press", target, "Use a strong squat and controlled reach.", "Full-body movement."));
+        return copyLibrary(target);
+    }
+
+    private static List<Exercise> copyLibrary(String target) {
+        List<Exercise> source = LIBRARY.get(target);
+        if (source == null) source = LIBRARY.get("Full Body");
+        return new ArrayList<>(source);
+    }
+
+    private static List<Exercise> options(Exercise first, Exercise second, Exercise third) {
+        return new ArrayList<>(Arrays.asList(first, second, third));
     }
     public static String goalSummary(String goal) {
         if(goal.equals(GOALS[0])) return "Likely focus: stronger movement patterns and confidence with gradually heavier loads.";

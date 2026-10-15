@@ -15,6 +15,13 @@ public final class ExerciseVisuals {
         else if ("Incline Push-up".equals(exerciseName)) slug = "incline_pushup";
         else if ("Push-up".equals(exerciseName)) slug = "pushup";
         else if ("Step-up".equals(exerciseName)) slug = "stepup";
+        else if ("Backpack Floor Press".equals(exerciseName)) slug = "floor_press";
+        else if ("Pec Deck Fly".equals(exerciseName)) slug = "chest_fly";
+        else if ("Cable Chest Press".equals(exerciseName)) slug = "machine_chest_press";
+        else if ("Seated Leg Curl".equals(exerciseName)) slug = "romanian_deadlift";
+        else if ("Cable Biceps Curl".equals(exerciseName)) slug = "biceps_curl";
+        else if ("Cable Triceps Pressdown".equals(exerciseName)) slug = "overhead_triceps_extension";
+        else if ("Machine Shoulder Press".equals(exerciseName)) slug = "dumbbell_press";
         else slug = exerciseName.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "_").replaceAll("^_|_$", "");
         String coach = "Male".equals(trainer) ? "leo_" : "mia_";
         return context.getResources().getIdentifier(coach + slug, "drawable", context.getPackageName());
