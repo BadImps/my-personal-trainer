@@ -837,7 +837,7 @@ public final class MainActivity extends Activity {
         addCounter(counters, "REPS", "0 / " + exercise.reps);
         body.addView(counters);
         gap(body, 14);
-        Button done = primary("Complete set");
+        Button done = primary("Reps completed");
         done.setOnClickListener(view -> startRest(index, set, exercise));
         addButton(body, done);
         gap(body, 10);
@@ -866,7 +866,7 @@ public final class MainActivity extends Activity {
         timer.setGravity(Gravity.CENTER);
         timer.setContentDescription("Rest time remaining " + exercise.restSeconds + " seconds");
         timerCard.addView(timer, new LinearLayout.LayoutParams(-1, dp(98)));
-        TextView reminder = text("Breathe slowly. Sip water if you need it. You can continue early whenever you are ready.", 15, muted);
+        TextView reminder = text("Breathe slowly. At 10 seconds, Coach Mia will count you in.", 15, muted);
         reminder.setGravity(Gravity.CENTER);
         timerCard.addView(reminder);
         body.addView(timerCard);
@@ -883,11 +883,11 @@ public final class MainActivity extends Activity {
                 int seconds = (int) Math.ceil(left / 1000d);
                 timer.setText(format(seconds));
                 timer.setContentDescription("Rest time remaining " + seconds + " seconds");
-                if (seconds == 10) say("Ten seconds remaining.");
+                if (seconds <= 10 && seconds >= 1) say(String.valueOf(seconds));
             }
 
             @Override public void onFinish() {
-                say("Rest complete. Next set.");
+                say("Let's go.");
                 advance(index, set, exercise);
             }
         }.start();
