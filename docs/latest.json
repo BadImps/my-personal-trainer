@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 12,
-  "versionName": "2.1",
-  "publishedAt": "2026-10-15T08:06:54Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v2.1/app-release.apk",
-  "sha256": "bd6c6fe9521fc5eb5ad70c9b665c6cd5ba938d12c1abab5fb95f6fe444cc0798",
-  "sizeBytes": 25201383,
-  "notes": "Unifies every screen under the coach-rail design, fixes the full-height welcome canvas and navigation state, restores every exercise demonstration, and uses Android's modern animated-image renderer on supported devices."
+  "versionCode": 13,
+  "versionName": "2.2",
+  "publishedAt": "2026-10-15T08:44:35Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v2.2/app-release.apk",
+  "sha256": "0843924b1cc34a86df952edbd31ff8b6c82bf9b0696244ea5e3cd1512a9ff103",
+  "sizeBytes": 25203075,
+  "notes": "Refines the preview-matched coach rail with labeled Home, Workouts, Progress, Nutrition, and Settings controls; each destination now has a specific icon and selected state."
 }
