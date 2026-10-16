@@ -2898,9 +2898,9 @@ public final class MainActivity extends Activity {
                 "Your age, height, gender, and weight remain on this device. These educational summaries support your plans; they do not diagnose health or prescribe a body size, pace, or calorie target.");
 
         if (!BodyProfileStore.configured(this) || !WeightStore.configured(this)) {
-            LinearLayout start = card();
-            start.addView(heading("Build your private context", 20, ink));
-            start.addView(text("Add your adult age, height, optional gender, and current weight. You can then see an adult screening reference, an adjustable walking-distance estimate, and how your planned activity compares with general guidance.", 14, muted));
+            LinearLayout start = darkCard();
+            start.addView(heading("Build your private context", 22, Color.WHITE));
+            start.addView(text("Add your adult age, height, optional gender, and current weight. You can then see an adult screening reference, an adjustable walking-distance estimate, and how your planned activity compares with general guidance.", 14, Color.rgb(202, 216, 234)));
             gap(start, 11);
             Button complete = primary("Add my private body context");
             complete.setOnClickListener(view -> showBodyProfileSetup(false));
@@ -2917,17 +2917,32 @@ public final class MainActivity extends Activity {
         float current = WeightStore.latest(this);
         float targetWeight = WeightStore.target(this);
 
-        LinearLayout identity = card();
-        identity.addView(heading("Your local profile", 19, ink));
-        identity.addView(text(BodyProfileStore.summary(this) + "  •  Current weight " + WeightStore.latestLabel(this), 14, muted));
-        identity.addView(text("Gender is optional. It is not inferred from your selected coach and is only shared with Gemini if you explicitly opt in.", 13, muted));
+        LinearLayout identity = darkCard();
+        identity.addView(heading("YOUR BODY SNAPSHOT", 11, mint));
+        LinearLayout metrics = new LinearLayout(this);
+        metrics.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout currentMetric = new LinearLayout(this);
+        currentMetric.setOrientation(LinearLayout.VERTICAL);
+        currentMetric.addView(heading(WeightStore.latestLabel(this), 31, Color.WHITE));
+        currentMetric.addView(text("CURRENT WEIGHT", 11, mint));
+        metrics.addView(currentMetric, new LinearLayout.LayoutParams(0, -2, 1));
+        LinearLayout targetMetric = new LinearLayout(this);
+        targetMetric.setOrientation(LinearLayout.VERTICAL);
+        targetMetric.addView(heading(String.format(Locale.US, "%.1f %s", targetWeight, unit), 20, mint));
+        targetMetric.addView(text("PERSONAL TARGET", 10, Color.rgb(202, 216, 234)));
+        metrics.addView(targetMetric, new LinearLayout.LayoutParams(0, -2, 1));
+        LinearLayout.LayoutParams metricsParams = new LinearLayout.LayoutParams(-1, -2);
+        metricsParams.topMargin = dp(7);
+        identity.addView(metrics, metricsParams);
+        identity.addView(text(BodyProfileStore.summary(this), 13, Color.rgb(202, 216, 234)));
+        identity.addView(text("Private to this device. Gender is optional and never inferred from your coach.", 12, Color.rgb(202, 216, 234)));
         body.addView(identity);
         gap(body, 12);
 
-        LinearLayout reference = card();
+        LinearLayout reference = darkCard();
         if (BodyInsights.usesAdultReference(age)) {
-            reference.addView(heading("Adult screening reference", 19, ink));
-            reference.addView(text("For your height, a BMI 18.5–24.9 screening reference corresponds to " + BodyInsights.referenceRange(heightCm, unit) + ". This is not an ideal weight, goal, or diagnosis.", 14, muted));
+            reference.addView(heading("Adult screening reference", 19, Color.WHITE));
+            reference.addView(text("For your height, a BMI 18.5–24.9 screening reference corresponds to " + BodyInsights.referenceRange(heightCm, unit) + ". This is not an ideal weight, goal, or diagnosis.", 14, Color.rgb(202, 216, 234)));
             ReferenceWeightRangeView chart = new ReferenceWeightRangeView(this);
             chart.setValues(current, targetWeight,
                     BodyInsights.fromKg(BodyInsights.referenceWeightLowKg(heightCm), unit),
@@ -2935,19 +2950,19 @@ public final class MainActivity extends Activity {
             LinearLayout.LayoutParams chartParams = new LinearLayout.LayoutParams(-1, dp(118));
             chartParams.topMargin = dp(8);
             reference.addView(chart, chartParams);
-            reference.addView(text(String.format(Locale.US, "Current BMI screening value: %.1f. BMI is one screening measure and does not measure health, fitness, or body composition by itself.", BodyInsights.bmi(heightCm, current, unit)), 13, muted));
+            reference.addView(text(String.format(Locale.US, "Current BMI screening value: %.1f. BMI is one screening measure and does not measure health, fitness, or body composition by itself.", BodyInsights.bmi(heightCm, current, unit)), 13, Color.rgb(202, 216, 234)));
         } else {
-            reference.addView(heading("Age-specific growth context", 19, ink));
-            reference.addView(text("For ages 18–19, this app does not apply an adult BMI range. Growth and weight context require a sex- and age-specific clinical chart, so talk with a qualified healthcare professional if you want an assessment.", 14, muted));
+            reference.addView(heading("Age-specific growth context", 19, Color.WHITE));
+            reference.addView(text("For ages 18–19, this app does not apply an adult BMI range. Growth and weight context require a sex- and age-specific clinical chart, so talk with a qualified healthcare professional if you want an assessment.", 14, Color.rgb(202, 216, 234)));
         }
         body.addView(reference);
         gap(body, 12);
 
-        LinearLayout movement = card();
-        movement.addView(heading("Comfortable walking estimate", 19, ink));
-        TextView paceCopy = text(BodyInsights.paceDistance(BodyProfileStore.walkingPaceMph(this)), 14, muted);
+        LinearLayout movement = darkCard();
+        movement.addView(heading("Comfortable walking estimate", 19, Color.WHITE));
+        TextView paceCopy = text(BodyInsights.paceDistance(BodyProfileStore.walkingPaceMph(this)), 15, mint);
         movement.addView(paceCopy);
-        movement.addView(text("This is distance at the pace you choose—not an age-based performance test. Slow down, pause, or seek advice if activity causes concerning symptoms.", 13, muted));
+        movement.addView(text("This is distance at the pace you choose—not an age-based performance test. Slow down, pause, or seek advice if activity causes concerning symptoms.", 13, Color.rgb(202, 216, 234)));
         SeekBar pace = new SeekBar(this);
         pace.setMax(6); // 2.0 through 5.0 mph in 0.5-mph steps.
         pace.setProgress(Math.max(0, Math.min(6, Math.round((BodyProfileStore.walkingPaceMph(this) - 2f) * 2f))));
@@ -2970,11 +2985,11 @@ public final class MainActivity extends Activity {
         body.addView(movement);
         gap(body, 12);
 
-        LinearLayout activity = card();
-        activity.addView(heading("Weekly movement context", 19, ink));
+        LinearLayout activity = darkCard();
+        activity.addView(heading("Weekly movement context", 19, Color.WHITE));
         int plannedMinutes = session.isEmpty() ? 0 : plannedSessionsThisWeek() * sessionMinutes;
-        activity.addView(text(BodyInsights.weeklyActivityContext(plannedMinutes, age), 14, muted));
-        activity.addView(text("The general adult baseline is 150–300 minutes of moderate aerobic activity each week plus muscle-strengthening activity on 2 days. Your plan can be one part of that total.", 13, muted));
+        activity.addView(text(BodyInsights.weeklyActivityContext(plannedMinutes, age), 14, mint));
+        activity.addView(text("The general adult baseline is 150–300 minutes of moderate aerobic activity each week plus muscle-strengthening activity on 2 days. Your plan can be one part of that total.", 13, Color.rgb(202, 216, 234)));
         body.addView(activity);
         gap(body, 12);
 
