@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 32,
-  "versionName": "4.1",
-  "publishedAt": "2026-10-16T19:30:00Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v4.1/My-Personal-Trainer-4.1.apk",
-  "sha256": "344fc690236678ee59b80b1ae2228abb6ce5d2c92a0336ecafef82d067f1d056",
+  "versionCode": 33,
+  "versionName": "4.2",
+  "publishedAt": "2026-10-16T21:40:00Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v4.2/app-release.apk",
+  "sha256": "d12f2379edab7d17f3053932a769972fafa2dd30fe4e0bc586f502fafb9221ed",
   "sizeBytes": 84161825,
-  "notes": "Adds star-and-shadow recognition for the fastest set, automatically starts cooldown after coaching dialogue, and improves Home with next-week highlights, planned-session tiles, and a monthly workout calendar."
+  "notes": "Applies the approved dark dashboard direction: navy panels, mint workout status, coral primary actions, compact weekly planning, and updated Home cards."
 }
