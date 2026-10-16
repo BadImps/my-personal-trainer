@@ -1,8 +1,8 @@
 # OTA delivery: mobile-data reliability and release safety
 
-## 3.8 release note
+## 3.9 release note
 
-Version 3.8 addresses mobile-data update-channel timeouts before a package download starts. The app reads the GitHub Pages manifest first and, only for a transport failure, automatically retries an independently routed `raw.githubusercontent.com` copy of the same manifest. Manifest validation, HTTPS-only package delivery, and SHA-256 verification remain mandatory. If both routes are unavailable, the screen offers a concise recovery message and a manual link to the current GitHub release rather than exposing a raw IP/port error.
+Version 3.9 addresses mobile-data update-channel timeouts before a package download starts. The app reads the GitHub Pages manifest first and, only for a transport failure, automatically retries the same manifest through GitHub's repository raw route. Manifest validation, HTTPS-only package delivery, and SHA-256 verification remain mandatory. If both routes are unavailable, the screen offers a concise recovery message and a manual link to the current GitHub release rather than exposing a raw IP/port error.
 
 ## 3.7 release note
 

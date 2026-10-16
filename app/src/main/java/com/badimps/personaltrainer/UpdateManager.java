@@ -38,7 +38,7 @@ import java.util.Locale;
 public final class UpdateManager {
     public static final String ENDPOINT = "https://badimps.github.io/my-personal-trainer/latest.json";
     /** A separately routed copy for mobile networks that intermittently cannot reach Pages. */
-    public static final String FALLBACK_ENDPOINT = "https://raw.githubusercontent.com/BadImps/my-personal-trainer/main/docs/latest.json";
+    public static final String FALLBACK_ENDPOINT = "https://github.com/BadImps/my-personal-trainer/raw/refs/heads/main/docs/latest.json";
     public static final String MANUAL_RELEASES_URL = "https://github.com/BadImps/my-personal-trainer/releases/latest";
     private static final String PREFS = "ota_download_state";
     private static final String KEY_ID = "download_id";
@@ -101,9 +101,7 @@ public final class UpdateManager {
             // Transport failures can safely use the independently routed mirror. A downloaded
             // manifest that fails validation remains a visible safety failure.
             try {
-                // Raw GitHub may cache the branch URL. A distinct query key keeps a carrier
-                // fallback from receiving an older manifest after a new release is published.
-                return checkEndpoint(FALLBACK_ENDPOINT + "?checkedAt=" + System.currentTimeMillis());
+                return checkEndpoint(FALLBACK_ENDPOINT);
             } catch (Exception fallbackError) {
                 fallbackError.addSuppressed(primaryError);
                 throw new IOException("Could not reach either update service", fallbackError);
