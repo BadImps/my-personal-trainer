@@ -5,6 +5,6 @@
   "publishedAt": "2026-10-16T19:20:00Z",
   "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v4.0/My-Personal-Trainer-4.0.apk",
   "sha256": "b4300aafc88daa200af40efd6f0efb8f1f09afb087c177555b2fdac8637d2dd6",
-  "sizeBytes": 84161821,
+  "sizeBytes": 84161825,
   "notes": "Fixes carrier update checks that time out before downloading. The app now retries the verified manifest through GitHub's contents API and provides a manual release link if both routes are unavailable."
 }
