@@ -31,6 +31,7 @@ import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.FrameLayout;
+import android.widget.GridLayout;
 import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -1065,6 +1066,11 @@ public final class MainActivity extends Activity {
         LinearLayout.LayoutParams legendParams = new LinearLayout.LayoutParams(-1, -2);
         legendParams.topMargin = dp(8);
         weekly.addView(legend, legendParams);
+        if (homeWeekOffset == 0) {
+            Calendar nextWeekStart = homeWeekStart(1);
+            boolean nextConfirmed = hasHomeWeekSchedule(1, nextWeekStart);
+            if (nextConfirmed) addNextWeekHighlights(weekly, nextWeekStart, homeWeekSchedule(1, nextWeekStart, true));
+        }
         body.addView(weekly);
 
         gap(body, 14);
@@ -1199,7 +1205,7 @@ public final class MainActivity extends Activity {
         body.addView(scroll, new LinearLayout.LayoutParams(-1, -2));
         gap(body, 9);
         Button browse = lightAction("Browse all weeks");
-        browse.setOnClickListener(view -> showWizard());
+        browse.setOnClickListener(view -> showMonthScheduleDialog());
         addButton(body, browse);
     }
 
@@ -1217,25 +1223,99 @@ public final class MainActivity extends Activity {
         });
         tile.addView(heading(homeWeekRange(weekStart), 15, ink));
         int sessions = countTrainingDays(schedule.workoutDays);
-        tile.addView(text(confirmed ? sessions + " session" + (sessions == 1 ? "" : "s") + " planned" : "No plan set yet", 12, muted));
+        tile.addView(text(confirmed ? "Scheduled training" : "No plan set yet", 12, muted));
         LinearLayout blocks = new LinearLayout(this);
-        blocks.setGravity(Gravity.CENTER_VERTICAL);
-        LinearLayout.LayoutParams blocksParams = new LinearLayout.LayoutParams(-1, dp(17));
-        blocksParams.topMargin = dp(9);
+        blocks.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams blocksParams = new LinearLayout.LayoutParams(-1, -2);
+        blocksParams.topMargin = dp(7);
         for (int day = 0; day < 7; day++) {
-            TextView block = new TextView(this);
-            block.setGravity(Gravity.CENTER);
-            block.setText(schedule.workoutDays[day] ? "•" : confirmed ? "–" : "");
-            block.setTextSize(13);
-            block.setTextColor(schedule.workoutDays[day] ? navy : muted);
-            block.setBackground(surface(schedule.workoutDays[day] ? mint : confirmed ? Color.rgb(218, 226, 239) : Color.rgb(239, 242, 247), 5, 0, Color.TRANSPARENT));
-            LinearLayout.LayoutParams blockParams = new LinearLayout.LayoutParams(0, dp(17), 1);
-            blockParams.rightMargin = day == 6 ? 0 : dp(3);
+            if (!schedule.workoutDays[day]) continue;
+            TextView block = text(weekDays[day] + " " + homeWeekDate(weekStart, day) + "  ·  " + homeFocusForDay(day, schedule), 11, ink);
+            block.setPadding(dp(7), dp(4), dp(7), dp(4));
+            block.setBackground(surface(mint, 7, 0, Color.TRANSPARENT));
+            LinearLayout.LayoutParams blockParams = new LinearLayout.LayoutParams(-1, -2);
+            blockParams.bottomMargin = dp(3);
             blocks.addView(block, blockParams);
         }
+        if (confirmed && sessions == 0) blocks.addView(text("Rest week", 12, muted));
         tile.addView(blocks, blocksParams);
         tile.setContentDescription(homeWeekRange(weekStart) + ", " + (confirmed ? sessions + " scheduled sessions" : "no plan set") + ". Open this week.");
         return tile;
+    }
+
+    private void addNextWeekHighlights(LinearLayout container, Calendar weekStart, WeeklyScheduleStore.Schedule schedule) {
+        int count = countTrainingDays(schedule.workoutDays);
+        if (count == 0) return;
+        gap(container, 10);
+        container.addView(heading("Next week · selected days", 13, ink));
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        for (int day = 0; day < 7; day++) {
+            boolean workout = schedule.workoutDays[day];
+            TextView item = text(weekDays[day] + "\n" + homeWeekDate(weekStart, day), 10, workout ? navy : muted);
+            item.setGravity(Gravity.CENTER);
+            item.setPadding(dp(2), dp(5), dp(2), dp(5));
+            item.setBackground(surface(workout ? mint : Color.rgb(232, 236, 244), 8, 0, Color.TRANSPARENT));
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(46), 1);
+            params.rightMargin = day == 6 ? 0 : dp(3);
+            row.addView(item, params);
+        }
+        container.addView(row);
+    }
+
+    private void showMonthScheduleDialog() {
+        Calendar month = Calendar.getInstance();
+        month.set(Calendar.DAY_OF_MONTH, 1);
+        Dialog dialog = new Dialog(this);
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dp(18), dp(18), dp(18), dp(18));
+        content.setBackgroundColor(paper);
+        content.addView(heading("Workout calendar", 22, ink));
+        content.addView(text(new SimpleDateFormat("MMMM yyyy", Locale.getDefault()).format(month.getTime()) + " · planned workout dates", 13, muted));
+        GridLayout grid = new GridLayout(this);
+        grid.setColumnCount(7);
+        String[] shortDays = {"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"};
+        for (String day : shortDays) grid.addView(monthCell(day, false));
+        int first = (month.get(Calendar.DAY_OF_WEEK) - Calendar.MONDAY + 7) % 7;
+        for (int blank = 0; blank < first; blank++) grid.addView(monthCell("", false));
+        int max = month.getActualMaximum(Calendar.DAY_OF_MONTH);
+        for (int date = 1; date <= max; date++) {
+            Calendar value = (Calendar) month.clone();
+            value.set(Calendar.DAY_OF_MONTH, date);
+            boolean planned = isMonthWorkoutDay(value);
+            grid.addView(monthCell(String.valueOf(date), planned));
+        }
+        LinearLayout.LayoutParams gridParams = new LinearLayout.LayoutParams(-1, -2);
+        gridParams.topMargin = dp(14);
+        content.addView(grid, gridParams);
+        Button close = lightAction("Close");
+        close.setOnClickListener(v -> dialog.dismiss());
+        LinearLayout.LayoutParams closeParams = new LinearLayout.LayoutParams(-1, dp(46));
+        closeParams.topMargin = dp(16);
+        content.addView(close, closeParams);
+        dialog.setContentView(content);
+        dialog.show();
+    }
+
+    private TextView monthCell(String label, boolean planned) {
+        TextView cell = text(label, 12, planned ? navy : muted);
+        cell.setGravity(Gravity.CENTER);
+        cell.setBackground(surface(planned ? mint : Color.TRANSPARENT, 8, planned ? 1 : 0, planned ? mint : Color.TRANSPARENT));
+        cell.setPadding(0, dp(8), 0, dp(8));
+        cell.setLayoutParams(new GridLayout.LayoutParams());
+        ((GridLayout.LayoutParams) cell.getLayoutParams()).width = dp(40);
+        ((GridLayout.LayoutParams) cell.getLayoutParams()).height = dp(42);
+        return cell;
+    }
+
+    private boolean isMonthWorkoutDay(Calendar date) {
+        Calendar weekStart = (Calendar) date.clone();
+        weekStart.setFirstDayOfWeek(Calendar.MONDAY);
+        weekStart.add(Calendar.DAY_OF_YEAR, -((weekStart.get(Calendar.DAY_OF_WEEK) - Calendar.MONDAY + 7) % 7));
+        int day = (date.get(Calendar.DAY_OF_WEEK) - Calendar.MONDAY + 7) % 7;
+        WeeklyScheduleStore.Schedule schedule = WeeklyScheduleStore.load(this, weekStart, defaultWeeklyDays(), defaultWeeklyTargets());
+        return schedule.workoutDays[day];
     }
 
     private String homeWeekRange(Calendar weekStart) {
@@ -3661,13 +3741,12 @@ public final class MainActivity extends Activity {
             TextView set = heading("Set " + entry.setNumber, 15, ink);
             row.addView(set, new LinearLayout.LayoutParams(0, -2, 1));
             if (best) {
-                TextView badge = heading("PERSONAL BEST", 9, navy);
-                badge.setLetterSpacing(.04f);
-                badge.setPadding(dp(7), dp(5), dp(7), dp(5));
-                badge.setBackground(surface(mint, 99, 0, Color.TRANSPARENT));
-                LinearLayout.LayoutParams badgeParams = new LinearLayout.LayoutParams(-2, -2);
-                badgeParams.rightMargin = dp(8);
-                row.addView(badge, badgeParams);
+                TextView star = heading("★", 20, coral);
+                star.setContentDescription("Fastest set");
+                LinearLayout.LayoutParams starParams = new LinearLayout.LayoutParams(-2, -2);
+                starParams.rightMargin = dp(8);
+                row.addView(star, starParams);
+                row.setElevation(dp(5));
             }
             TextView duration = heading(WorkoutTiming.formatElapsedMillis(entry.durationMillis), 16, ink);
             duration.setGravity(Gravity.END);
@@ -3741,7 +3820,8 @@ public final class MainActivity extends Activity {
         if (guidedWorkoutAborted) return;
         if (set >= exercise.sets) {
             completeExerciseTiming(index, exercise);
-            showExerciseSetSummary(index, exercise);
+            if (index + 1 < session.size()) showRest(index, set, exercise, planCooldownSeconds, true, true);
+            else showExerciseSetSummary(index, exercise);
             return;
         }
         showRest(index, set, exercise, recoverySeconds, true, false);
