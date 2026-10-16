@@ -747,6 +747,16 @@ public final class MainActivity extends Activity {
         return view;
     }
 
+    /** Dark-panel surface used by the approved Home/Progress visual direction. */
+    private LinearLayout darkCard() {
+        LinearLayout view = new LinearLayout(this);
+        view.setOrientation(LinearLayout.VERTICAL);
+        view.setPadding(dp(15), dp(14), dp(15), dp(14));
+        view.setBackground(surface(Color.rgb(20, 38, 66), 16, 1, Color.rgb(35, 58, 91)));
+        view.setElevation(dp(3));
+        return view;
+    }
+
     private TextView chip(String value) {
         TextView view = heading(value, 12, navy);
         view.setGravity(Gravity.CENTER_VERTICAL);
@@ -1014,15 +1024,29 @@ public final class MainActivity extends Activity {
                 ? Coach.recommendation(target, goal, environment)
                 : session;
         Coach.Exercise first = recommendation.get(0);
-        LinearLayout next = card();
-        next.addView(exerciseMedia(profile.trainer, first, 170), new LinearLayout.LayoutParams(-1, dp(170)));
-        gap(next, 12);
-        TextView nextLabel = heading("NEXT WORKOUT", 12, Color.rgb(67, 98, 139));
+        LinearLayout next = darkCard();
+        LinearLayout nextRow = new LinearLayout(this);
+        nextRow.setGravity(Gravity.CENTER_VERTICAL);
+        ImageView nextIcon = new ImageView(this);
+        nextIcon.setImageResource(R.drawable.ic_nav_plan);
+        nextIcon.setImageTintList(ColorStateList.valueOf(navy));
+        nextIcon.setPadding(dp(14), dp(14), dp(14), dp(14));
+        nextIcon.setBackground(surface(mint, 14, 0, Color.TRANSPARENT));
+        LinearLayout.LayoutParams nextIconParams = new LinearLayout.LayoutParams(dp(66), dp(66));
+        nextIconParams.rightMargin = dp(13);
+        nextRow.addView(nextIcon, nextIconParams);
+        LinearLayout nextCopy = new LinearLayout(this);
+        nextCopy.setOrientation(LinearLayout.VERTICAL);
+        TextView nextLabel = heading("NEXT WORKOUT", 11, mint);
         nextLabel.setLetterSpacing(.06f);
-        next.addView(nextLabel);
-        gap(next, 3);
-        next.addView(heading(target + " strength", 23, ink));
-        next.addView(text(sessionMinutes + " min  •  " + goal + "  •  " + environment, 14, muted));
+        nextCopy.addView(nextLabel);
+        nextCopy.addView(heading(target + " strength", 21, Color.WHITE));
+        nextCopy.addView(text(sessionMinutes + " min  •  " + goal, 13, Color.rgb(202, 216, 234)));
+        nextRow.addView(nextCopy, new LinearLayout.LayoutParams(0, -2, 1));
+        TextView arrow = heading("›", 32, mint);
+        arrow.setGravity(Gravity.CENTER);
+        nextRow.addView(arrow, new LinearLayout.LayoutParams(dp(30), dp(54)));
+        next.addView(nextRow);
         gap(next, 12);
         Button start = primary("Start workout");
         start.setOnClickListener(view -> {
@@ -1039,7 +1063,7 @@ public final class MainActivity extends Activity {
                 : "No sessions scheduled yet · choose a week to plan";
         body.addView(text(homeSummary, 14, mint));
         gap(body, 9);
-        LinearLayout weekly = card();
+        LinearLayout weekly = darkCard();
         addHomeWeekHeader(weekly, homeWeekStart);
         gap(weekly, 9);
         LinearLayout weekRow = new LinearLayout(this);
@@ -1061,7 +1085,7 @@ public final class MainActivity extends Activity {
             weekRow.addView(day, dayParams);
         }
         weekly.addView(weekRow);
-        TextView legend = text("Mint = planned workout  ·  slate = Rest Day" + (homeWeekConfirmed ? "" : "  ·  open = not planned"), 12, muted);
+        TextView legend = text("Mint = planned workout  ·  slate = Rest Day" + (homeWeekConfirmed ? "" : "  ·  open = not planned"), 12, Color.rgb(202, 216, 234));
         legend.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams legendParams = new LinearLayout.LayoutParams(-1, -2);
         legendParams.topMargin = dp(8);
@@ -1081,14 +1105,14 @@ public final class MainActivity extends Activity {
 
         gap(body, 12);
         NutritionRecommendation.Day food = NutritionRecommendation.forToday();
-        LinearLayout fuel = card();
-        fuel.addView(heading("Today’s fuel", 19, ink));
-        fuel.addView(text("Two flexible ideas for today. Adapt them to your appetite, culture, allergies, and budget.", 13, muted));
+        LinearLayout fuel = darkCard();
+        fuel.addView(heading("Today’s fuel", 19, Color.WHITE));
+        fuel.addView(text("Two flexible ideas for today. Adapt them to your appetite, culture, allergies, and budget.", 13, Color.rgb(202, 216, 234)));
         gap(fuel, 8);
-        addMealSuggestion(fuel, "Breakfast", food.breakfastTitle, food.breakfastDetail);
+        addDarkMealSuggestion(fuel, "Breakfast", food.breakfastTitle, food.breakfastDetail);
         gap(fuel, 7);
-        addMealSuggestion(fuel, "Lunch", food.lunchTitle, food.lunchDetail);
-        Button openNutrition = lightAction("Open nutrition ideas");
+        addDarkMealSuggestion(fuel, "Lunch", food.lunchTitle, food.lunchDetail);
+        Button openNutrition = secondary("Open nutrition ideas");
         openNutrition.setOnClickListener(view -> showMeals());
         LinearLayout.LayoutParams nutritionParams = new LinearLayout.LayoutParams(-1, dp(42));
         nutritionParams.topMargin = dp(10);
@@ -1096,26 +1120,26 @@ public final class MainActivity extends Activity {
         body.addView(fuel);
 
         gap(body, 12);
-        LinearLayout month = card();
+        LinearLayout month = darkCard();
         JourneyStore.MonthReport monthReport = JourneyStore.monthReport(this);
-        month.addView(heading("Monthly consistency", 19, ink));
-        month.addView(text(monthReport.completedTotal + " completed guided plans  •  " + monthReport.minutesTotal + " active min", 13, muted));
+        month.addView(heading("Monthly consistency", 19, Color.WHITE));
+        month.addView(text(monthReport.completedTotal + " completed guided plans  •  " + monthReport.minutesTotal + " active min", 13, Color.rgb(202, 216, 234)));
         gap(month, 8);
-        addMonthlyCompletionChart(month, monthReport);
+        addDarkMonthlyCompletionChart(month, monthReport);
         body.addView(month);
 
         gap(body, 12);
         LinearLayout summaryRow = new LinearLayout(this);
         summaryRow.setOrientation(LinearLayout.HORIZONTAL);
-        LinearLayout sessions = card();
-        sessions.addView(heading(String.valueOf("Weekly".equals(planMode) ? trainingDays : session.size()), 28, ink));
-        sessions.addView(text("Weekly".equals(planMode) ? "planned sessions" : "planned session", 14, muted));
+        LinearLayout sessions = darkCard();
+        sessions.addView(heading(String.valueOf("Weekly".equals(planMode) ? trainingDays : session.size()), 28, Color.WHITE));
+        sessions.addView(text("Weekly".equals(planMode) ? "planned sessions" : "planned session", 14, Color.rgb(202, 216, 234)));
         summaryRow.addView(sessions, new LinearLayout.LayoutParams(0, -2, 1));
         View space = new View(this);
         summaryRow.addView(space, new LinearLayout.LayoutParams(dp(9), 1));
-        LinearLayout ready = card();
-        ready.addView(heading("Ready", 22, ink));
-        ready.addView(text("Your next session is prepared.", 14, muted));
+        LinearLayout ready = darkCard();
+        ready.addView(heading("Ready", 22, Color.WHITE));
+        ready.addView(text("Your next session is prepared.", 14, Color.rgb(202, 216, 234)));
         summaryRow.addView(ready, new LinearLayout.LayoutParams(0, -2, 1));
         body.addView(summaryRow);
 
@@ -1214,30 +1238,30 @@ public final class MainActivity extends Activity {
         tile.setOrientation(LinearLayout.VERTICAL);
         tile.setPadding(dp(11), dp(10), dp(11), dp(10));
         boolean selected = offset == homeWeekOffset;
-        tile.setBackground(surface(paper, 15, selected ? 2 : 1, selected ? mint : cardLine));
+        tile.setBackground(surface(navyPanel, 15, selected ? 2 : 1, selected ? mint : Color.rgb(35, 58, 91)));
         tile.setClickable(true);
         tile.setFocusable(true);
         tile.setOnClickListener(view -> {
             homeWeekOffset = offset;
             showHome();
         });
-        tile.addView(heading(homeWeekRange(weekStart), 15, ink));
+        tile.addView(heading(homeWeekRange(weekStart), 15, Color.WHITE));
         int sessions = countTrainingDays(schedule.workoutDays);
-        tile.addView(text(confirmed ? "Scheduled training" : "No plan set yet", 12, muted));
+        tile.addView(text(confirmed ? "Scheduled training" : "No plan set yet", 12, Color.rgb(202, 216, 234)));
         LinearLayout blocks = new LinearLayout(this);
         blocks.setOrientation(LinearLayout.VERTICAL);
         LinearLayout.LayoutParams blocksParams = new LinearLayout.LayoutParams(-1, -2);
         blocksParams.topMargin = dp(7);
         for (int day = 0; day < 7; day++) {
             if (!schedule.workoutDays[day]) continue;
-            TextView block = text(weekDays[day] + " " + homeWeekDate(weekStart, day) + "  ·  " + homeFocusForDay(day, schedule), 11, ink);
+            TextView block = text(weekDays[day] + " " + homeWeekDate(weekStart, day) + "  ·  " + homeFocusForDay(day, schedule), 11, navy);
             block.setPadding(dp(7), dp(4), dp(7), dp(4));
             block.setBackground(surface(mint, 7, 0, Color.TRANSPARENT));
             LinearLayout.LayoutParams blockParams = new LinearLayout.LayoutParams(-1, -2);
             blockParams.bottomMargin = dp(3);
             blocks.addView(block, blockParams);
         }
-        if (confirmed && sessions == 0) blocks.addView(text("Rest week", 12, muted));
+        if (confirmed && sessions == 0) blocks.addView(text("Rest week", 12, Color.rgb(202, 216, 234)));
         tile.addView(blocks, blocksParams);
         tile.setContentDescription(homeWeekRange(weekStart) + ", " + (confirmed ? sessions + " scheduled sessions" : "no plan set") + ". Open this week.");
         return tile;
@@ -1363,6 +1387,19 @@ public final class MainActivity extends Activity {
         container.addView(row);
     }
 
+    private void addDarkMealSuggestion(LinearLayout container, String label, String title, String detail) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.VERTICAL);
+        row.setPadding(dp(10), dp(8), dp(10), dp(8));
+        row.setBackground(surface(Color.rgb(26, 48, 78), 11, 1, Color.rgb(35, 58, 91)));
+        TextView mealLabel = heading(label.toUpperCase(Locale.ROOT), 10, mint);
+        mealLabel.setLetterSpacing(.05f);
+        row.addView(mealLabel);
+        row.addView(heading(title, 16, Color.WHITE));
+        row.addView(text(detail, 12, Color.rgb(202, 216, 234)));
+        container.addView(row);
+    }
+
     private void addMonthlyCompletionChart(LinearLayout container, JourneyStore.MonthReport report) {
         LinearLayout graph = new LinearLayout(this);
         graph.setOrientation(LinearLayout.HORIZONTAL);
@@ -1383,6 +1420,37 @@ public final class MainActivity extends Activity {
             barParams.topMargin = dp(3);
             column.addView(bar, barParams);
             TextView label = text("W" + (i + 1), 10, muted);
+            label.setGravity(Gravity.CENTER);
+            LinearLayout.LayoutParams labelParams = new LinearLayout.LayoutParams(-1, dp(19));
+            labelParams.topMargin = dp(4);
+            column.addView(label, labelParams);
+            LinearLayout.LayoutParams columnParams = new LinearLayout.LayoutParams(0, dp(121), 1);
+            columnParams.rightMargin = i == report.completedByWeek.length - 1 ? 0 : dp(4);
+            graph.addView(column, columnParams);
+        }
+        container.addView(graph);
+    }
+
+    private void addDarkMonthlyCompletionChart(LinearLayout container, JourneyStore.MonthReport report) {
+        LinearLayout graph = new LinearLayout(this);
+        graph.setOrientation(LinearLayout.HORIZONTAL);
+        graph.setGravity(Gravity.BOTTOM);
+        int highest = 1;
+        for (int count : report.completedByWeek) highest = Math.max(highest, count);
+        for (int i = 0; i < report.completedByWeek.length; i++) {
+            LinearLayout column = new LinearLayout(this);
+            column.setOrientation(LinearLayout.VERTICAL);
+            column.setGravity(Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
+            TextView count = heading(String.valueOf(report.completedByWeek[i]), 12, Color.WHITE);
+            count.setGravity(Gravity.CENTER);
+            column.addView(count, new LinearLayout.LayoutParams(-1, dp(19)));
+            View bar = new View(this);
+            int height = dp(14 + (72 * report.completedByWeek[i] / highest));
+            bar.setBackground(surface(mint, 6, 0, Color.TRANSPARENT));
+            LinearLayout.LayoutParams barParams = new LinearLayout.LayoutParams(dp(25), height);
+            barParams.topMargin = dp(3);
+            column.addView(bar, barParams);
+            TextView label = text("Week " + (i + 1), 10, Color.rgb(202, 216, 234));
             label.setGravity(Gravity.CENTER);
             LinearLayout.LayoutParams labelParams = new LinearLayout.LayoutParams(-1, dp(19));
             labelParams.topMargin = dp(4);
