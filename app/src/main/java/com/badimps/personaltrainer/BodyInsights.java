@@ -47,6 +47,14 @@ public final class BodyInsights {
                 milesPerHour, milesPerHour, milesPerHour * 2f);
     }
 
+    /** A deliberately broad, optional practice range—not a fitness standard or medical assessment. */
+    public static String twoMilePracticeRange(int age) {
+        if (age >= 65) return "32–40 min";
+        if (age >= 50) return "28–35 min";
+        if (age >= 35) return "25–31 min";
+        return "22–28 min";
+    }
+
     public static String weeklyActivityContext(int plannedMinutes, int age) {
         String gradual = age >= 65
                 ? "Prioritize balance, mobility, and gradual progression when that feels right."
