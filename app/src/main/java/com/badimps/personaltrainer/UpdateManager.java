@@ -13,6 +13,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
 import android.provider.Settings;
+import android.util.Base64;
 
 import androidx.core.content.FileProvider;
 
@@ -38,7 +39,7 @@ import java.util.Locale;
 public final class UpdateManager {
     public static final String ENDPOINT = "https://badimps.github.io/my-personal-trainer/latest.json";
     /** A separately routed copy for mobile networks that intermittently cannot reach Pages. */
-    public static final String FALLBACK_ENDPOINT = "https://github.com/BadImps/my-personal-trainer/raw/refs/heads/main/docs/latest.json";
+    public static final String FALLBACK_ENDPOINT = "https://api.github.com/repos/BadImps/my-personal-trainer/contents/docs/latest.json?ref=main";
     public static final String MANUAL_RELEASES_URL = "https://github.com/BadImps/my-personal-trainer/releases/latest";
     private static final String PREFS = "ota_download_state";
     private static final String KEY_ID = "download_id";
@@ -110,7 +111,14 @@ public final class UpdateManager {
     }
 
     private static Info checkEndpoint(String endpoint) throws Exception {
-        return parseManifest(read(endpoint));
+        String payload = read(endpoint);
+        JSONObject envelope = new JSONObject(payload);
+        // GitHub's contents API is used only as the network fallback. It returns the same
+        // checked manifest as base64, avoiding stale branch-file caches on mobile carriers.
+        if ("base64".equals(envelope.optString("encoding", "")) && envelope.has("content")) {
+            payload = new String(Base64.decode(envelope.getString("content"), Base64.DEFAULT), StandardCharsets.UTF_8);
+        }
+        return parseManifest(payload);
     }
 
     static Info parseManifest(String manifest) throws Exception {
