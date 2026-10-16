@@ -10,6 +10,7 @@ import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.CountDownTimer;
@@ -114,11 +115,21 @@ public final class MainActivity extends Activity {
     private Runnable setClockUpdate;
     private WorkoutTiming.SetTracker setTracker;
     private int timingExerciseIndex = -1;
-    private final List<String> setHistory = new ArrayList<>();
+    /** In-memory until the guided workout completes normally; emergency stops never persist it. */
+    private final List<SetTimeStore.SetEntry> currentExerciseSetTimes = new ArrayList<>();
+    private final List<SetTimeStore.ExerciseSummary> completedExerciseSetTimes = new ArrayList<>();
     private int openingPhraseIndex;
     private int completionPhraseIndex;
     private long guidedWorkoutStartedAt;
     private boolean guidedSessionRecorded;
+    private boolean guidedWorkoutAborted;
+    private UpdateManager.Info pendingOtaInstall;
+    private Runnable otaStatusPoll;
+    private boolean otaVerificationInFlight;
+    /** Changes whenever setContentView replaces a screen; detached OTA callbacks must not act. */
+    private int pageGeneration;
+    private int otaPageGeneration = -1;
+    private boolean showingUpdatePage;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -135,6 +146,7 @@ public final class MainActivity extends Activity {
                 ttsReady = true;
             }
         });
+        pendingOtaInstall = UpdateManager.pendingInstallInfo(this);
         boolean hasLocalAccount = AccountStore.exists(this);
         if (hasLocalAccount) {
             AccountStore.Profile profile = AccountStore.get(this);
@@ -155,12 +167,30 @@ public final class MainActivity extends Activity {
     @Override protected void onDestroy() {
         if (restTimer != null) restTimer.cancel();
         stopSetClock();
+        stopOtaStatusPolling();
         workoutHandler.removeCallbacksAndMessages(null);
         speechDoneCallbacks.clear();
         GemmaOnDeviceCoach.close();
         if (voice != null) voice.shutdown();
         if (toneGenerator != null) toneGenerator.release();
         super.onDestroy();
+    }
+
+    @Override protected void onResume() {
+        super.onResume();
+        if (pendingOtaInstall != null) {
+            if (Build.VERSION.SDK_INT >= 26 && !getPackageManager().canRequestPackageInstalls()) return;
+            UpdateManager.Info ready = pendingOtaInstall;
+            pendingOtaInstall = null;
+            requestVerifiedUpdateInstall(ready);
+            return;
+        }
+        if (showingUpdatePage) showUpdate(UpdateManager.savedInfo(this));
+    }
+
+    @Override protected void onPause() {
+        stopOtaStatusPolling();
+        super.onPause();
     }
 
     @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
@@ -421,6 +451,7 @@ public final class MainActivity extends Activity {
 
     /** A full-height surface used before a profile exists. */
     private LinearLayout signedOutPage() {
+        beginNewPage();
         setSystemBars();
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
@@ -434,6 +465,7 @@ public final class MainActivity extends Activity {
 
     /** A full-height app page with exactly one navigation system: the coach rail. */
     private LinearLayout appPage(String activeScreen) {
+        beginNewPage();
         setSystemBars();
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
@@ -457,6 +489,7 @@ public final class MainActivity extends Activity {
      * screens or introducing a second navigation style.
      */
     private LinearLayout planPage() {
+        beginNewPage();
         setSystemBars();
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
@@ -483,6 +516,12 @@ public final class MainActivity extends Activity {
         shell.addView(scroll, new LinearLayout.LayoutParams(0, -1, 1));
         setContentView(shell);
         return body;
+    }
+
+    private void beginNewPage() {
+        pageGeneration++;
+        showingUpdatePage = false;
+        stopOtaStatusPolling();
     }
 
     private LinearLayout planCoachRail() {
@@ -2400,6 +2439,7 @@ public final class MainActivity extends Activity {
         } else {
             SimpleDateFormat dayFormat = new SimpleDateFormat("EEE, MMM d", Locale.getDefault());
             for (JourneyStore.WorkoutRecord record : completed) {
+                SetTimeStore.WorkoutSummary timing = SetTimeStore.loadWorkout(this, record.timestamp);
                 LinearLayout row = new LinearLayout(this);
                 row.setOrientation(LinearLayout.HORIZONTAL);
                 row.setGravity(Gravity.CENTER_VERTICAL);
@@ -2415,7 +2455,22 @@ public final class MainActivity extends Activity {
                 copy.setOrientation(LinearLayout.VERTICAL);
                 copy.addView(heading(record.target, 15, ink));
                 copy.addView(text(dayFormat.format(record.timestamp) + "  •  " + record.minutes + " guided min", 12, muted));
+                if (timing != null && timing.totalActiveMillis > 0L) {
+                    copy.addView(text("Set time " + WorkoutTiming.formatElapsedMillis(timing.totalActiveMillis)
+                            + "  •  open leaderboard", 12, mint));
+                }
                 row.addView(copy, new LinearLayout.LayoutParams(0, -2, 1));
+                if (timing != null && timing.totalActiveMillis > 0L) {
+                    row.setClickable(true);
+                    row.setFocusable(true);
+                    row.setContentDescription(record.target + ", completed " + dayFormat.format(record.timestamp)
+                            + ", " + WorkoutTiming.formatElapsedMillis(timing.totalActiveMillis)
+                            + " active set time. Open set-time leaderboard.");
+                    row.setOnClickListener(view -> showWorkoutSetTimeDetails(record, timing));
+                } else {
+                    row.setContentDescription(record.target + ", completed " + dayFormat.format(record.timestamp)
+                            + ", " + record.minutes + " guided minutes.");
+                }
                 LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(-1, -2);
                 rowParams.topMargin = dp(7);
                 history.addView(row, rowParams);
@@ -2499,6 +2554,37 @@ public final class MainActivity extends Activity {
         weight.setOnClickListener(view -> showWeightTracker());
         addButton(trend, weight);
         body.addView(trend);
+    }
+
+    /** Detailed progress record for a normally completed guided workout only. */
+    private void showWorkoutSetTimeDetails(JourneyStore.WorkoutRecord record, SetTimeStore.WorkoutSummary timing) {
+        LinearLayout body = appPage("Progress");
+        String completed = new SimpleDateFormat("EEEE, MMMM d", Locale.getDefault()).format(record.timestamp);
+        title(body, "SET-TIME PERFORMANCE", record.target,
+                "Completed " + completed + ". Each exercise is ranked from fastest to slowest. Rest and cooldown time are never included in these totals.");
+
+        LinearLayout overview = card();
+        overview.addView(heading("SESSION TOTAL", 11, muted));
+        overview.addView(heading(WorkoutTiming.formatElapsedMillis(timing.totalActiveMillis), 28, ink));
+        overview.addView(text(timing.exerciseSummaries.size() + " completed exercise"
+                + (timing.exerciseSummaries.size() == 1 ? "" : "s") + "  •  "
+                + record.minutes + " guided min", 14, muted));
+        body.addView(overview);
+
+        if (timing.exerciseSummaries.isEmpty()) {
+            gap(body, 12);
+            body.addView(text("No set-time details were saved for this earlier workout.", 14, muted));
+        } else {
+            for (SetTimeStore.ExerciseSummary summary : timing.exerciseSummaries) {
+                gap(body, 12);
+                body.addView(heading(summary.exerciseName, 20, Color.WHITE));
+                addSetTimesCard(body, summary, true);
+            }
+        }
+        gap(body, 14);
+        Button back = secondary("Back to Progress");
+        back.setOnClickListener(view -> showProgress());
+        addButton(body, back);
     }
 
     private int plannedSessionsThisWeek() {
@@ -2678,6 +2764,7 @@ public final class MainActivity extends Activity {
             GeminiCoachSettings.clear(this);
             MealPlanStore.clear(this);
             JourneyStore.clear(this);
+            SetTimeStore.clear(this);
             session.clear();
             selectedExercises.clear();
             selectedTrainer = "Female";
@@ -2813,6 +2900,38 @@ public final class MainActivity extends Activity {
         wake.addView(text("Prevents the screen from sleeping while the app is open. Your normal timeout returns when this is off.", 14, muted));
         keepAwake.setOnCheckedChangeListener((button, checked) -> updateCoachSettings(profile.coachName, profile.dialogueMode, checked));
         body.addView(wake);
+        gap(body, 12);
+
+        LinearLayout gemma = card();
+        gemma.addView(heading("Private Gemma model", 19, ink));
+        if (GemmaOnDeviceCoach.installed(this)) {
+            gemma.addView(text("Installed locally • " + humanFileSize(LocalAiModelStore.sizeBytes(this)) + ". It only improves private Coach wording; your food estimates remain transparent local rules.", 14, muted));
+            gap(gemma, 8);
+            Button replaceModel = secondary("Replace downloaded Gemma model");
+            replaceModel.setOnClickListener(view -> chooseLocalGemmaModel());
+            addButton(gemma, replaceModel);
+            gap(gemma, 7);
+            Button removeModel = lightAction("Remove Gemma model");
+            removeModel.setOnClickListener(view -> {
+                GemmaOnDeviceCoach.close();
+                LocalAiModelStore.clear(this);
+                toast("Gemma removed. Your free private Coach is still ready.");
+                showCoachCustomization();
+            });
+            addButton(gemma, removeModel);
+        } else {
+            gemma.addView(text("Optional • Gemma 3 1B is about 584 MB. It stays on this phone and is never required for the free private Coach.", 14, muted));
+            gemma.addView(text("Download it from the official model page, accept its terms there, then return here to install the downloaded file.", 13, muted));
+            gap(gemma, 8);
+            Button downloadModel = secondary("Download Gemma model (official) — about 584 MB");
+            downloadModel.setOnClickListener(view -> openOfficialGemmaDownload());
+            addButton(gemma, downloadModel);
+            gap(gemma, 7);
+            Button installModel = primary("Install downloaded Gemma model");
+            installModel.setOnClickListener(view -> chooseLocalGemmaModel());
+            addButton(gemma, installModel);
+        }
+        body.addView(gemma);
         gap(body, 12);
 
         LinearLayout note = card();
@@ -3171,13 +3290,16 @@ public final class MainActivity extends Activity {
         stopSpeech();
         timingExerciseIndex = -1;
         setTracker = null;
-        setHistory.clear();
+        currentExerciseSetTimes.clear();
+        completedExerciseSetTimes.clear();
         guidedWorkoutStartedAt = SystemClock.elapsedRealtime();
         guidedSessionRecorded = false;
+        guidedWorkoutAborted = false;
         showSetCountIn(0, 1, true);
     }
 
     private void showSetCountIn(int index, int set, boolean newExercise) {
+        if (guidedWorkoutAborted) return;
         if (index >= session.size()) {
             showComplete();
             return;
@@ -3219,6 +3341,7 @@ public final class MainActivity extends Activity {
     }
 
     private void showActive(int index, int set) {
+        if (guidedWorkoutAborted) return;
         if (index >= session.size()) {
             showComplete();
             return;
@@ -3229,7 +3352,7 @@ public final class MainActivity extends Activity {
         if (timingExerciseIndex != index || setTracker == null) {
             timingExerciseIndex = index;
             setTracker = new WorkoutTiming.SetTracker(exercise.restSeconds);
-            setHistory.clear();
+            currentExerciseSetTimes.clear();
         }
         LinearLayout body = appPage("Workouts");
         title(body, "GUIDED WORKOUT", exercise.target, "Exercise " + (index + 1) + " of " + session.size() + "  •  Set " + set + " of " + exercise.sets);
@@ -3261,7 +3384,7 @@ public final class MainActivity extends Activity {
         paceStatus.setGravity(Gravity.CENTER);
         timing.addView(paceStatus);
         gap(timing, 8);
-        TextView history = text(setHistoryText(), 13, muted);
+        TextView history = text(setHistoryText(exercise), 13, muted);
         history.setGravity(Gravity.CENTER);
         timing.addView(history);
         body.addView(timing);
@@ -3282,8 +3405,8 @@ public final class MainActivity extends Activity {
             done.setEnabled(false);
             stopSetClock();
             WorkoutTiming.SetResult result = setTracker.completeSet(SystemClock.elapsedRealtime());
-            setHistory.add("Set " + set + "   " + WorkoutTiming.formatElapsedMillis(result.durationMillis));
-            history.setText(setHistoryText());
+            currentExerciseSetTimes.add(new SetTimeStore.SetEntry(result.setNumber, result.durationMillis));
+            history.setText(setHistoryText(exercise));
             recoveryValue.setText(format(result.recoverySeconds));
             if (result.slowerThanRecentPace) {
                 paceStatus.setText("This set took longer · recovery increased by 10 seconds.");
@@ -3338,12 +3461,107 @@ public final class MainActivity extends Activity {
         setClockUpdate = null;
     }
 
-    private String setHistoryText() {
-        if (setHistory.isEmpty()) return "Completed set times will appear here.";
-        return "SET TIME RECORDS\n" + String.join("   •   ", setHistory);
+    private String setHistoryText(Coach.Exercise exercise) {
+        SetTimeStore.ExerciseSummary summary = currentExerciseSummary(exercise);
+        if (!summary.hasSetEntries()) return "Completed set times will appear here.";
+        StringBuilder output = new StringBuilder("SET TIME RECORDS  •  FASTEST FIRST\n");
+        for (int index = 0; index < summary.leaderboard.size(); index++) {
+            SetTimeStore.SetEntry entry = summary.leaderboard.get(index);
+            if (index > 0) output.append("   •   ");
+            output.append("Set ").append(entry.setNumber).append(" ")
+                    .append(WorkoutTiming.formatElapsedMillis(entry.durationMillis));
+            if (summary.isLeaderboardLeader(entry)) output.append("  PB");
+        }
+        return output.toString();
+    }
+
+    private SetTimeStore.ExerciseSummary currentExerciseSummary(Coach.Exercise exercise) {
+        return new SetTimeStore.ExerciseSummary(exercise.name, exercise.target, currentExerciseSetTimes);
+    }
+
+    /** Freezes the current exercise once, so only a normally completed workout can later persist it. */
+    private SetTimeStore.ExerciseSummary completeExerciseTiming(int index, Coach.Exercise exercise) {
+        if (index >= 0 && index < completedExerciseSetTimes.size()) return completedExerciseSetTimes.get(index);
+        SetTimeStore.ExerciseSummary summary = currentExerciseSummary(exercise);
+        if (index == completedExerciseSetTimes.size()) completedExerciseSetTimes.add(summary);
+        return summary;
+    }
+
+    /** Leaderboard card used directly above Emergency stop and on each completed-exercise page. */
+    private void addSetTimesCard(LinearLayout container, SetTimeStore.ExerciseSummary summary, boolean includeTotal) {
+        LinearLayout card = card();
+        TextView label = heading("SET TIMES", 11, muted);
+        label.setLetterSpacing(.08f);
+        card.addView(label);
+        card.addView(text("Fastest first • active work time only", 13, muted));
+        if (!summary.hasSetEntries()) {
+            card.addView(text("Complete a set to add its time here.", 14, muted));
+            container.addView(card);
+            return;
+        }
+        gap(card, 8);
+        for (SetTimeStore.SetEntry entry : summary.leaderboard) {
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setPadding(dp(11), dp(9), dp(11), dp(9));
+            boolean best = summary.isLeaderboardLeader(entry);
+            row.setBackground(surface(best ? Color.rgb(226, 249, 243) : Color.rgb(240, 244, 249), 13, best ? 1 : 0, best ? mint : Color.TRANSPARENT));
+            TextView set = heading("Set " + entry.setNumber, 15, ink);
+            row.addView(set, new LinearLayout.LayoutParams(0, -2, 1));
+            if (best) {
+                TextView badge = heading("PERSONAL BEST", 9, navy);
+                badge.setLetterSpacing(.04f);
+                badge.setPadding(dp(7), dp(5), dp(7), dp(5));
+                badge.setBackground(surface(mint, 99, 0, Color.TRANSPARENT));
+                LinearLayout.LayoutParams badgeParams = new LinearLayout.LayoutParams(-2, -2);
+                badgeParams.rightMargin = dp(8);
+                row.addView(badge, badgeParams);
+            }
+            TextView duration = heading(WorkoutTiming.formatElapsedMillis(entry.durationMillis), 16, ink);
+            duration.setGravity(Gravity.END);
+            row.addView(duration, new LinearLayout.LayoutParams(dp(104), -2));
+            LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(-1, -2);
+            rowParams.topMargin = dp(6);
+            card.addView(row, rowParams);
+        }
+        if (includeTotal) {
+            gap(card, 10);
+            LinearLayout total = new LinearLayout(this);
+            total.setGravity(Gravity.CENTER_VERTICAL);
+            TextView totalLabel = heading("TOTAL ACTIVE SET TIME", 11, muted);
+            totalLabel.setLetterSpacing(.06f);
+            total.addView(totalLabel, new LinearLayout.LayoutParams(0, -2, 1));
+            total.addView(heading(WorkoutTiming.formatElapsedMillis(summary.totalActiveMillis), 18, ink));
+            card.addView(total);
+        }
+        container.addView(card);
+    }
+
+    private void showExerciseSetSummary(int index, Coach.Exercise exercise) {
+        if (guidedWorkoutAborted) return;
+        stopSetClock();
+        SetTimeStore.ExerciseSummary summary = completeExerciseTiming(index, exercise);
+        boolean hasNextExercise = index + 1 < session.size();
+        LinearLayout body = appPage("Workouts");
+        title(body, "EXERCISE COMPLETE", exercise.name, "Your set leaderboard is ordered from fastest to slowest. The total below includes work-set time only, not rest or cooldown.");
+        addSetTimesCard(body, summary, true);
+        gap(body, 14);
+        Button next = primary(hasNextExercise ? "Begin cooldown" : "Finish guided workout");
+        next.setOnClickListener(view -> {
+            if (hasNextExercise) showRest(index, exercise.sets, exercise, planCooldownSeconds, true, true);
+            else showComplete();
+        });
+        addButton(body, next);
+        gap(body, 9);
+        Button emergency = emergencyStopButton();
+        emergency.setOnClickListener(view -> showEmergencyStopConfirmation(index, exercise.sets,
+                () -> showExerciseSetSummary(index, exercise)));
+        addButton(body, emergency);
     }
 
     private void finishSet(int index, int set, Coach.Exercise exercise, int recoverySeconds) {
+        if (guidedWorkoutAborted) return;
         stopSetClock();
         boolean exerciseComplete = set >= exercise.sets;
         boolean hasNextExercise = index + 1 < session.size();
@@ -3369,19 +3587,20 @@ public final class MainActivity extends Activity {
     }
 
     private void continueAfterCompletedSet(int index, int set, Coach.Exercise exercise, int recoverySeconds) {
-        boolean sessionComplete = set >= exercise.sets && index + 1 >= session.size();
-        if (sessionComplete) showComplete();
-        else {
-            boolean betweenExercises = set >= exercise.sets;
-            int timerSeconds = betweenExercises ? planCooldownSeconds : recoverySeconds;
-            showRest(index, set, exercise, timerSeconds, true, betweenExercises);
+        if (guidedWorkoutAborted) return;
+        if (set >= exercise.sets) {
+            completeExerciseTiming(index, exercise);
+            showExerciseSetSummary(index, exercise);
+            return;
         }
+        showRest(index, set, exercise, recoverySeconds, true, false);
     }
 
     private void showRest(int index, int set, Coach.Exercise exercise, int secondsRemaining, boolean running, boolean betweenExercises) {
+        if (guidedWorkoutAborted) return;
         stopSetClock();
         LinearLayout body = appPage("Workouts");
-        title(body, betweenExercises ? "COOLDOWN TIMER" : "REST TIMER", betweenExercises ? "Cooldown before next exercise" : "Set complete · recover", betweenExercises ? "Your " + restChoiceLabel(planCooldownSeconds) + " exercise cooldown is separate from set rest. The next exercise begins after Coach " + coachName() + " gives your count-in." : "Your custom set rest is " + restChoiceLabel(exercise.restSeconds) + ". Your next set begins after the count-in.");
+        title(body, betweenExercises ? "COOLDOWN TIMER" : "REST TIMER", betweenExercises ? "Cooldown before next exercise" : "Set complete · recover", betweenExercises ? "Your " + restChoiceLabel(planCooldownSeconds) + " exercise cooldown is separate from set rest. The next exercise begins after Coach " + coachName() + " gives your count-in." : "Your custom set rest is " + restChoiceLabel(secondsRemaining) + ". Your next set begins after the count-in.");
         LinearLayout timerCard = card();
         TextView timer = heading(format(secondsRemaining), 52, ink);
         timer.setGravity(Gravity.CENTER);
@@ -3413,6 +3632,8 @@ public final class MainActivity extends Activity {
         });
         controls.addView(skip, new LinearLayout.LayoutParams(0, dp(52), 1));
         body.addView(controls);
+        gap(body, 12);
+        addSetTimesCard(body, currentExerciseSummary(exercise), false);
         gap(body, 12);
         Button emergency = emergencyStopButton();
         emergency.setOnClickListener(view -> showEmergencyStopConfirmation(index, set,
@@ -3454,7 +3675,14 @@ public final class MainActivity extends Activity {
         body.addView(notice);
         gap(body, 16);
         Button end = primary("End guided workout");
-        end.setOnClickListener(view -> showHome());
+        end.setOnClickListener(view -> {
+            guidedWorkoutAborted = true;
+            timingExerciseIndex = -1;
+            setTracker = null;
+            currentExerciseSetTimes.clear();
+            completedExerciseSetTimes.clear();
+            showHome();
+        });
         addButton(body, end);
         gap(body, 10);
         Button continueWorkout = secondary("Keep working out");
@@ -3463,6 +3691,7 @@ public final class MainActivity extends Activity {
     }
 
     private void advance(int index, int set, Coach.Exercise exercise) {
+        if (guidedWorkoutAborted) return;
         if (set < exercise.sets) showSetCountIn(index, set + 1, false);
         else showSetCountIn(index + 1, 1, true);
     }
@@ -3608,6 +3837,9 @@ public final class MainActivity extends Activity {
     }
 
     private void stopGuidedRuntime() {
+        // Leaving a live guided screen is an abandonment, never a completed workout. This also
+        // invalidates delayed count-in callbacks before they can write Progress data.
+        if (guidedWorkoutStartedAt > 0L && !guidedSessionRecorded) guidedWorkoutAborted = true;
         if (restTimer != null) restTimer.cancel();
         restTimer = null;
         stopSetClock();
@@ -4097,6 +4329,23 @@ public final class MainActivity extends Activity {
         startActivityForResult(pick, REQUEST_LOCAL_GEMMA_MODEL);
     }
 
+    /** Opens the gated, official model page rather than silently fetching a licensed model. */
+    private void openOfficialGemmaDownload() {
+        new AlertDialog.Builder(this)
+                .setTitle("Download private Gemma")
+                .setMessage("Gemma 3 1B is a large optional model (about 584 MB). The official download requires you to review and accept Gemma's terms in your browser. It stays separate from the app and is never downloaded silently or charged to your mobile data without your action.")
+                .setNegativeButton("Not now", null)
+                .setPositiveButton("Open official download", (dialog, which) -> {
+                    try {
+                        startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("https://huggingface.co/litert-community/Gemma3-1B-IT")));
+                        toast("After the download finishes, return here and tap Install downloaded Gemma model.");
+                    } catch (RuntimeException unavailable) {
+                        toast("No browser is available to open the Gemma model page.");
+                    }
+                })
+                .show();
+    }
+
     private String humanFileSize(long bytes) {
         if (bytes >= 1024L * 1024L * 1024L) return String.format(Locale.US, "%.1f GB", bytes / (1024f * 1024f * 1024f));
         return String.format(Locale.US, "%.0f MB", bytes / (1024f * 1024f));
@@ -4161,11 +4410,21 @@ public final class MainActivity extends Activity {
     }
 
     private void showUpdate() {
+        showUpdate(null);
+    }
+
+    /** Renders a persisted update immediately, then refreshes the public channel in the background. */
+    private void showUpdate(UpdateManager.Info knownInfo) {
         LinearLayout body = appPage("Settings");
-        title(body, "APP UPDATES", "Keep your coach current", "Updates are checked over HTTPS, verified against the published SHA-256, and then verified again by Android's signing identity.");
+        final int updatePage = pageGeneration;
+        otaPageGeneration = updatePage;
+        showingUpdatePage = true;
+        title(body, "APP UPDATES", "Keep your coach current", "Android now owns the download so it can persist through mobile-data interruptions and app backgrounding. Every package is SHA-256 checked before Android installs it.");
         LinearLayout statusCard = card();
         TextView status = heading("Checking the update channel…", 18, ink);
         statusCard.addView(status);
+        TextView network = text("Connection: " + UpdateManager.networkSummary(this), 13, muted);
+        statusCard.addView(network);
         ProgressBar downloadProgress = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
         downloadProgress.setMax(100);
         downloadProgress.setProgressTintList(ColorStateList.valueOf(mint));
@@ -4178,67 +4437,243 @@ public final class MainActivity extends Activity {
         progressLabel.setVisibility(View.GONE);
         statusCard.addView(progressLabel);
         body.addView(statusCard);
-        gap(body, 18);
+        gap(body, 12);
+        LinearLayout actions = new LinearLayout(this);
+        actions.setOrientation(LinearLayout.VERTICAL);
+        body.addView(actions);
+        gap(body, 6);
+        body.addView(text("For a metered mobile connection, you choose whether to use mobile data. Roaming is never used automatically. A downloaded update is kept until Android is ready to install it.", 13, Color.rgb(211, 225, 233)));
+        gap(body, 14);
         Button back = secondary("Back to account");
         back.setOnClickListener(view -> showProfile());
         addButton(body, back);
+
+        UpdateManager.Info restored = knownInfo != null ? knownInfo : UpdateManager.savedInfo(this);
+        if (hasSavedUpdateState(restored)) {
+            renderUpdateState(restored, status, network, downloadProgress, progressLabel, actions);
+        }
         new Thread(() -> {
             try {
                 UpdateManager.Info info = UpdateManager.check();
                 runOnUiThread(() -> {
+                    if (!isCurrentUpdatePage(updatePage)) return;
                     if (info == null) {
+                        UpdateManager.Info saved = UpdateManager.savedInfo(this);
+                        if (hasSavedUpdateState(saved)) {
+                            renderUpdateState(saved, status, network, downloadProgress, progressLabel, actions);
+                            return;
+                        }
                         status.setText("You already have the latest published version.");
+                        network.setText("Connection: " + UpdateManager.networkSummary(this));
                         return;
                     }
-                    status.setText("Version " + info.name + " is ready to download.");
-                    Button install = primary("Download and install " + info.name);
-                    install.setOnClickListener(view -> downloadUpdate(info, status, downloadProgress, progressLabel, install));
-                    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(54));
-                    params.bottomMargin = dp(10);
-                    body.addView(install, 1, params);
+                    renderUpdateState(info, status, network, downloadProgress, progressLabel, actions);
                 });
-            } catch (Exception ignored) {
-                runOnUiThread(() -> status.setText("The update channel could not be reached. Try again when you have a connection."));
+            } catch (Exception error) {
+                runOnUiThread(() -> {
+                    if (!isCurrentUpdatePage(updatePage)) return;
+                    UpdateManager.Info saved = UpdateManager.savedInfo(this);
+                    if (hasSavedUpdateState(saved)) {
+                        renderUpdateState(saved, status, network, downloadProgress, progressLabel, actions);
+                        return;
+                    }
+                    status.setText("The update channel could not be reached. " + UpdateManager.networkSummary(this) + ". " + conciseNetworkError(error));
+                    actions.removeAllViews();
+                    Button retry = primary("Retry update check");
+                    retry.setOnClickListener(view -> showUpdate());
+                    addButton(actions, retry);
+                });
             }
         }).start();
     }
 
-    private void downloadUpdate(UpdateManager.Info info, TextView status, ProgressBar progress, TextView progressLabel, Button install) {
-        status.setText("Downloading version " + info.name + "…");
-        install.setEnabled(false);
-        progress.setVisibility(View.VISIBLE);
-        progress.setIndeterminate(true);
-        progressLabel.setVisibility(View.VISIBLE);
-        progressLabel.setText("Connecting securely…");
+    private boolean hasSavedUpdateState(UpdateManager.Info info) {
+        if (info == null) return false;
+        try {
+            return UpdateManager.status(this, info).state != UpdateManager.STATE_NONE;
+        } catch (RuntimeException ignored) {
+            return false;
+        }
+    }
+
+    private boolean isCurrentUpdatePage(int expectedPage) {
+        return pageGeneration == expectedPage && otaPageGeneration == expectedPage;
+    }
+
+    private void renderUpdateState(UpdateManager.Info info, TextView status, TextView network, ProgressBar progress, TextView progressLabel, LinearLayout actions) {
+        UpdateManager.DownloadStatus state;
+        try {
+            state = UpdateManager.status(this, info);
+        } catch (RuntimeException error) {
+            state = new UpdateManager.DownloadStatus(UpdateManager.STATE_FAILED, 0L, info.sizeBytes, conciseNetworkError(error));
+        }
+        network.setText("Connection: " + UpdateManager.networkSummary(this));
+        actions.removeAllViews();
+        progress.setVisibility(state.state == UpdateManager.STATE_NONE ? View.GONE : View.VISIBLE);
+        progressLabel.setVisibility(state.state == UpdateManager.STATE_NONE ? View.GONE : View.VISIBLE);
+        long total = state.totalBytes > 0L ? state.totalBytes : info.sizeBytes;
+        int percent = UpdateManager.progressPercent(state.downloadedBytes, total);
+        if (percent >= 0) {
+            progress.setIndeterminate(false);
+            progress.setProgress(percent, true);
+            progressLabel.setText(percent + "%  •  " + formatDownloadSize(state.downloadedBytes) + " of " + formatDownloadSize(total));
+        } else {
+            progress.setIndeterminate(state.active());
+            progressLabel.setText(state.downloadedBytes > 0L ? formatDownloadSize(state.downloadedBytes) + " downloaded" : "Waiting for download details…");
+        }
+
+        if (state.state == UpdateManager.STATE_NONE) {
+            String size = info.sizeBytes > 0L ? " • " + formatDownloadSize(info.sizeBytes) : "";
+            status.setText("Version " + info.name + " is ready" + size + ".");
+            Button download = primary(UpdateManager.isMetered(this) ? "Choose mobile-data download" : "Download and install " + info.name);
+            download.setOnClickListener(view -> confirmAndStartUpdateDownload(info));
+            addButton(actions, download);
+        } else if (state.state == UpdateManager.STATE_QUEUED || state.state == UpdateManager.STATE_DOWNLOADING || state.state == UpdateManager.STATE_PAUSED) {
+            status.setText(state.detail + " • " + info.name);
+            if (state.state == UpdateManager.STATE_PAUSED) {
+                boolean metered = UpdateManager.isMetered(this);
+                Button resume = primary(metered ? "Use mobile data & restart" : "Check download status");
+                resume.setOnClickListener(view -> {
+                    if (metered) confirmAndStartUpdateDownload(info);
+                    else renderUpdateState(info, status, network, progress, progressLabel, actions);
+                });
+                addButton(actions, resume);
+                gap(actions, 7);
+            }
+            Button cancel = lightAction("Cancel this download");
+            cancel.setOnClickListener(view -> {
+                UpdateManager.cancel(this, info);
+                stopOtaStatusPolling();
+                renderUpdateState(info, status, network, progress, progressLabel, actions);
+            });
+            addButton(actions, cancel);
+            startOtaStatusPolling(info, status, network, progress, progressLabel, actions);
+        } else if (state.state == UpdateManager.STATE_VERIFYING) {
+            status.setText("Download complete. Verifying its SHA-256 before Android installs it…");
+            progress.setIndeterminate(true);
+            progressLabel.setText("Downloaded • verifying integrity");
+            verifyAndInstallUpdate(info);
+        } else if (state.state == UpdateManager.STATE_READY_TO_INSTALL) {
+            status.setText("Version " + info.name + " is verified and ready for Android to install.");
+            progress.setIndeterminate(false);
+            progress.setProgress(100, true);
+            progressLabel.setText("100%  •  SHA-256 verified");
+            Button install = primary("Install verified " + info.name);
+            install.setOnClickListener(view -> requestVerifiedUpdateInstall(info));
+            addButton(actions, install);
+            gap(actions, 7);
+            Button remove = lightAction("Remove verified download");
+            remove.setOnClickListener(view -> {
+                UpdateManager.cancel(this, info);
+                renderUpdateState(info, status, network, progress, progressLabel, actions);
+            });
+            addButton(actions, remove);
+        } else {
+            status.setText("Update download stopped. " + state.detail);
+            progress.setIndeterminate(false);
+            progress.setProgress(0);
+            progressLabel.setText("No verified update is waiting");
+            Button retry = primary("Retry update download");
+            retry.setOnClickListener(view -> confirmAndStartUpdateDownload(info));
+            addButton(actions, retry);
+        }
+    }
+
+    private void confirmAndStartUpdateDownload(UpdateManager.Info info) {
+        boolean metered = UpdateManager.isMetered(this);
+        if (!metered) {
+            startUpdateDownload(info, false);
+            return;
+        }
+        String size = info.sizeBytes > 0L ? formatDownloadSize(info.sizeBytes) : "this update";
+        UpdateManager.DownloadStatus existing;
+        try {
+            existing = UpdateManager.status(this, info);
+        } catch (RuntimeException ignored) {
+            existing = new UpdateManager.DownloadStatus(UpdateManager.STATE_NONE, 0L, info.sizeBytes, "");
+        }
+        String restart = existing.state == UpdateManager.STATE_PAUSED
+                ? " The earlier Wi-Fi-only transfer will restart with mobile data enabled."
+                : "";
+        new AlertDialog.Builder(this)
+                .setTitle("Use mobile data?")
+                .setMessage("This update is " + size + ". Android will keep the download active through a temporary signal loss, but it may use your mobile-data allowance. Roaming is blocked." + restart)
+                .setNegativeButton("Wait for Wi‑Fi", null)
+                .setPositiveButton("Download on mobile", (dialog, which) -> startUpdateDownload(info, true))
+                .show();
+    }
+
+    private void startUpdateDownload(UpdateManager.Info info, boolean allowMetered) {
+        try {
+            UpdateManager.enqueue(this, info, allowMetered);
+            toast(allowMetered ? "Android is downloading the update over mobile data." : "Android is downloading the update.");
+            // Render the saved transfer immediately. A momentary manifest outage must not hide
+            // a DownloadManager job that has already begun.
+            showUpdate(info);
+        } catch (RuntimeException error) {
+            toast("Could not start update: " + conciseNetworkError(error));
+        }
+    }
+
+    private void startOtaStatusPolling(UpdateManager.Info info, TextView status, TextView network, ProgressBar progress, TextView progressLabel, LinearLayout actions) {
+        if (otaStatusPoll != null) return;
+        final int expectedPage = otaPageGeneration;
+        otaStatusPoll = new Runnable() {
+            @Override public void run() {
+                otaStatusPoll = null;
+                if (!isCurrentUpdatePage(expectedPage)) return;
+                renderUpdateState(info, status, network, progress, progressLabel, actions);
+            }
+        };
+        workoutHandler.postDelayed(otaStatusPoll, 850L);
+    }
+
+    private void stopOtaStatusPolling() {
+        if (otaStatusPoll != null) workoutHandler.removeCallbacks(otaStatusPoll);
+        otaStatusPoll = null;
+    }
+
+    private void verifyAndInstallUpdate(UpdateManager.Info info) {
+        if (otaVerificationInFlight) return;
+        final int expectedPage = otaPageGeneration;
+        otaVerificationInFlight = true;
         new Thread(() -> {
             try {
-                UpdateManager.downloadAndInstall(this, info, (downloaded, total) -> runOnUiThread(() -> {
-                    if (total > 0) {
-                        int percent = UpdateManager.progressPercent(downloaded, total);
-                        progress.setIndeterminate(false);
-                        progress.setProgress(percent, true);
-                        progressLabel.setText(percent + "%  •  " + formatDownloadSize(downloaded) + " of " + formatDownloadSize(total));
-                    } else {
-                        progress.setIndeterminate(true);
-                        progressLabel.setText(formatDownloadSize(downloaded) + " downloaded");
-                    }
-                }));
+                UpdateManager.verifyDownloaded(this, info);
                 runOnUiThread(() -> {
-                    progress.setIndeterminate(false);
-                    progress.setProgress(100, true);
-                    status.setText("Download verified. Android will now ask you to confirm the install.");
-                    progressLabel.setText("100%  •  SHA-256 verified");
+                    otaVerificationInFlight = false;
+                    if (!isCurrentUpdatePage(expectedPage)) return;
+                    requestVerifiedUpdateInstall(info);
                 });
             } catch (Exception error) {
                 runOnUiThread(() -> {
-                    status.setText("Update could not be verified: " + error.getMessage());
-                    progress.setIndeterminate(false);
-                    progress.setProgress(0);
-                    progressLabel.setText("Download stopped");
-                    install.setEnabled(true);
+                    otaVerificationInFlight = false;
+                    UpdateManager.cancel(this, info);
+                    if (!isCurrentUpdatePage(expectedPage)) return;
+                    toast("Update could not be verified: " + conciseNetworkError(error));
+                    showUpdate(info);
                 });
             }
         }).start();
+    }
+
+    private void requestVerifiedUpdateInstall(UpdateManager.Info info) {
+        try {
+            boolean installerOpened = UpdateManager.requestInstall(this, info);
+            if (!installerOpened) {
+                pendingOtaInstall = info;
+                toast("Allow installs for My Personal Trainer, then return here. The verified update will continue automatically.");
+            }
+        } catch (SecurityException | IllegalStateException error) {
+            UpdateManager.cancel(this, info);
+            toast("Could not open Android's installer: " + conciseNetworkError(error));
+            showUpdate(info);
+        } catch (Exception error) {
+            // Preserve a verified APK if Android's installer activity is temporarily unavailable.
+            // The user can retry without downloading the full file again.
+            toast("Could not open Android's installer: " + conciseNetworkError(error));
+            showUpdate(info);
+        }
     }
 
     private String formatDownloadSize(long bytes) {
@@ -4247,11 +4682,18 @@ public final class MainActivity extends Activity {
     }
 
     private void showComplete() {
+        if (guidedWorkoutAborted) {
+            showHome();
+            return;
+        }
         if (restTimer != null) restTimer.cancel();
         stopSetClock();
         if (!guidedSessionRecorded) {
             long elapsed = guidedWorkoutStartedAt == 0 ? 60_000L : Math.max(60_000L, SystemClock.elapsedRealtime() - guidedWorkoutStartedAt);
-            JourneyStore.recordWorkout(this, target, (int) Math.max(1, Math.round(elapsed / 60_000d)));
+            int activeMinutes = (int) Math.max(1, Math.round(elapsed / 60_000d));
+            long completedAt = System.currentTimeMillis();
+            JourneyStore.recordWorkoutAt(this, target, activeMinutes, completedAt);
+            SetTimeStore.recordCompletedWorkout(this, completedAt, target, completedExerciseSetTimes);
             guidedSessionRecorded = true;
         }
         JourneyStore.Snapshot snapshot = JourneyStore.snapshot(this);
