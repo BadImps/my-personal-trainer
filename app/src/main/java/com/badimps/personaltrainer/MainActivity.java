@@ -500,6 +500,7 @@ public final class MainActivity extends Activity {
         addPlanRailItem(rail, "Workouts", R.drawable.ic_nav_plan, true, view -> { stopGuidedRuntime(); showPlans(); });
         addPlanRailItem(rail, "Progress", R.drawable.ic_nav_progress, false, view -> { stopGuidedRuntime(); showProgress(); });
         addPlanRailItem(rail, "Nutrition", R.drawable.ic_nav_nutrition, false, view -> { stopGuidedRuntime(); showMeals(); });
+        addPlanRailItem(rail, "Body", R.drawable.ic_nav_body, false, view -> { stopGuidedRuntime(); showBodyContext(); });
         addPlanRailItem(rail, "Settings", R.drawable.ic_nav_settings, false, view -> { stopGuidedRuntime(); showProfile(); });
         return rail;
     }
@@ -563,6 +564,7 @@ public final class MainActivity extends Activity {
         addRailItem(rail, "Workouts", R.drawable.ic_nav_plan, activeScreen, view -> { stopGuidedRuntime(); showPlans(); });
         addRailItem(rail, "Progress", R.drawable.ic_nav_progress, activeScreen, view -> { stopGuidedRuntime(); showProgress(); });
         addRailItem(rail, "Nutrition", R.drawable.ic_nav_nutrition, activeScreen, view -> { stopGuidedRuntime(); showMeals(); });
+        addRailItem(rail, "Body", R.drawable.ic_nav_body, activeScreen, view -> { stopGuidedRuntime(); showBodyContext(); });
         addRailItem(rail, "Settings", R.drawable.ic_nav_settings, activeScreen, view -> { stopGuidedRuntime(); showProfile(); });
         return rail;
     }
@@ -2463,8 +2465,8 @@ public final class MainActivity extends Activity {
         profileCard.addView(text(BodyProfileStore.summary(this), 14, muted));
         profileCard.addView(text("Current weight: " + WeightStore.latestLabel(this) + ". Measurements add context; they never diagnose health or choose a lifting load.", 13, muted));
         gap(profileCard, 10);
-        Button editProfile = lightAction(BodyProfileStore.configured(this) ? "Edit body profile" : "Complete body profile");
-        editProfile.setOnClickListener(view -> showBodyProfileSetup(false));
+        Button editProfile = lightAction(BodyProfileStore.configured(this) ? "Open body context" : "Complete body profile");
+        editProfile.setOnClickListener(view -> { if (BodyProfileStore.configured(this)) showBodyContext(); else showBodyProfileSetup(false); });
         addButton(profileCard, editProfile);
         body.addView(profileCard);
         gap(body, 12);
@@ -2484,6 +2486,104 @@ public final class MainActivity extends Activity {
         return "Weekly".equals(planMode) ? Math.max(1, trainingDays) : 1;
     }
 
+    /** Dedicated, local-only body context reached directly from the left navigation rail. */
+    private void showBodyContext() {
+        LinearLayout body = appPage("Body");
+        title(body, "PRIVATE BODY CONTEXT", "Context, not a verdict",
+                "Your age, height, gender, and weight remain on this device. These educational summaries support your plans; they do not diagnose health or prescribe a body size, pace, or calorie target.");
+
+        if (!BodyProfileStore.configured(this) || !WeightStore.configured(this)) {
+            LinearLayout start = card();
+            start.addView(heading("Build your private context", 20, ink));
+            start.addView(text("Add your adult age, height, optional gender, and current weight. You can then see an adult screening reference, an adjustable walking-distance estimate, and how your planned activity compares with general guidance.", 14, muted));
+            gap(start, 11);
+            Button complete = primary("Add my private body context");
+            complete.setOnClickListener(view -> showBodyProfileSetup(false));
+            addButton(start, complete);
+            body.addView(start);
+            gap(body, 12);
+            body.addView(text("For anyone under 20, use an age- and sex-specific growth assessment with a qualified healthcare professional rather than an adult reference range.", 13, Color.rgb(211, 225, 233)));
+            return;
+        }
+
+        int age = BodyProfileStore.age(this);
+        float heightCm = BodyProfileStore.heightCm(this);
+        String unit = WeightStore.unit(this);
+        float current = WeightStore.latest(this);
+        float targetWeight = WeightStore.target(this);
+
+        LinearLayout identity = card();
+        identity.addView(heading("Your local profile", 19, ink));
+        identity.addView(text(BodyProfileStore.summary(this) + "  •  Current weight " + WeightStore.latestLabel(this), 14, muted));
+        identity.addView(text("Gender is optional. It is not inferred from your selected coach and is only shared with Gemini if you explicitly opt in.", 13, muted));
+        body.addView(identity);
+        gap(body, 12);
+
+        LinearLayout reference = card();
+        if (BodyInsights.usesAdultReference(age)) {
+            reference.addView(heading("Adult screening reference", 19, ink));
+            reference.addView(text("For your height, a BMI 18.5–24.9 screening reference corresponds to " + BodyInsights.referenceRange(heightCm, unit) + ". This is not an ideal weight, goal, or diagnosis.", 14, muted));
+            ReferenceWeightRangeView chart = new ReferenceWeightRangeView(this);
+            chart.setValues(current, targetWeight,
+                    BodyInsights.fromKg(BodyInsights.referenceWeightLowKg(heightCm), unit),
+                    BodyInsights.fromKg(BodyInsights.referenceWeightHighKg(heightCm), unit), unit);
+            LinearLayout.LayoutParams chartParams = new LinearLayout.LayoutParams(-1, dp(118));
+            chartParams.topMargin = dp(8);
+            reference.addView(chart, chartParams);
+            reference.addView(text(String.format(Locale.US, "Current BMI screening value: %.1f. BMI is one screening measure and does not measure health, fitness, or body composition by itself.", BodyInsights.bmi(heightCm, current, unit)), 13, muted));
+        } else {
+            reference.addView(heading("Age-specific growth context", 19, ink));
+            reference.addView(text("For ages 18–19, this app does not apply an adult BMI range. Growth and weight context require a sex- and age-specific clinical chart, so talk with a qualified healthcare professional if you want an assessment.", 14, muted));
+        }
+        body.addView(reference);
+        gap(body, 12);
+
+        LinearLayout movement = card();
+        movement.addView(heading("Comfortable walking estimate", 19, ink));
+        TextView paceCopy = text(BodyInsights.paceDistance(BodyProfileStore.walkingPaceMph(this)), 14, muted);
+        movement.addView(paceCopy);
+        movement.addView(text("This is distance at the pace you choose—not an age-based performance test. Slow down, pause, or seek advice if activity causes concerning symptoms.", 13, muted));
+        SeekBar pace = new SeekBar(this);
+        pace.setMax(6); // 2.0 through 5.0 mph in 0.5-mph steps.
+        pace.setProgress(Math.max(0, Math.min(6, Math.round((BodyProfileStore.walkingPaceMph(this) - 2f) * 2f))));
+        pace.setProgressTintList(ColorStateList.valueOf(mint));
+        pace.setThumbTintList(ColorStateList.valueOf(coral));
+        pace.setContentDescription("Comfortable walking pace, currently " + BodyProfileStore.walkingPaceMph(this) + " miles per hour");
+        pace.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
+                float selectedPace = 2f + progress * .5f;
+                paceCopy.setText(BodyInsights.paceDistance(selectedPace));
+                bar.setContentDescription("Comfortable walking pace, " + selectedPace + " miles per hour");
+                if (fromUser) BodyProfileStore.setWalkingPaceMph(MainActivity.this, selectedPace);
+            }
+            @Override public void onStartTrackingTouch(SeekBar bar) { }
+            @Override public void onStopTrackingTouch(SeekBar bar) { }
+        });
+        LinearLayout.LayoutParams paceParams = new LinearLayout.LayoutParams(-1, dp(42));
+        paceParams.topMargin = dp(7);
+        movement.addView(pace, paceParams);
+        body.addView(movement);
+        gap(body, 12);
+
+        LinearLayout activity = card();
+        activity.addView(heading("Weekly movement context", 19, ink));
+        int plannedMinutes = session.isEmpty() ? 0 : plannedSessionsThisWeek() * sessionMinutes;
+        activity.addView(text(BodyInsights.weeklyActivityContext(plannedMinutes, age), 14, muted));
+        activity.addView(text("The general adult baseline is 150–300 minutes of moderate aerobic activity each week plus muscle-strengthening activity on 2 days. Your plan can be one part of that total.", 13, muted));
+        body.addView(activity);
+        gap(body, 12);
+
+        Button edit = secondary("Edit private body context");
+        edit.setOnClickListener(view -> showBodyProfileSetup(false));
+        addButton(body, edit);
+        gap(body, 10);
+        Button nutrition = lightAction("Open nutrition + Ask Coach");
+        nutrition.setOnClickListener(view -> showMeals());
+        addButton(body, nutrition);
+        gap(body, 12);
+        body.addView(text("If you are pregnant, have a medical condition, take medication that affects weight or activity, have an eating concern, or experience chest pain, dizziness, or unusual shortness of breath, use a qualified clinician for individualized advice.", 13, Color.rgb(211, 225, 233)));
+    }
+
     private void showProfile() {
         AccountStore.Profile profile = AccountStore.get(this);
         String coach = "Coach " + profile.coachName;
@@ -2499,13 +2599,13 @@ public final class MainActivity extends Activity {
         gap(body, 12);
 
         LinearLayout bodyProfile = card();
-        bodyProfile.addView(heading("Body & goal profile", 19, ink));
+        bodyProfile.addView(heading("Private body context", 19, ink));
         bodyProfile.addView(text(BodyProfileStore.summary(this), 14, muted));
         bodyProfile.addView(text("Weight: " + WeightStore.latestLabel(this) + "  •  Used locally for trend context across Workouts, Progress, and Nutrition.", 13, muted));
         bodyProfile.setClickable(true);
         bodyProfile.setFocusable(true);
-        bodyProfile.setContentDescription("Body and goal profile. " + BodyProfileStore.summary(this));
-        bodyProfile.setOnClickListener(view -> showBodyProfileSetup(false));
+        bodyProfile.setContentDescription("Private body context. " + BodyProfileStore.summary(this));
+        bodyProfile.setOnClickListener(view -> { if (BodyProfileStore.configured(this)) showBodyContext(); else showBodyProfileSetup(false); });
         body.addView(bodyProfile);
         gap(body, 12);
 
@@ -2555,6 +2655,8 @@ public final class MainActivity extends Activity {
             WorkoutReminderScheduler.cancel(this);
             WeightStore.clear(this);
             BodyProfileStore.clear(this);
+            GeminiCoachSettings.clear(this);
+            MealPlanStore.clear(this);
             JourneyStore.clear(this);
             session.clear();
             selectedExercises.clear();
@@ -2568,11 +2670,11 @@ public final class MainActivity extends Activity {
     private void showBodyProfileSetup(boolean onboarding) {
         LinearLayout body = appPage("Settings");
         title(body, "PRIVATE PROFILE", onboarding ? "Connect your plan" : "Body & goal profile",
-                "Age, height, and weight stay on this device. They add context across Workouts, Progress, and Nutrition; they do not diagnose health or choose a lifting load.");
+                "Age, height, gender, and weight stay on this device. They add context across Workouts, Progress, and Nutrition; they do not diagnose health or choose a lifting load.");
 
         LinearLayout consent = card();
         consent.addView(heading("Why these details help", 18, ink));
-        consent.addView(text("Age can surface age-aware safety context. Height and weight support a private trend. Nutrition remains flexible and does not prescribe calories from these details.", 14, muted));
+        consent.addView(text("Age can surface age-aware safety context. Height and weight support a private trend. Gender is optional and never inferred from your coach. Nutrition remains flexible and does not prescribe calories from these details.", 14, muted));
         body.addView(consent);
         gap(body, 12);
 
@@ -2583,6 +2685,17 @@ public final class MainActivity extends Activity {
         EditText height = input("Height in centimetres", InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
         if (BodyProfileStore.configured(this)) height.setText(String.format(Locale.US, "%.0f", BodyProfileStore.heightCm(this)));
         body.addView(height);
+        gap(body, 9);
+        body.addView(heading("Your gender — optional", 17, Color.WHITE));
+        RadioGroup gender = new RadioGroup(this);
+        gender.setOrientation(RadioGroup.HORIZONTAL);
+        RadioButton female = profileGenderOption("Female", BodyProfileStore.GENDER_FEMALE.equals(BodyProfileStore.gender(this)));
+        RadioButton male = profileGenderOption("Male", BodyProfileStore.GENDER_MALE.equals(BodyProfileStore.gender(this)));
+        RadioButton notSpecified = profileGenderOption("Prefer not to say", !BodyProfileStore.GENDER_FEMALE.equals(BodyProfileStore.gender(this)) && !BodyProfileStore.GENDER_MALE.equals(BodyProfileStore.gender(this)));
+        gender.addView(female);
+        gender.addView(male);
+        gender.addView(notSpecified);
+        body.addView(gender);
         gap(body, 9);
         EditText current = input("Current weight", InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
         if (WeightStore.configured(this)) current.setText(String.format(Locale.US, "%.1f", WeightStore.latest(this)));
@@ -2613,7 +2726,9 @@ public final class MainActivity extends Activity {
                 float enteredTarget = targetText.isEmpty() ? enteredWeight : Float.parseFloat(targetText);
                 if (enteredTarget <= 0) throw new IllegalArgumentException();
                 String unit = units.getCheckedRadioButtonId() == R.id.unit_lb ? "lb" : "kg";
-                BodyProfileStore.save(this, enteredAge, enteredHeight);
+                String enteredGender = female.isChecked() ? BodyProfileStore.GENDER_FEMALE
+                        : male.isChecked() ? BodyProfileStore.GENDER_MALE : BodyProfileStore.GENDER_NOT_SET;
+                BodyProfileStore.save(this, enteredAge, enteredHeight, enteredGender);
                 WeightStore.updateProfile(this, enteredWeight, enteredTarget, unit);
                 toast("Your private profile now connects all three pages.");
                 if (onboarding) showPlans(); else showProfile();
@@ -3615,6 +3730,17 @@ public final class MainActivity extends Activity {
         return option;
     }
 
+    private RadioButton profileGenderOption(String label, boolean checked) {
+        RadioButton option = new RadioButton(this);
+        option.setId(View.generateViewId());
+        option.setText(label);
+        option.setTextColor(Color.WHITE);
+        option.setTextSize(14);
+        option.setButtonTintList(ColorStateList.valueOf(mint));
+        option.setChecked(checked);
+        return option;
+    }
+
     private void showMeals() {
         LinearLayout body = appPage("Nutrition");
         title(body, "NUTRITION NEXUS", "Fuel the plan you built", "Use flexible food-group goals around your workout, then let Progress show the pattern beside your training consistency.");
@@ -3641,6 +3767,26 @@ public final class MainActivity extends Activity {
         addMealSuggestion(todayIdeas, "Lunch", todayFood.lunchTitle, todayFood.lunchDetail);
         body.addView(todayIdeas);
         gap(body, 12);
+
+        addAskCoachFoodCard(body);
+        gap(body, 12);
+
+        List<String> plannedMeals = MealPlanStore.meals(this);
+        if (!plannedMeals.isEmpty()) {
+            LinearLayout savedMeals = card();
+            savedMeals.addView(heading("Meals added to my plan", 19, ink));
+            savedMeals.addView(text("You chose these after reviewing an online Coach answer. They stay on this device.", 13, muted));
+            for (String meal : plannedMeals) {
+                gap(savedMeals, 7);
+                Button remove = lightAction("✓  " + meal + "   Remove");
+                remove.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+                remove.setContentDescription("Remove " + meal + " from my meal plan");
+                remove.setOnClickListener(view -> { MealPlanStore.remove(this, meal); showMeals(); });
+                addButton(savedMeals, remove);
+            }
+            body.addView(savedMeals);
+            gap(body, 12);
+        }
 
         LinearLayout checkIn = card();
         checkIn.addView(heading("Today's simple fuel check-in", 19, ink));
@@ -3687,6 +3833,161 @@ public final class MainActivity extends Activity {
         addButton(body, progress);
         gap(body, 12);
         body.addView(text("These are general wellness ideas, not medical nutrition treatment. For allergies, medical conditions, eating concerns, pregnancy, or specific weight-change targets, consult a qualified clinician or registered dietitian.", 13, Color.rgb(211, 225, 233)));
+    }
+
+    /** Entry point for the opt-in Gemini-backed food question flow. */
+    private void addAskCoachFoodCard(LinearLayout body) {
+        LinearLayout coach = card();
+        coach.addView(heading("Ask Coach " + coachName(), 19, ink));
+        coach.addView(text("Type a meal or food. When connected, your secure Gemini service can return an estimated calorie range, a neutral nutrition note, and how it may fit your selected plan.", 14, muted));
+        gap(coach, 9);
+        EditText meal = input("Example: chicken, rice, and vegetables", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES | InputType.TYPE_TEXT_FLAG_MULTI_LINE);
+        meal.setSingleLine(false);
+        meal.setMinLines(2);
+        coach.addView(meal);
+        gap(coach, 8);
+        TextView privacy = text(GeminiCoachSettings.configured(this)
+                        ? (GeminiCoachSettings.sharesBodyContext(this)
+                            ? "Online connection ready • You chose to share your entered body context with your Gemini service for this question."
+                            : "Online connection ready • Only the meal and selected plan context are sent. Private body context stays on-device.")
+                        : "Gemini is not connected yet. The app never stores a Gemini API key; connect your own secure HTTPS Gemini service first.",
+                12, muted);
+        coach.addView(privacy);
+        gap(coach, 10);
+        ProgressBar loading = new ProgressBar(this);
+        loading.setIndeterminateTintList(ColorStateList.valueOf(mint));
+        loading.setVisibility(View.GONE);
+        coach.addView(loading, new LinearLayout.LayoutParams(dp(30), dp(30)));
+        LinearLayout resultHost = new LinearLayout(this);
+        resultHost.setOrientation(LinearLayout.VERTICAL);
+        coach.addView(resultHost);
+        Button ask = primary(GeminiCoachSettings.configured(this) ? "Ask Coach online" : "Connect Gemini securely");
+        ask.setOnClickListener(view -> {
+            if (!GeminiCoachSettings.configured(this)) {
+                showGeminiSetup();
+                return;
+            }
+            String question = meal.getText().toString().trim();
+            if (question.isEmpty()) {
+                meal.setError("Tell your coach which meal or food you want to ask about.");
+                meal.requestFocus();
+                return;
+            }
+            askFoodCoach(question, ask, loading, resultHost);
+        });
+        addButton(coach, ask);
+        body.addView(coach);
+    }
+
+    private void askFoodCoach(String meal, Button ask, ProgressBar loading, LinearLayout resultHost) {
+        ask.setEnabled(false);
+        loading.setVisibility(View.VISIBLE);
+        resultHost.removeAllViews();
+        TextView checking = text("Coach " + coachName() + " is checking your meal online…", 13, muted);
+        resultHost.addView(checking);
+        boolean includeBody = GeminiCoachSettings.sharesBodyContext(this) && BodyProfileStore.configured(this) && WeightStore.configured(this);
+        GeminiFoodCoach.Request request = new GeminiFoodCoach.Request(meal, goal, target, sessionMinutes,
+                includeBody ? BodyProfileStore.age(this) : 0,
+                includeBody ? BodyProfileStore.heightCm(this) : 0f,
+                includeBody ? WeightStore.latest(this) : 0f,
+                includeBody ? WeightStore.unit(this) : "",
+                includeBody ? BodyProfileStore.gender(this) : "",
+                includeBody);
+        new Thread(() -> {
+            try {
+                GeminiFoodCoach.Result result = GeminiFoodCoach.ask(GeminiCoachSettings.endpoint(this), request);
+                runOnUiThread(() -> {
+                    loading.setVisibility(View.GONE);
+                    ask.setEnabled(true);
+                    showFoodCoachResult(resultHost, meal, result);
+                });
+            } catch (Exception error) {
+                runOnUiThread(() -> {
+                    loading.setVisibility(View.GONE);
+                    ask.setEnabled(true);
+                    resultHost.removeAllViews();
+                    resultHost.addView(text("Coach could not reach the Gemini service. Check your connection and secure service address, then try again. " + conciseNetworkError(error), 13, coral));
+                });
+            }
+        }).start();
+    }
+
+    private void showFoodCoachResult(LinearLayout resultHost, String meal, GeminiFoodCoach.Result result) {
+        resultHost.removeAllViews();
+        gap(resultHost, 10);
+        LinearLayout answer = new LinearLayout(this);
+        answer.setOrientation(LinearLayout.VERTICAL);
+        answer.setPadding(dp(12), dp(12), dp(12), dp(12));
+        answer.setBackground(surface(Color.rgb(239, 248, 246), 14, 1, mint));
+        answer.addView(heading("Coach answer", 16, ink));
+        answer.addView(text(result.summary, 14, muted));
+        gap(answer, 6);
+        answer.addView(text("Estimated calories: " + result.calories, 14, ink));
+        answer.addView(text("Nutrition note: " + result.healthNote, 13, muted));
+        answer.addView(text("Plan fit: " + result.planFit, 13, muted));
+        answer.addView(text("Online estimates can be incomplete. Check packaging, ingredients, allergies, and clinical guidance where relevant.", 12, muted));
+        resultHost.addView(answer);
+        gap(resultHost, 8);
+        Button add = action("Add this meal to my plan", mint, navy);
+        add.setContentDescription("Add " + meal + " to my meal plan");
+        add.setOnClickListener(view -> {
+            MealPlanStore.add(this, meal);
+            toast("Added to your local meal plan.");
+            showMeals();
+        });
+        addButton(resultHost, add);
+    }
+
+    private String conciseNetworkError(Exception error) {
+        String message = error.getMessage();
+        if (message == null || message.trim().isEmpty()) return "";
+        return message.length() > 110 ? message.substring(0, 110) + "…" : message;
+    }
+
+    private void showGeminiSetup() {
+        LinearLayout body = appPage("Nutrition");
+        title(body, "ASK COACH ONLINE", "Connect your Gemini service", "Use a user-owned HTTPS gateway that calls Gemini server-side. This keeps your Gemini API key out of the app and gives you control over where an optional meal question is processed.");
+        LinearLayout privacy = card();
+        privacy.addView(heading("Private by default", 19, ink));
+        privacy.addView(text("Do not paste an API key here. Android apps can be reverse engineered, so the key belongs in a secure server or cloud secret manager—not in this APK. Until you opt in below, Coach sends only the meal and selected plan context.", 14, muted));
+        body.addView(privacy);
+        gap(body, 12);
+        EditText endpoint = input("Secure Gemini service URL — https://", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
+        endpoint.setText(GeminiCoachSettings.endpoint(this));
+        body.addView(endpoint);
+        gap(body, 10);
+        LinearLayout sharing = card();
+        CheckBox includeContext = new CheckBox(this);
+        includeContext.setText("Share my entered body context with Gemini");
+        includeContext.setTextSize(16);
+        includeContext.setTextColor(ink);
+        includeContext.setButtonTintList(ColorStateList.valueOf(mint));
+        includeContext.setChecked(GeminiCoachSettings.sharesBodyContext(this));
+        sharing.addView(includeContext);
+        sharing.addView(text("Optional: age, selected gender, height, and current weight are sent only with this request. They otherwise remain on this device. Never use this option for a medical diagnosis or emergency.", 13, muted));
+        body.addView(sharing);
+        gap(body, 12);
+        LinearLayout contract = card();
+        contract.addView(heading("Gateway response", 18, ink));
+        contract.addView(text("Your service should accept JSON containing meal, goal, workoutFocus, workoutMinutes, and optional bodyContext; return summary, estimatedCalories, healthNote, and planFit. The app displays the answer and lets you choose whether to save the meal locally.", 13, muted));
+        body.addView(contract);
+        gap(body, 14);
+        Button save = primary("Save secure connection");
+        save.setOnClickListener(view -> {
+            try {
+                GeminiCoachSettings.save(this, endpoint.getText().toString(), includeContext.isChecked());
+                toast("Gemini service connection saved. Ask Coach from Nutrition whenever you are online.");
+                showMeals();
+            } catch (Exception error) {
+                endpoint.setError("Enter a complete HTTPS service address.");
+                endpoint.requestFocus();
+            }
+        });
+        addButton(body, save);
+        gap(body, 8);
+        Button back = secondary("Back to Nutrition");
+        back.setOnClickListener(view -> showMeals());
+        addButton(body, back);
     }
 
     private Button fuelGoalButton(String label, int flag, int mask) {

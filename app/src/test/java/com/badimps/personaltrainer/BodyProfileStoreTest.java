@@ -30,6 +30,14 @@ public final class BodyProfileStoreTest {
         assertTrue(BodyProfileStore.summary(context).contains("42 years"));
     }
 
+    @Test public void storesOptionalGenderAndWalkingPaceOnlyOnDevice() {
+        BodyProfileStore.save(context, 42, 178f, BodyProfileStore.GENDER_FEMALE);
+        BodyProfileStore.setWalkingPaceMph(context, 3.5f);
+        assertEquals(BodyProfileStore.GENDER_FEMALE, BodyProfileStore.gender(context));
+        assertEquals(3.5f, BodyProfileStore.walkingPaceMph(context), .01f);
+        assertTrue(BodyProfileStore.summary(context).contains("Female"));
+    }
+
     @Test(expected = IllegalArgumentException.class)
     public void minorsAreOutsideAdultPersonalizationScope() {
         BodyProfileStore.save(context, 17, 170f);
