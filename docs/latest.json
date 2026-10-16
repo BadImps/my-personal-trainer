@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 26,
-  "versionName": "3.5",
-  "publishedAt": "2026-10-16T13:19:39Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v3.5/My-Personal-Trainer-3.5.apk",
-  "sha256": "6108d5ca4409ccb7e842d6ecd18dcbf3bd3a16b03b5358e7d54fe9c9f65b0c83",
-  "sizeBytes": 34429545,
-  "notes": "Adds Ask Coach online in Nutrition with a private-by-default Gemini gateway flow, an explicit Add to my plan step, and a dedicated Body panel below Nutrition. Body Context now stores optional gender locally and presents adult screening, walking-pace, and weekly-activity context."
+  "versionCode": 28,
+  "versionName": "3.7",
+  "publishedAt": "2026-10-16T18:36:43Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v3.7/My-Personal-Trainer-3.7.apk",
+  "sha256": "b2ef0337655af35e676fe09c392509d37a6296f8de7d42c841bd51ea82b1c7a2",
+  "sizeBytes": 84161821,
+  "notes": "Adds a clear home schedule calendar with focus labels, explicit rest days, a today marker, and browsable upcoming weeks. Unscheduled future weeks remain visibly open rather than being confused with rest days."
 }
