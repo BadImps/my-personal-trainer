@@ -51,6 +51,12 @@ public final class WorkoutTimingTest {
         assertEquals(480, WorkoutTiming.clampRestSeconds(900));
     }
 
+    @Test public void cooldownUsesOnlyOneThreeOrFiveMinutePresets() {
+        assertEquals(60, WorkoutTiming.normalizeCooldownSeconds(45));
+        assertEquals(180, WorkoutTiming.normalizeCooldownSeconds(150));
+        assertEquals(300, WorkoutTiming.normalizeCooldownSeconds(480));
+    }
+
     @Test public void setTimeUsesMinuteSecondAndTenthFormat() {
         assertEquals("01:05.4", WorkoutTiming.formatElapsedMillis(65_499));
     }

@@ -11,6 +11,8 @@ public final class WorkoutTiming {
     public static final int MIN_REST_SECONDS = 45;
     public static final int MAX_REST_SECONDS = 8 * 60;
     public static final int REST_STEP_SECONDS = 15;
+    public static final int DEFAULT_COOLDOWN_SECONDS = 3 * 60;
+    public static final int[] COOLDOWN_PRESET_SECONDS = {60, 3 * 60, 5 * 60};
     private static final long MINIMUM_SLOWER_MARGIN_MS = 250L;
     private static final double SLOWER_MARGIN_RATIO = 0.05d;
 
@@ -80,6 +82,20 @@ public final class WorkoutTiming {
 
     public static int clampRestSeconds(int seconds) {
         return Math.max(MIN_REST_SECONDS, Math.min(MAX_REST_SECONDS, seconds));
+    }
+
+    /** Cooldown is intentionally preset-only so it cannot be confused with custom set recovery. */
+    public static int normalizeCooldownSeconds(int seconds) {
+        int closest = DEFAULT_COOLDOWN_SECONDS;
+        int distance = Integer.MAX_VALUE;
+        for (int preset : COOLDOWN_PRESET_SECONDS) {
+            int candidateDistance = Math.abs(seconds - preset);
+            if (candidateDistance < distance) {
+                closest = preset;
+                distance = candidateDistance;
+            }
+        }
+        return closest;
     }
 
     public static String formatElapsedMillis(long millis) {

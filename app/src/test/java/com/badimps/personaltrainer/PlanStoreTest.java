@@ -30,6 +30,7 @@ public final class PlanStoreTest {
             assertEquals("Machine-assisted", saved.equipment);
             assertEquals("1,0,1,0,1,0,0", saved.weeklyDays);
             assertEquals(4, saved.exerciseNames.size());
+            assertEquals(180, saved.cooldownSeconds);
         } finally {
             PlanStore.clear(context);
         }
@@ -51,6 +52,24 @@ public final class PlanStoreTest {
             assertEquals(1, saved.weekOffset);
             assertEquals(180, saved.restSeconds);
             assertEquals("Machine Chest Press|Pec Deck Fly;;Cable Biceps Curl", saved.weeklyExerciseNames);
+        } finally {
+            PlanStore.clear(context);
+        }
+    }
+
+    @Test public void customRestAndPresetCooldownPersistSeparately() {
+        Context context = RuntimeEnvironment.getApplication();
+        PlanStore.clear(context);
+        try {
+            List<Coach.Exercise> exercises = Coach.planOptions("Chest", "Bodyweight");
+            boolean[] schedule = {false, false, true, false, false, false, false};
+            PlanStore.save(context, "Daily", "Chest", "Bodyweight", 45, 0, 4, 10, 75, 300,
+                    schedule, "Chest", "", "", 2, 1, exercises);
+
+            PlanStore.SavedPlan saved = PlanStore.load(context);
+            assertNotNull(saved);
+            assertEquals(75, saved.restSeconds);
+            assertEquals(300, saved.cooldownSeconds);
         } finally {
             PlanStore.clear(context);
         }

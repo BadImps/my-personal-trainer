@@ -15,12 +15,12 @@ public final class PlanStore {
 
     public static final class SavedPlan {
         public final String mode, target, equipment, focusTargets, weeklyTargets, weeklyExerciseNames;
-        public final int minutes, weightKg, sets, reps, restSeconds;
+        public final int minutes, weightKg, sets, reps, restSeconds, cooldownSeconds;
         public final String weeklyDays;
         public final int scheduledDay, weekOffset;
         public final List<String> exerciseNames;
 
-        SavedPlan(String mode, String target, String equipment, int minutes, int weightKg, int sets, int reps, int restSeconds, String weeklyDays, String focusTargets, String weeklyTargets, String weeklyExerciseNames, int scheduledDay, int weekOffset, List<String> exerciseNames) {
+        SavedPlan(String mode, String target, String equipment, int minutes, int weightKg, int sets, int reps, int restSeconds, int cooldownSeconds, String weeklyDays, String focusTargets, String weeklyTargets, String weeklyExerciseNames, int scheduledDay, int weekOffset, List<String> exerciseNames) {
             this.mode = mode;
             this.target = target;
             this.equipment = equipment;
@@ -29,6 +29,7 @@ public final class PlanStore {
             this.sets = sets;
             this.reps = reps;
             this.restSeconds = restSeconds;
+            this.cooldownSeconds = cooldownSeconds;
             this.weeklyDays = weeklyDays;
             this.focusTargets = focusTargets;
             this.weeklyTargets = weeklyTargets;
@@ -40,16 +41,21 @@ public final class PlanStore {
     }
 
     public static void save(Context context, String mode, String target, String equipment, int minutes, int weightKg, int sets, int reps, int restSeconds, boolean[] weeklyDays, List<Coach.Exercise> exercises) {
-        save(context, mode, target, equipment, minutes, weightKg, sets, reps, restSeconds, weeklyDays, target, "", 2, 1, exercises);
+        save(context, mode, target, equipment, minutes, weightKg, sets, reps, restSeconds, WorkoutTiming.DEFAULT_COOLDOWN_SECONDS, weeklyDays, target, "", "", 2, 1, exercises);
     }
 
     /** Stores calendar and one/two-focus assignments alongside the existing local-only plan. */
     public static void save(Context context, String mode, String target, String equipment, int minutes, int weightKg, int sets, int reps, int restSeconds, boolean[] weeklyDays, String focusTargets, String weeklyTargets, int scheduledDay, int weekOffset, List<Coach.Exercise> exercises) {
-        save(context, mode, target, equipment, minutes, weightKg, sets, reps, restSeconds, weeklyDays, focusTargets, weeklyTargets, "", scheduledDay, weekOffset, exercises);
+        save(context, mode, target, equipment, minutes, weightKg, sets, reps, restSeconds, WorkoutTiming.DEFAULT_COOLDOWN_SECONDS, weeklyDays, focusTargets, weeklyTargets, "", scheduledDay, weekOffset, exercises);
     }
 
     /** Persists the separately generated templates for each selected Weekly day. */
     public static void save(Context context, String mode, String target, String equipment, int minutes, int weightKg, int sets, int reps, int restSeconds, boolean[] weeklyDays, String focusTargets, String weeklyTargets, String weeklyExerciseNames, int scheduledDay, int weekOffset, List<Coach.Exercise> exercises) {
+        save(context, mode, target, equipment, minutes, weightKg, sets, reps, restSeconds, WorkoutTiming.DEFAULT_COOLDOWN_SECONDS, weeklyDays, focusTargets, weeklyTargets, weeklyExerciseNames, scheduledDay, weekOffset, exercises);
+    }
+
+    /** Persists distinct between-set rest and between-exercise cooldown choices. */
+    public static void save(Context context, String mode, String target, String equipment, int minutes, int weightKg, int sets, int reps, int restSeconds, int cooldownSeconds, boolean[] weeklyDays, String focusTargets, String weeklyTargets, String weeklyExerciseNames, int scheduledDay, int weekOffset, List<Coach.Exercise> exercises) {
         ArrayList<String> names = new ArrayList<>();
         for (Coach.Exercise exercise : exercises) names.add(exercise.name);
         preferences(context).edit()
@@ -62,6 +68,7 @@ public final class PlanStore {
                 .putInt("sets", sets)
                 .putInt("reps", reps)
                 .putInt("rest", restSeconds)
+                .putInt("cooldown", WorkoutTiming.normalizeCooldownSeconds(cooldownSeconds))
                 .putString("weekly_days", encodeWeeklyDays(weeklyDays))
                 .putString("focus_targets", focusTargets)
                 .putString("weekly_targets", weeklyTargets)
@@ -86,6 +93,7 @@ public final class PlanStore {
                 preferences.getInt("sets", 3),
                 preferences.getInt("reps", 10),
                 preferences.getInt("rest", 90),
+                preferences.getInt("cooldown", WorkoutTiming.DEFAULT_COOLDOWN_SECONDS),
                 preferences.getString("weekly_days", "1,0,1,0,1,0,0"),
                 preferences.getString("focus_targets", preferences.getString("target", "Full Body")),
                 preferences.getString("weekly_targets", ""),

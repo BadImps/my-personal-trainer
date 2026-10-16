@@ -76,6 +76,7 @@ public final class MainActivity extends Activity {
     private int planSets = 3;
     private int planReps = 10;
     private int planRestSeconds = 180;
+    private int planCooldownSeconds = WorkoutTiming.DEFAULT_COOLDOWN_SECONDS;
     private final String[] weekDays = {"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"};
     /** Monday / Wednesday / Friday is the default weekly rhythm; unselected days are explicit rest days. */
     private boolean[] weeklyWorkoutDays = {true, false, true, false, true, false, false};
@@ -1535,6 +1536,7 @@ public final class MainActivity extends Activity {
         planSets = saved.sets;
         planReps = saved.reps;
         planRestSeconds = WorkoutTiming.clampRestSeconds(saved.restSeconds);
+        planCooldownSeconds = WorkoutTiming.normalizeCooldownSeconds(saved.cooldownSeconds);
         weeklyWorkoutDays = decodeWeeklyDays(saved.weeklyDays);
         selectedWeekOffset = saved.weekOffset;
         dailyScheduledDay = Math.max(0, Math.min(6, saved.scheduledDay));
@@ -1907,6 +1909,30 @@ public final class MainActivity extends Activity {
         restRange.addView(maximum, new LinearLayout.LayoutParams(0, -2, 1));
         rest.addView(restRange);
         settings.addView(rest);
+        gap(settings, 14);
+        LinearLayout cooldown = new LinearLayout(this);
+        cooldown.setOrientation(LinearLayout.VERTICAL);
+        cooldown.addView(heading("Cooldown between exercises", 15, ink));
+        cooldown.addView(text("Choose a separate recovery preset before the next exercise begins.", 12, muted));
+        gap(cooldown, 7);
+        LinearLayout cooldownOptions = new LinearLayout(this);
+        cooldownOptions.setOrientation(LinearLayout.HORIZONTAL);
+        for (int seconds : WorkoutTiming.COOLDOWN_PRESET_SECONDS) {
+            boolean selected = seconds == planCooldownSeconds;
+            Button option = selected ? action(restChoiceLabel(seconds), mint, navy)
+                    : action(restChoiceLabel(seconds), Color.rgb(232, 236, 244), ink);
+            option.setTextSize(12);
+            option.setContentDescription("Cooldown between exercises, " + restChoiceLabel(seconds) + (selected ? ", selected" : ""));
+            option.setOnClickListener(view -> {
+                planCooldownSeconds = seconds;
+                showPlanSetup();
+            });
+            LinearLayout.LayoutParams optionParams = new LinearLayout.LayoutParams(0, dp(44), 1);
+            optionParams.rightMargin = seconds == WorkoutTiming.COOLDOWN_PRESET_SECONDS[WorkoutTiming.COOLDOWN_PRESET_SECONDS.length - 1] ? 0 : dp(6);
+            cooldownOptions.addView(option, optionParams);
+        }
+        cooldown.addView(cooldownOptions);
+        settings.addView(cooldown);
         body.addView(settings);
         gap(body, 12);
         Button build = planPrimary("Build my " + focusSummary(activeTargets()).toLowerCase(Locale.ROOT) + " " + planMode.toLowerCase(Locale.ROOT) + " plan");
@@ -1968,7 +1994,7 @@ public final class MainActivity extends Activity {
         } else {
             session = prescribeExercises(selectedExercises);
         }
-        PlanStore.save(this, planMode, target, encodeEquipmentTypes(), sessionMinutes, workingWeightKg, planSets, planReps, planRestSeconds, weeklyWorkoutDays, encodeFocusTargets(activeTargets()), encodeWeeklyTargets(), encodeWeeklySessionNames(), "Weekly".equals(planMode) ? activeScheduleDay : dailyScheduledDay, selectedWeekOffset, session);
+        PlanStore.save(this, planMode, target, encodeEquipmentTypes(), sessionMinutes, workingWeightKg, planSets, planReps, planRestSeconds, planCooldownSeconds, weeklyWorkoutDays, encodeFocusTargets(activeTargets()), encodeWeeklyTargets(), encodeWeeklySessionNames(), "Weekly".equals(planMode) ? activeScheduleDay : dailyScheduledDay, selectedWeekOffset, session);
         showPlanReady();
     }
 
@@ -2019,7 +2045,7 @@ public final class MainActivity extends Activity {
             details.setOrientation(LinearLayout.VERTICAL);
             details.addView(heading(exercise.name, 18, ink));
             String load = (selectedEquipmentTypes.contains("Dumbbells") || selectedEquipmentTypes.contains("Machine-assisted")) ? "  •  " + workingWeightKg + " kg" : "";
-            details.addView(text(exercise.sets + " sets × " + exercise.reps + " reps" + load + "  •  Rest " + exercise.restSeconds + " sec", 14, muted));
+            details.addView(text(exercise.sets + " sets × " + exercise.reps + " reps" + load + "  •  Set rest " + restChoiceLabel(exercise.restSeconds), 14, muted));
             item.addView(details, new LinearLayout.LayoutParams(0, -2, 1));
             body.addView(item);
             gap(body, 8);
@@ -2029,6 +2055,8 @@ public final class MainActivity extends Activity {
         cue.addView(text("Move with control, choose a comfortable load, and stop if you feel pain.", 14, muted));
         gap(cue, 6);
         cue.addView(text(BodyProfileStore.workoutContext(this), 13, muted));
+        gap(cue, 6);
+        cue.addView(text("Between exercises: " + restChoiceLabel(planCooldownSeconds) + " cooldown.", 13, muted));
         body.addView(cue);
         gap(body, 12);
         LinearLayout nexus = card();
@@ -2046,7 +2074,7 @@ public final class MainActivity extends Activity {
         gap(body, 10);
         Button scheduleLater = secondary("Schedule for later");
         scheduleLater.setOnClickListener(view -> {
-            PlanStore.save(this, planMode, target, encodeEquipmentTypes(), sessionMinutes, workingWeightKg, planSets, planReps, planRestSeconds, weeklyWorkoutDays, encodeFocusTargets(activeTargets()), encodeWeeklyTargets(), encodeWeeklySessionNames(), "Weekly".equals(planMode) ? activeScheduleDay : dailyScheduledDay, selectedWeekOffset, session);
+            PlanStore.save(this, planMode, target, encodeEquipmentTypes(), sessionMinutes, workingWeightKg, planSets, planReps, planRestSeconds, planCooldownSeconds, weeklyWorkoutDays, encodeFocusTargets(activeTargets()), encodeWeeklyTargets(), encodeWeeklySessionNames(), "Weekly".equals(planMode) ? activeScheduleDay : dailyScheduledDay, selectedWeekOffset, session);
             toast("Your " + planSchedule() + " is saved on this device.");
         });
         addButton(body, scheduleLater);
@@ -2691,7 +2719,7 @@ public final class MainActivity extends Activity {
             Coach.Exercise exercise = session.get(i);
             LinearLayout item = card();
             item.addView(heading(String.format(Locale.US, "%02d  %s", i + 1, exercise.name), 18, ink));
-            item.addView(text(exercise.sets + " sets × " + exercise.reps + " reps  •  " + exercise.restSeconds + " sec rest", 14, muted));
+            item.addView(text(exercise.sets + " sets × " + exercise.reps + " reps  •  Set rest " + restChoiceLabel(exercise.restSeconds), 14, muted));
             item.addView(text(exercise.cue, 14, muted));
             body.addView(item);
             gap(body, 8);
@@ -2917,17 +2945,21 @@ public final class MainActivity extends Activity {
     private void continueAfterCompletedSet(int index, int set, Coach.Exercise exercise, int recoverySeconds) {
         boolean sessionComplete = set >= exercise.sets && index + 1 >= session.size();
         if (sessionComplete) showComplete();
-        else showRest(index, set, exercise, recoverySeconds, true, set >= exercise.sets);
+        else {
+            boolean betweenExercises = set >= exercise.sets;
+            int timerSeconds = betweenExercises ? planCooldownSeconds : recoverySeconds;
+            showRest(index, set, exercise, timerSeconds, true, betweenExercises);
+        }
     }
 
     private void showRest(int index, int set, Coach.Exercise exercise, int secondsRemaining, boolean running, boolean betweenExercises) {
         stopSetClock();
         LinearLayout body = appPage("Workouts");
-        title(body, betweenExercises ? "COOLDOWN" : "REST CLOCK", betweenExercises ? "Cooldown before next exercise" : "Set complete · recover", betweenExercises ? "Recover for your selected time. Your next exercise begins after Coach " + coachName() + " gives your count-in." : "Your next set begins after your selected count-in.");
+        title(body, betweenExercises ? "COOLDOWN TIMER" : "REST TIMER", betweenExercises ? "Cooldown before next exercise" : "Set complete · recover", betweenExercises ? "Your " + restChoiceLabel(planCooldownSeconds) + " exercise cooldown is separate from set rest. The next exercise begins after Coach " + coachName() + " gives your count-in." : "Your custom set rest is " + restChoiceLabel(exercise.restSeconds) + ". Your next set begins after the count-in.");
         LinearLayout timerCard = card();
         TextView timer = heading(format(secondsRemaining), 52, ink);
         timer.setGravity(Gravity.CENTER);
-        timer.setContentDescription("Rest time remaining " + secondsRemaining + " seconds");
+        timer.setContentDescription((betweenExercises ? "Cooldown" : "Rest") + " time remaining " + secondsRemaining + " seconds");
         timerCard.addView(timer, new LinearLayout.LayoutParams(-1, dp(98)));
         TextView reminder = text(running ? "Breathe slowly. Your 5-to-1 count-in begins when recovery is complete." : "Countdown paused. Resume when you are ready.", 15, muted);
         reminder.setGravity(Gravity.CENTER);
@@ -2938,7 +2970,7 @@ public final class MainActivity extends Activity {
         LinearLayout controls = new LinearLayout(this);
         controls.setOrientation(LinearLayout.HORIZONTAL);
         Button pause = running ? secondary("Pause") : action("Resume", mint, navy);
-        pause.setContentDescription(running ? "Pause rest countdown" : "Resume rest countdown");
+        pause.setContentDescription((running ? "Pause " : "Resume ") + (betweenExercises ? "cooldown" : "rest") + " countdown");
         pause.setOnClickListener(view -> {
             if (restTimer != null) restTimer.cancel();
             stopSpeech();
@@ -2947,7 +2979,7 @@ public final class MainActivity extends Activity {
         LinearLayout.LayoutParams pauseParams = new LinearLayout.LayoutParams(0, dp(52), 1);
         pauseParams.rightMargin = dp(7);
         controls.addView(pause, pauseParams);
-        Button skip = lightAction("Skip rest");
+        Button skip = lightAction(betweenExercises ? "Skip cooldown" : "Skip rest");
         skip.setOnClickListener(view -> {
             if (restTimer != null) restTimer.cancel();
             stopSpeech();
@@ -2966,7 +2998,7 @@ public final class MainActivity extends Activity {
                 int seconds = (int) Math.ceil(left / 1000d);
                 remaining[0] = seconds;
                 timer.setText(format(seconds));
-                timer.setContentDescription("Rest time remaining " + seconds + " seconds");
+                timer.setContentDescription((betweenExercises ? "Cooldown" : "Rest") + " time remaining " + seconds + " seconds");
             }
 
             @Override public void onFinish() {
@@ -3208,7 +3240,7 @@ public final class MainActivity extends Activity {
         guidance.addView(text(exercise.cue, 16, muted));
         gap(guidance, 8);
         guidance.addView(heading("Suggested starting point", 16, ink));
-        guidance.addView(text(exercise.sets + " sets × " + exercise.reps + " reps • Rest " + exercise.restSeconds + " sec", 15, muted));
+        guidance.addView(text(exercise.sets + " sets × " + exercise.reps + " reps • Set rest " + restChoiceLabel(exercise.restSeconds), 15, muted));
         body.addView(guidance);
         gap(body, 12);
         Button choose = primary("Add to my " + target.toLowerCase(Locale.ROOT) + " plan");

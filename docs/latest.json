@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 23,
-  "versionName": "3.2",
-  "publishedAt": "2026-10-16T01:47:50Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v3.2/app-release.apk",
-  "sha256": "2e43fcbd926371e0b1691055ee43edd06185f44516b2c799195b33ed2d68089e",
-  "sizeBytes": 33003485,
-  "notes": "Connects Workouts, Progress, and Nutrition through private device-local completion, guided-minute, and daily fuel signals. Adds an optional adult age, height, and weight profile; custom 45-second to 8-minute set recovery; and the requested last-set cooldown dialogue."
+  "versionCode": 24,
+  "versionName": "3.3",
+  "publishedAt": "2026-10-16T11:27:58Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v3.3/app-release.apk",
+  "sha256": "de00d8b87c1d58d7dff5e7c88dda33fe4a9b4a53b89af5e2174803d2e0c8a5e4",
+  "sizeBytes": 33004065,
+  "notes": "Separates the custom 45-second to 8-minute set-rest timer from the 1-, 3-, or 5-minute exercise cooldown presets. Both values persist in the plan and show distinct guided timer screens."
 }

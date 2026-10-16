@@ -71,6 +71,10 @@ Exercise posters, training-area artwork, equipment artwork, and looping videos p
 
 Workouts, Progress, and Nutrition now share one private device-local journey. Completed guided sessions update weekly workout totals and guided minutes; simple nutrition check-ins update the same Progress view; and each page offers a direct next step into the others. An optional adult body profile captures age, height, current weight, and a personal target with clear privacy and safety boundaries.
 
-Rest between sets is now adjustable from 45 seconds through 8 minutes in 15-second steps. The last set of an exercise uses the dedicated cooldown dialogue before the next exercise begins.
+Rest between sets is adjustable from 45 seconds through 8 minutes in 15-second steps. The last set of an exercise uses the dedicated cooldown dialogue before the next exercise begins.
 
 The evidence review and product decisions are documented in `docs/WORKOUT_PROGRESS_NUTRITION_NEXUS.md`.
+
+## 3.3 separate recovery timers
+
+Set rest and exercise cooldown are now deliberately separate controls. Set rest remains fully adjustable from 45 seconds to 8 minutes in 15-second steps and appears only between sets. Exercise cooldown appears only after the final set of an exercise, using 1-, 3-, or 5-minute presets. The guided screens identify each timer clearly, persist both choices in the saved plan, and keep pause, skip, and emergency-stop controls available.

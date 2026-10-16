@@ -55,6 +55,7 @@ complete profile → build/open plan → check fuel → start/review session
 - Explicitly says body measurements never choose lifting load.
 - On guided completion, records target and actual guided elapsed minutes once.
 - Completion offers `Log recovery fuel` and `View connected progress`.
+- Keeps custom between-set rest (45 seconds–8 minutes) separate from a preset exercise cooldown (1, 3, or 5 minutes).
 
 ### Progress page
 
