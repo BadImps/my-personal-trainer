@@ -94,3 +94,7 @@ The delivery rationale, production boundary, and mobile-data regression checklis
 ## 3.7 home schedule calendar
 
 The home screen now has a full weekly schedule calendar: every confirmed workout day shows its planned focus in mint, saved rest days are clearly labelled, and today receives a coral outline. The previous/next controls and horizontal **Upcoming weeks** cards browse up to eight future weeks without changing the week currently being planned. An unscheduled future week is shown as open rather than being mistaken for a rest week.
+
+## 3.8 mobile-data update recovery
+
+The updater now automatically retries the verified release manifest through a separately routed GitHub Raw endpoint when GitHub Pages times out on a mobile carrier. If neither secure route can be reached, the app keeps all local data intact and offers a manual link to the latest signed release instead of showing a raw connection trace.

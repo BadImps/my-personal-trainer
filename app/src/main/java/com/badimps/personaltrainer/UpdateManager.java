@@ -20,6 +20,7 @@ import org.json.JSONObject;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -36,6 +37,9 @@ import java.util.Locale;
  */
 public final class UpdateManager {
     public static final String ENDPOINT = "https://badimps.github.io/my-personal-trainer/latest.json";
+    /** A separately routed copy for mobile networks that intermittently cannot reach Pages. */
+    public static final String FALLBACK_ENDPOINT = "https://raw.githubusercontent.com/BadImps/my-personal-trainer/main/docs/latest.json";
+    public static final String MANUAL_RELEASES_URL = "https://github.com/BadImps/my-personal-trainer/releases/latest";
     private static final String PREFS = "ota_download_state";
     private static final String KEY_ID = "download_id";
     private static final String KEY_CODE = "version_code";
@@ -91,7 +95,26 @@ public final class UpdateManager {
 
     /** Checks the HTTPS manifest and returns a newer compatible package, if one exists. */
     public static Info check() throws Exception {
-        JSONObject json = new JSONObject(read(ENDPOINT));
+        try {
+            return checkEndpoint(ENDPOINT);
+        } catch (IOException primaryError) {
+            // Transport failures can safely use the independently routed mirror. A downloaded
+            // manifest that fails validation remains a visible safety failure.
+            try {
+                return checkEndpoint(FALLBACK_ENDPOINT);
+            } catch (Exception fallbackError) {
+                fallbackError.addSuppressed(primaryError);
+                throw new IOException("Could not reach either update service", fallbackError);
+            }
+        }
+    }
+
+    private static Info checkEndpoint(String endpoint) throws Exception {
+        return parseManifest(read(endpoint));
+    }
+
+    static Info parseManifest(String manifest) throws Exception {
+        JSONObject json = new JSONObject(manifest);
         String applicationId = json.optString("applicationId", BuildConfig.APPLICATION_ID);
         if (!BuildConfig.APPLICATION_ID.equals(applicationId)) throw new SecurityException("Update is for a different app");
         int code = json.getInt("versionCode");
@@ -360,9 +383,12 @@ public final class UpdateManager {
 
     private static String read(String address) throws Exception {
         HttpURLConnection connection = (HttpURLConnection) new URL(address).openConnection();
-        connection.setConnectTimeout(15_000);
+        // A failing route should move to the backup channel promptly rather than appear stuck.
+        connection.setConnectTimeout(10_000);
         connection.setReadTimeout(20_000);
         connection.setInstanceFollowRedirects(true);
+        connection.setRequestProperty("Accept", "application/json");
+        connection.setRequestProperty("User-Agent", "MyPersonalTrainer/" + BuildConfig.VERSION_NAME);
         try {
             int response = connection.getResponseCode();
             if (response < 200 || response >= 300) throw new IllegalStateException("Update channel returned HTTP " + response);

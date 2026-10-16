@@ -4628,11 +4628,25 @@ public final class MainActivity extends Activity {
                         renderUpdateState(saved, status, network, downloadProgress, progressLabel, actions);
                         return;
                     }
-                    status.setText("The update channel could not be reached. " + UpdateManager.networkSummary(this) + ". " + conciseNetworkError(error));
+                    status.setText("We could not reach the update service on this connection. "
+                            + "Your plans and app stay unchanged. Try again, use Wi-Fi, or use the manual download.");
                     actions.removeAllViews();
                     Button retry = primary("Retry update check");
                     retry.setOnClickListener(view -> showUpdate());
                     addButton(actions, retry);
+                    gap(actions, 10);
+                    Button manual = secondary("Open manual download");
+                    manual.setOnClickListener(view -> {
+                        try {
+                            startActivity(new Intent(Intent.ACTION_VIEW,
+                                    Uri.parse(UpdateManager.MANUAL_RELEASES_URL)));
+                        } catch (Exception ignored) {
+                            toast("Unable to open the download page.");
+                        }
+                    });
+                    addButton(actions, manual);
+                    network.setText("Connection: " + UpdateManager.networkSummary(this)
+                            + " • primary and backup channels unavailable");
                 });
             }
         }).start();
