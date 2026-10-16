@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 29,
-  "versionName": "3.8",
-  "publishedAt": "2026-10-16T19:00:00Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v3.8/My-Personal-Trainer-3.8.apk",
-  "sha256": "0a598c74359a681487ba587fd5774665188d57c697446078d12667ab5f1907d9",
+  "versionCode": 30,
+  "versionName": "3.9",
+  "publishedAt": "2026-10-16T19:10:00Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v3.9/My-Personal-Trainer-3.9.apk",
+  "sha256": "f9a556adaa3f3ac88408d3b1712f7b06563137259a4235844a9956340b4e762c",
   "sizeBytes": 84161821,
-  "notes": "Fixes mobile-data update checks that time out before downloading. The app now retries the verified manifest through an independently routed GitHub Raw endpoint and provides a manual release link if both routes are unavailable."
+  "notes": "Fixes mobile-data update checks that time out before downloading. The app now retries the verified manifest through GitHub's repository raw route and provides a manual release link if both routes are unavailable."
 }
