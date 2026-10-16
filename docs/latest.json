@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 33,
-  "versionName": "4.2",
-  "publishedAt": "2026-10-16T21:40:00Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v4.2/app-release.apk",
-  "sha256": "d12f2379edab7d17f3053932a769972fafa2dd30fe4e0bc586f502fafb9221ed",
+  "versionCode": 34,
+  "versionName": "4.3",
+  "publishedAt": "2026-10-16T23:00:00Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v4.3/app-release.apk",
+  "sha256": "311428273149e67f1cb3bd7953e0d87bfcd4b9a87720a42128b08d5d3f59b08d",
   "sizeBytes": 84161825,
-  "notes": "Applies the approved dark dashboard direction: navy panels, mint workout status, coral primary actions, compact weekly planning, and updated Home cards."
+  "notes": "Applies the approved dark dashboard visual system to Private Body Context, with prominent current-weight and personal-target metrics plus clear screening and movement panels."
 }
