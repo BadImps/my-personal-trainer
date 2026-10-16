@@ -78,3 +78,7 @@ The evidence review and product decisions are documented in `docs/WORKOUT_PROGRE
 ## 3.3 separate recovery timers
 
 Set rest and exercise cooldown are now deliberately separate controls. Set rest remains fully adjustable from 45 seconds to 8 minutes in 15-second steps and appears only between sets. Exercise cooldown appears only after the final set of an exercise, using 1-, 3-, or 5-minute presets. The guided screens identify each timer clearly, persist both choices in the saved plan, and keep pause, skip, and emergency-stop controls available.
+
+## 3.6 free-first private Coach
+
+Nutrition now works without any cloud account: **Ask Coach privately — free** runs locally, uses transparent common-portion food-pattern ranges, and never uploads the meal or body context. People can optionally add a separately downloaded on-device Gemma LiteRT-LM model for richer private wording, or configure their own HTTPS Gemini gateway for a distinct opt-in online answer. The calorie estimate always remains a labelled broad local estimate rather than an LLM guess.

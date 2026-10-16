@@ -1,4 +1,7 @@
-plugins { id 'com.android.application' }
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+}
 
 android {
     namespace 'com.badimps.personaltrainer'
@@ -15,8 +18,8 @@ android {
         applicationId 'com.badimps.personaltrainer'
         minSdk 26
         targetSdk 36
-        versionCode 26
-        versionName '3.5'
+        versionCode 27
+        versionName '3.6'
     }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
     testOptions { unitTests.includeAndroidResources = true }
@@ -24,9 +27,17 @@ android {
     buildTypes { release { signingConfig signingConfigs.otaCompatibility } }
 }
 
+// Keep the new optional Kotlin LiteRT-LM wrapper compatible with the existing Java 17 app.
+tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
+    compilerOptions.jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+}
+
 dependencies {
     implementation 'androidx.core:core:1.17.0'
     implementation 'androidx.activity:activity:1.11.0'
+    // The optional Gemma enhancement runs entirely on-device. Its large model is selected by
+    // the person after installation; it is never bundled into, or downloaded by, this APK.
+    implementation 'com.google.ai.edge.litertlm:litertlm-android:0.18.0'
     testImplementation 'junit:junit:4.13.2'
     testImplementation 'org.robolectric:robolectric:4.16'
 }

@@ -1,6 +1,8 @@
-# Gemini Food Coach gateway
+# Optional online Gemini Food Coach gateway
 
-The Android app deliberately does **not** contain a Gemini API key. Google advises that production mobile clients use a backend proxy so a key cannot be extracted from the APK.
+The free private Coach is the default: it runs on the device using transparent local food-pattern rules and does not require this gateway. A person may also install a compatible local Gemma LiteRT-LM model to improve the private wording without sending their question away from their phone.
+
+This online Gemini route is deliberately optional. The Android app does **not** contain a Gemini API key. Google advises that production mobile clients use a backend proxy so a key cannot be extracted from the APK.
 
 Configure a user-owned HTTPS gateway in Nutrition → **Ask Coach online**. The app posts:
 
