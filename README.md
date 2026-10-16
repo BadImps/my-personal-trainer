@@ -90,3 +90,7 @@ Guided workouts now preserve a local **Set Times** leaderboard for every normall
 Direct APK updates now use Android’s persistent download service rather than a one-shot in-app stream. The update screen makes mobile-data use explicit, blocks roaming, restores progress after app backgrounding or a short signal loss, verifies SHA-256 before installation, and resumes the Android installer after the normal install-permission screen.
 
 The delivery rationale, production boundary, and mobile-data regression checklist are in `docs/OTA_DELIVERY.md`.
+
+## 3.7 home schedule calendar
+
+The home screen now has a full weekly schedule calendar: every confirmed workout day shows its planned focus in mint, saved rest days are clearly labelled, and today receives a coral outline. The previous/next controls and horizontal **Upcoming weeks** cards browse up to eight future weeks without changing the week currently being planned. An unscheduled future week is shown as open rather than being mistaken for a rest week.

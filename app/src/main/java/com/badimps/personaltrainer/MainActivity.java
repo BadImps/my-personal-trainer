@@ -95,6 +95,9 @@ public final class MainActivity extends Activity {
     private int activeScheduleDay = 2;
     private int dailyScheduledDay = 2;
     private int selectedWeekOffset;
+    /** Home can browse confirmed schedules without changing the week being edited in the planner. */
+    private int homeWeekOffset;
+    private static final int HOME_UPCOMING_WEEK_COUNT = 8;
     private List<Coach.Exercise> session = new ArrayList<>();
     private List<Coach.Exercise> availableExercises = new ArrayList<>();
     private List<Coach.Exercise> selectedExercises = new ArrayList<>();
@@ -999,7 +1002,9 @@ public final class MainActivity extends Activity {
         AccountStore.Profile profile = AccountStore.get(this);
         LinearLayout body = appPage("Home");
         title(body, "TODAY", "Train with purpose", "Showing up today builds a stronger tomorrow.");
-        WeeklyScheduleStore.Schedule homeSchedule = currentWeekSchedule();
+        Calendar homeWeekStart = homeWeekStart(homeWeekOffset);
+        boolean homeWeekConfirmed = hasHomeWeekSchedule(homeWeekOffset, homeWeekStart);
+        WeeklyScheduleStore.Schedule homeSchedule = homeWeekSchedule(homeWeekOffset, homeWeekStart, homeWeekConfirmed);
         int homeTrainingDays = countTrainingDays(homeSchedule.workoutDays);
 
         // Surface the exact saved plan when one exists; a generic recommendation must not
@@ -1027,32 +1032,46 @@ public final class MainActivity extends Activity {
         body.addView(next);
 
         gap(body, 20);
-        body.addView(heading("This week", 21, Color.WHITE));
-        body.addView(text("Weekly".equals(planMode) ? homeTrainingDays + " scheduled sessions · " + (7 - homeTrainingDays) + " Rest Days" : planSchedule(), 14, mint));
+        body.addView(heading(homeWeekOffset == 0 ? "This week" : "Selected week", 21, Color.WHITE));
+        String homeSummary = homeWeekConfirmed
+                ? homeTrainingDays + " scheduled session" + (homeTrainingDays == 1 ? " · " : "s · ") + (7 - homeTrainingDays) + " Rest Day" + (7 - homeTrainingDays == 1 ? "" : "s")
+                : "No sessions scheduled yet · choose a week to plan";
+        body.addView(text(homeSummary, 14, mint));
         gap(body, 9);
         LinearLayout weekly = card();
+        addHomeWeekHeader(weekly, homeWeekStart);
+        gap(weekly, 9);
         LinearLayout weekRow = new LinearLayout(this);
         weekRow.setOrientation(LinearLayout.HORIZONTAL);
         for (int i = 0; i < weekDays.length; i++) {
-            boolean workoutDay = "Weekly".equals(planMode) ? homeSchedule.workoutDays[i] : "Daily".equals(planMode) && dailyScheduledDay == i;
-            TextView day = text(weekDays[i] + "\n" + (workoutDay ? homeFocusForDay(i, homeSchedule) : "Rest"), 10, workoutDay ? navy : muted);
+            boolean workoutDay = homeWeekConfirmed && homeSchedule.workoutDays[i];
+            boolean isToday = homeWeekOffset == 0 && isToday(homeWeekStart, i);
+            String detail = workoutDay ? homeFocusForDay(i, homeSchedule) : homeWeekConfirmed ? "REST\nDAY" : "OPEN";
+            TextView day = text(weekDays[i] + "\n" + homeWeekDate(homeWeekStart, i) + "\n" + detail, 9, workoutDay ? navy : muted);
             day.setGravity(Gravity.CENTER);
-            day.setMaxLines(2);
+            day.setMaxLines(4);
             day.setLineSpacing(dp(3), 1);
             day.setPadding(dp(2), dp(5), dp(2), dp(5));
-            day.setBackground(surface(workoutDay ? mint : Color.rgb(232, 236, 244), 10, 0, Color.TRANSPARENT));
-            day.setContentDescription(weekDays[i] + (workoutDay ? ", " + homeFocusForDay(i, homeSchedule) + " planned" : ", Rest Day"));
-            LinearLayout.LayoutParams dayParams = new LinearLayout.LayoutParams(0, dp(59), 1);
+            day.setBackground(surface(workoutDay ? mint : Color.rgb(232, 236, 244), 10, isToday ? 2 : 0, isToday ? coral : Color.TRANSPARENT));
+            day.setContentDescription(weekDays[i] + " " + homeWeekDate(homeWeekStart, i)
+                    + (workoutDay ? ", " + homeFocusForDay(i, homeSchedule) + " planned" : homeWeekConfirmed ? ", Rest Day" : ", no plan set"));
+            LinearLayout.LayoutParams dayParams = new LinearLayout.LayoutParams(0, dp(76), 1);
             dayParams.rightMargin = i == weekDays.length - 1 ? 0 : dp(3);
             weekRow.addView(day, dayParams);
         }
         weekly.addView(weekRow);
-        TextView legend = text("Mint = planned workout  ·  pale = Rest Day", 12, muted);
+        TextView legend = text("Mint = planned workout  ·  slate = Rest Day" + (homeWeekConfirmed ? "" : "  ·  open = not planned"), 12, muted);
         legend.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams legendParams = new LinearLayout.LayoutParams(-1, -2);
         legendParams.topMargin = dp(8);
         weekly.addView(legend, legendParams);
         body.addView(weekly);
+
+        gap(body, 14);
+        body.addView(heading("Upcoming weeks", 19, Color.WHITE));
+        body.addView(text("Browse ahead without changing this week’s plan.", 13, mint));
+        gap(body, 8);
+        addUpcomingWeekCarousel(body);
 
         gap(body, 12);
         NutritionRecommendation.Day food = NutritionRecommendation.forToday();
@@ -1100,12 +1119,144 @@ public final class MainActivity extends Activity {
         addButton(body, plans);
     }
 
-    private WeeklyScheduleStore.Schedule currentWeekSchedule() {
+    private Calendar homeWeekStart(int offset) {
         Calendar current = Calendar.getInstance();
         current.setFirstDayOfWeek(Calendar.MONDAY);
         int sinceMonday = (current.get(Calendar.DAY_OF_WEEK) - Calendar.MONDAY + 7) % 7;
         current.add(Calendar.DAY_OF_YEAR, -sinceMonday);
-        return WeeklyScheduleStore.load(this, current, defaultWeeklyDays(), defaultWeeklyTargets());
+        current.add(Calendar.DAY_OF_YEAR, Math.max(0, offset) * 7);
+        return current;
+    }
+
+    private boolean hasHomeWeekSchedule(int offset, Calendar weekStart) {
+        if (offset == 0) return true;
+        return "Weekly".equals(planMode) && WeeklyScheduleStore.hasSavedSchedule(this, weekStart);
+    }
+
+    private WeeklyScheduleStore.Schedule homeWeekSchedule(int offset, Calendar weekStart, boolean confirmed) {
+        if (!confirmed) return new WeeklyScheduleStore.Schedule(new boolean[7], emptyWeeklyTargets());
+        if ("Daily".equals(planMode)) {
+            boolean[] days = new boolean[7];
+            days[Math.max(0, Math.min(6, dailyScheduledDay))] = true;
+            ArrayList<List<String>> focuses = emptyWeeklyTargets();
+            focuses.get(Math.max(0, Math.min(6, dailyScheduledDay))).add(target);
+            return new WeeklyScheduleStore.Schedule(days, focuses);
+        }
+        return WeeklyScheduleStore.load(this, weekStart, defaultWeeklyDays(), defaultWeeklyTargets());
+    }
+
+    private ArrayList<List<String>> emptyWeeklyTargets() {
+        ArrayList<List<String>> targets = new ArrayList<>();
+        for (int i = 0; i < 7; i++) targets.add(new ArrayList<>());
+        return targets;
+    }
+
+    private void addHomeWeekHeader(LinearLayout container, Calendar weekStart) {
+        LinearLayout header = new LinearLayout(this);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        TextView previous = homeWeekArrow("‹", homeWeekOffset > 0, view -> {
+            homeWeekOffset--;
+            showHome();
+        });
+        header.addView(previous, new LinearLayout.LayoutParams(dp(38), dp(38)));
+        TextView label = heading(homeWeekRange(weekStart), 18, ink);
+        label.setGravity(Gravity.CENTER);
+        header.addView(label, new LinearLayout.LayoutParams(0, dp(42), 1));
+        TextView next = homeWeekArrow("›", homeWeekOffset < HOME_UPCOMING_WEEK_COUNT, view -> {
+            homeWeekOffset++;
+            showHome();
+        });
+        header.addView(next, new LinearLayout.LayoutParams(dp(38), dp(38)));
+        container.addView(header);
+    }
+
+    private TextView homeWeekArrow(String symbol, boolean enabled, View.OnClickListener listener) {
+        TextView arrow = heading(symbol, 29, enabled ? ink : cardLine);
+        arrow.setGravity(Gravity.CENTER);
+        arrow.setBackground(surface(enabled ? Color.rgb(240, 244, 249) : Color.rgb(247, 248, 252), 99, 1, cardLine));
+        arrow.setClickable(enabled);
+        arrow.setFocusable(enabled);
+        if (enabled) arrow.setOnClickListener(listener);
+        arrow.setContentDescription(("‹".equals(symbol) ? "Previous" : "Next") + " schedule week");
+        return arrow;
+    }
+
+    private void addUpcomingWeekCarousel(LinearLayout body) {
+        HorizontalScrollView scroll = new HorizontalScrollView(this);
+        scroll.setHorizontalScrollBarEnabled(false);
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        for (int offset = 1; offset <= HOME_UPCOMING_WEEK_COUNT; offset++) {
+            Calendar weekStart = homeWeekStart(offset);
+            boolean confirmed = hasHomeWeekSchedule(offset, weekStart);
+            WeeklyScheduleStore.Schedule schedule = homeWeekSchedule(offset, weekStart, confirmed);
+            LinearLayout tile = upcomingWeekTile(offset, weekStart, schedule, confirmed);
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(dp(206), -2);
+            params.rightMargin = dp(9);
+            row.addView(tile, params);
+        }
+        scroll.addView(row, new HorizontalScrollView.LayoutParams(-2, -2));
+        body.addView(scroll, new LinearLayout.LayoutParams(-1, -2));
+        gap(body, 9);
+        Button browse = lightAction("Browse all weeks");
+        browse.setOnClickListener(view -> showWizard());
+        addButton(body, browse);
+    }
+
+    private LinearLayout upcomingWeekTile(int offset, Calendar weekStart, WeeklyScheduleStore.Schedule schedule, boolean confirmed) {
+        LinearLayout tile = new LinearLayout(this);
+        tile.setOrientation(LinearLayout.VERTICAL);
+        tile.setPadding(dp(11), dp(10), dp(11), dp(10));
+        boolean selected = offset == homeWeekOffset;
+        tile.setBackground(surface(paper, 15, selected ? 2 : 1, selected ? mint : cardLine));
+        tile.setClickable(true);
+        tile.setFocusable(true);
+        tile.setOnClickListener(view -> {
+            homeWeekOffset = offset;
+            showHome();
+        });
+        tile.addView(heading(homeWeekRange(weekStart), 15, ink));
+        int sessions = countTrainingDays(schedule.workoutDays);
+        tile.addView(text(confirmed ? sessions + " session" + (sessions == 1 ? "" : "s") + " planned" : "No plan set yet", 12, muted));
+        LinearLayout blocks = new LinearLayout(this);
+        blocks.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams blocksParams = new LinearLayout.LayoutParams(-1, dp(17));
+        blocksParams.topMargin = dp(9);
+        for (int day = 0; day < 7; day++) {
+            TextView block = new TextView(this);
+            block.setGravity(Gravity.CENTER);
+            block.setText(schedule.workoutDays[day] ? "•" : confirmed ? "–" : "");
+            block.setTextSize(13);
+            block.setTextColor(schedule.workoutDays[day] ? navy : muted);
+            block.setBackground(surface(schedule.workoutDays[day] ? mint : confirmed ? Color.rgb(218, 226, 239) : Color.rgb(239, 242, 247), 5, 0, Color.TRANSPARENT));
+            LinearLayout.LayoutParams blockParams = new LinearLayout.LayoutParams(0, dp(17), 1);
+            blockParams.rightMargin = day == 6 ? 0 : dp(3);
+            blocks.addView(block, blockParams);
+        }
+        tile.addView(blocks, blocksParams);
+        tile.setContentDescription(homeWeekRange(weekStart) + ", " + (confirmed ? sessions + " scheduled sessions" : "no plan set") + ". Open this week.");
+        return tile;
+    }
+
+    private String homeWeekRange(Calendar weekStart) {
+        Calendar end = (Calendar) weekStart.clone();
+        end.add(Calendar.DAY_OF_YEAR, 6);
+        SimpleDateFormat startFormat = new SimpleDateFormat("MMM d", Locale.getDefault());
+        SimpleDateFormat endFormat = new SimpleDateFormat(weekStart.get(Calendar.MONTH) == end.get(Calendar.MONTH) ? "d" : "MMM d", Locale.getDefault());
+        return startFormat.format(weekStart.getTime()) + "–" + endFormat.format(end.getTime());
+    }
+
+    private int homeWeekDate(Calendar weekStart, int index) {
+        Calendar date = (Calendar) weekStart.clone();
+        date.add(Calendar.DAY_OF_YEAR, index);
+        return date.get(Calendar.DAY_OF_MONTH);
+    }
+
+    private boolean isToday(Calendar weekStart, int index) {
+        Calendar date = (Calendar) weekStart.clone();
+        date.add(Calendar.DAY_OF_YEAR, index);
+        Calendar today = Calendar.getInstance();
+        return date.get(Calendar.YEAR) == today.get(Calendar.YEAR) && date.get(Calendar.DAY_OF_YEAR) == today.get(Calendar.DAY_OF_YEAR);
     }
 
     private int countTrainingDays(boolean[] days) {

@@ -1,5 +1,9 @@
 # OTA delivery: mobile-data reliability and release safety
 
+## 3.7 release note
+
+Version 3.7 adds the browseable home schedule calendar. It is presentation-only: selecting a future week on Home never rewrites the independently stored plan for the current week. Future weeks with no saved schedule are explicitly shown as open, preserving the distinction between an intentional rest day and a week that has not yet been planned.
+
 ## What changed in 3.6
 
 The direct-APK updater now delegates package transfer to Android `DownloadManager` rather than keeping a one-shot network stream inside the activity. Android retains the transfer when the app backgrounds, temporarily loses a cellular signal, or recreates the process. The app persists the update version, URL, SHA-256, byte size, and download ID so the update screen can restore an in-progress or verified package even if refreshing the release manifest temporarily fails.

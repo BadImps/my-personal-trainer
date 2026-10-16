@@ -35,6 +35,11 @@ public final class WeeklyScheduleStore {
         return new Schedule(decodeDays(encodedDays, fallbackDays), decodeTargets(encodedTargets, fallbackTargets));
     }
 
+    /** True only when the person has explicitly saved this week's plan; default planner suggestions do not count. */
+    public static boolean hasSavedSchedule(Context context, Calendar weekStart) {
+        return preferences(context).contains("days_" + key(weekStart));
+    }
+
     public static void save(Context context, Calendar weekStart, boolean[] days, List<List<String>> targets) {
         Schedule copy = copyOf(days, targets);
         preferences(context).edit()

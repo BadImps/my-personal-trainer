@@ -47,6 +47,18 @@ public final class WeeklyScheduleStoreTest {
         assertEquals("Legs", restoredUpcoming.targets.get(0).get(0));
     }
 
+    @Test public void savedScheduleIsDistinctFromPlannerFallback() {
+        Calendar week = Calendar.getInstance();
+        week.set(Calendar.DAY_OF_WEEK, Calendar.MONDAY);
+        assertFalse(WeeklyScheduleStore.hasSavedSchedule(context, week));
+
+        WeeklyScheduleStore.save(context, week, new boolean[]{true, false, false, false, false, false, false}, targets("Upper"));
+
+        assertTrue(WeeklyScheduleStore.hasSavedSchedule(context, week));
+        WeeklyScheduleStore.clear(context);
+        assertFalse(WeeklyScheduleStore.hasSavedSchedule(context, week));
+    }
+
     private static List<List<String>> targets(String focus) {
         ArrayList<List<String>> all = new ArrayList<>();
         for (int i = 0; i < 7; i++) {
