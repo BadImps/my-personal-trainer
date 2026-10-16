@@ -4,7 +4,7 @@
   "versionName": "3.8",
   "publishedAt": "2026-10-16T19:00:00Z",
   "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v3.8/My-Personal-Trainer-3.8.apk",
-  "sha256": "77f0e50825cbc799be17b8c3a27fb9ece88fe7444120b169c4a12222b9b5360e",
+  "sha256": "0a598c74359a681487ba587fd5774665188d57c697446078d12667ab5f1907d9",
   "sizeBytes": 84161821,
   "notes": "Fixes mobile-data update checks that time out before downloading. The app now retries the verified manifest through an independently routed GitHub Raw endpoint and provides a manual release link if both routes are unavailable."
 }
