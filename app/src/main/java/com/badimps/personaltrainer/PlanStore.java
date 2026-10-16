@@ -15,12 +15,13 @@ public final class PlanStore {
 
     public static final class SavedPlan {
         public final String mode, target, equipment, focusTargets, weeklyTargets, weeklyExerciseNames;
-        public final int minutes, weightKg, sets, reps, restSeconds, cooldownSeconds;
+        public final int minutes, weightKg, sets, reps, restSeconds, cooldownSeconds, reminderHour, reminderMinute;
+        public final boolean reminderEnabled;
         public final String weeklyDays;
         public final int scheduledDay, weekOffset;
         public final List<String> exerciseNames;
 
-        SavedPlan(String mode, String target, String equipment, int minutes, int weightKg, int sets, int reps, int restSeconds, int cooldownSeconds, String weeklyDays, String focusTargets, String weeklyTargets, String weeklyExerciseNames, int scheduledDay, int weekOffset, List<String> exerciseNames) {
+        SavedPlan(String mode, String target, String equipment, int minutes, int weightKg, int sets, int reps, int restSeconds, int cooldownSeconds, boolean reminderEnabled, int reminderHour, int reminderMinute, String weeklyDays, String focusTargets, String weeklyTargets, String weeklyExerciseNames, int scheduledDay, int weekOffset, List<String> exerciseNames) {
             this.mode = mode;
             this.target = target;
             this.equipment = equipment;
@@ -30,6 +31,9 @@ public final class PlanStore {
             this.reps = reps;
             this.restSeconds = restSeconds;
             this.cooldownSeconds = cooldownSeconds;
+            this.reminderEnabled = reminderEnabled;
+            this.reminderHour = reminderHour;
+            this.reminderMinute = reminderMinute;
             this.weeklyDays = weeklyDays;
             this.focusTargets = focusTargets;
             this.weeklyTargets = weeklyTargets;
@@ -56,6 +60,11 @@ public final class PlanStore {
 
     /** Persists distinct between-set rest and between-exercise cooldown choices. */
     public static void save(Context context, String mode, String target, String equipment, int minutes, int weightKg, int sets, int reps, int restSeconds, int cooldownSeconds, boolean[] weeklyDays, String focusTargets, String weeklyTargets, String weeklyExerciseNames, int scheduledDay, int weekOffset, List<Coach.Exercise> exercises) {
+        save(context, mode, target, equipment, minutes, weightKg, sets, reps, restSeconds, cooldownSeconds, false, 18, 0, weeklyDays, focusTargets, weeklyTargets, weeklyExerciseNames, scheduledDay, weekOffset, exercises);
+    }
+
+    /** Persists an optional local coach reminder alongside the plan. */
+    public static void save(Context context, String mode, String target, String equipment, int minutes, int weightKg, int sets, int reps, int restSeconds, int cooldownSeconds, boolean reminderEnabled, int reminderHour, int reminderMinute, boolean[] weeklyDays, String focusTargets, String weeklyTargets, String weeklyExerciseNames, int scheduledDay, int weekOffset, List<Coach.Exercise> exercises) {
         ArrayList<String> names = new ArrayList<>();
         for (Coach.Exercise exercise : exercises) names.add(exercise.name);
         preferences(context).edit()
@@ -69,6 +78,9 @@ public final class PlanStore {
                 .putInt("reps", reps)
                 .putInt("rest", restSeconds)
                 .putInt("cooldown", WorkoutTiming.normalizeCooldownSeconds(cooldownSeconds))
+                .putBoolean("reminder_enabled", reminderEnabled)
+                .putInt("reminder_hour", Math.max(0, Math.min(23, reminderHour)))
+                .putInt("reminder_minute", Math.max(0, Math.min(59, reminderMinute)))
                 .putString("weekly_days", encodeWeeklyDays(weeklyDays))
                 .putString("focus_targets", focusTargets)
                 .putString("weekly_targets", weeklyTargets)
@@ -94,12 +106,15 @@ public final class PlanStore {
                 preferences.getInt("reps", 10),
                 preferences.getInt("rest", 90),
                 preferences.getInt("cooldown", WorkoutTiming.DEFAULT_COOLDOWN_SECONDS),
+                preferences.getBoolean("reminder_enabled", false),
+                preferences.getInt("reminder_hour", 18),
+                preferences.getInt("reminder_minute", 0),
                 preferences.getString("weekly_days", "1,0,1,0,1,0,0"),
                 preferences.getString("focus_targets", preferences.getString("target", "Full Body")),
                 preferences.getString("weekly_targets", ""),
                 preferences.getString("weekly_exercises", ""),
                 preferences.getInt("scheduled_day", 2),
-                preferences.getInt("week_offset", 1),
+                preferences.getInt("week_offset", 0),
                 names);
     }
 

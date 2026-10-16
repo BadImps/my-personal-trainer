@@ -9,7 +9,11 @@ import java.util.Map;
 /** Offline training templates. These are general fitness suggestions, not medical advice. */
 public final class Coach {
     /** Training areas are deliberately separate from the equipment choice. */
-    public static final String[] TARGETS = {"Upper", "Lower", "Arms", "Chest", "Legs", "Back & Core", "Cardio", "Mobility", "Full Body"};
+    /**
+     * The planning focuses intentionally keep Back, Shoulders, Core and Endurance separate.
+     * There is no standalone "Abs" category: trunk work belongs under the more complete Core focus.
+     */
+    public static final String[] TARGETS = {"Upper", "Lower", "Arms", "Chest", "Legs", "Back", "Shoulders", "Core", "Endurance", "Mobility", "Full Body"};
     public static final String[] GOALS = {"Build strength", "Build muscle", "Reduce body fat", "Improve endurance", "Move & feel good"};
     public static final String[] ENVIRONMENTS = {"Gym", "Home — no equipment", "Home — dumbbells", "Outdoors"};
     public static final String[] PLAN_MODES = {"Weekly", "Daily", "Custom"};
@@ -31,6 +35,10 @@ public final class Coach {
         add("Arms", ex("Biceps Curl", "Arms", "Keep elbows beside your ribs.", "Biceps isolation."), ex("Overhead Triceps Extension", "Arms", "Keep elbows aimed forward.", "Triceps strength."), ex("Hammer Curl", "Arms", "Keep palms facing in.", "Forearms and biceps."), ex("Bench Dip", "Arms", "Shoulders stay away from ears.", "Triceps bodyweight work."));
         add("Chest", ex("Push-up", "Chest", "Brace your core; press the floor away.", "Chest, shoulders and triceps."), ex("Floor Press", "Chest", "Pause lightly, then press smoothly.", "Chest pressing with a safe range."), ex("Chest Fly", "Chest", "Hug a big tree; use a light load.", "Chest isolation."), ex("Incline Push-up", "Chest", "Body moves as one unit.", "A scalable push-up."));
         add("Legs", ex("Bodyweight Squat", "Legs", "Knees follow your toes.", "Leg strength and mobility."), ex("Walking Lunge", "Legs", "Stay tall as you step.", "Quads, glutes and balance."), ex("Calf Raise", "Legs", "Pause high, lower slowly.", "Calf strength."), ex("Wall Sit", "Legs", "Press your back into the wall.", "Leg endurance."));
+        add("Back", ex("One-arm Row", "Back", "Pull your elbow toward your hip without twisting.", "Upper-back pulling strength."), ex("Lat Pulldown", "Back", "Keep ribs down and pull toward the upper chest.", "Vertical back pulling."), ex("Seated Cable Row", "Back", "Sit tall and pull toward your ribs.", "Mid-back control."), ex("Prone Snow Angel", "Back", "Move slowly and keep the neck long.", "No-equipment upper-back control."));
+        add("Shoulders", ex("Dumbbell Press", "Shoulders", "Press tall while keeping ribs down.", "Shoulder and triceps strength."), ex("Lateral Raise", "Shoulders", "Lift only to shoulder height with a soft elbow.", "Side-shoulder control."), ex("Band Pull-apart", "Shoulders", "Open across the chest; squeeze shoulder blades.", "Rear-shoulder and posture support."), ex("Shoulder Wall Slide", "Shoulders", "Keep the range smooth and comfortable.", "Shoulder control and mobility."));
+        add("Core", ex("Dead Bug", "Core", "Keep your low back gently grounded.", "Deep trunk stability."), ex("Bird Dog", "Core", "Reach long without rotating through your torso.", "Cross-body core control."), ex("Side Plank", "Core", "Press the floor away and keep a long line.", "Lateral trunk stability."), ex("Mountain Climber", "Core", "Keep shoulders stacked over hands.", "Core control with conditioning."));
+        add("Endurance", ex("Brisk March", "Endurance", "Land softly and swing your arms.", "Low-impact aerobic conditioning."), ex("Step-up", "Endurance", "Use a stable step and drive through the whole foot.", "Leg and cardio conditioning."), ex("Jumping Jack", "Endurance", "Choose a step-out version if needed.", "Full-body aerobic work."), ex("Mountain Climber", "Endurance", "Keep shoulders stacked over hands.", "Higher-intensity conditioning."));
         add("Back & Core", ex("Bird Dog", "Back & Core", "Reach long without twisting.", "Core stability and back control."), ex("Dead Bug", "Back & Core", "Keep your low back gently grounded.", "Deep core control."), ex("Superman Hold", "Back & Core", "Lift lightly; keep your neck long.", "Back-body endurance."), ex("Side Plank", "Back & Core", "Press the floor away and stay tall.", "Oblique and shoulder stability."));
         add("Cardio", ex("Brisk March", "Cardio", "Land softly and swing your arms.", "Low-impact heart-rate work."), ex("Mountain Climber", "Cardio", "Keep shoulders stacked over hands.", "Core and conditioning."), ex("Step-up", "Cardio", "Use a stable step and drive through the whole foot.", "Leg and cardio conditioning."), ex("Jumping Jack", "Cardio", "Choose a step-out version if needed.", "Simple full-body cardio."));
         add("Mobility", ex("Cat Cow", "Mobility", "Move slowly with your breath.", "Gentle spinal mobility."), ex("World's Greatest Stretch", "Mobility", "Keep the range comfortable.", "Hips, hamstrings and upper back."), ex("90/90 Hip Switch", "Mobility", "Use your hands for support if needed.", "Hip rotation control."), ex("Shoulder Wall Slide", "Mobility", "Keep ribs soft and arms smooth.", "Shoulder mobility."));
@@ -133,6 +141,22 @@ public final class Coach {
     }
 
     private static List<Exercise> dumbbellOptions(String target) {
+        if ("Back".equals(target)) return options(
+                ex("One-arm Row", target, "Pull your elbow toward your hip; avoid twisting.", "Dumbbell upper-back pulling."),
+                ex("Incline Reverse Fly", target, "Keep a soft elbow and raise with control.", "Dumbbell rear-shoulder and upper-back work."),
+                ex("Dumbbell Pullover", target, "Keep ribs down and move only through a comfortable range.", "Dumbbell lats and trunk control."));
+        if ("Shoulders".equals(target)) return options(
+                ex("Dumbbell Press", target, "Press tall; ribs stay down.", "Dumbbell shoulder pressing."),
+                ex("Lateral Raise", target, "Lift to shoulder height with a soft elbow.", "Dumbbell side-shoulder control."),
+                ex("Front Raise", target, "Keep the torso still and use a light load.", "Dumbbell front-shoulder control."));
+        if ("Core".equals(target)) return options(
+                ex("Dumbbell Dead Bug", target, "Move slowly while keeping your low back gently grounded.", "Loaded trunk stability."),
+                ex("Suitcase Carry", target, "Stand tall and do not lean into the weight.", "One-sided carry for core control."),
+                ex("Renegade Row", target, "Resist twisting through your hips.", "Dumbbell core and upper-back control."));
+        if ("Endurance".equals(target)) return options(
+                ex("Dumbbell Squat to Press", target, "Use a controlled squat and smooth overhead press.", "Full-body dumbbell conditioning."),
+                ex("Dumbbell March", target, "Stand tall, move steadily and keep the load close.", "Low-impact loaded conditioning."),
+                ex("Dumbbell Step-up", target, "Use a stable step and keep a controlled pace.", "Leg and aerobic conditioning."));
         if ("Chest".equals(target)) return options(
                 ex("Floor Press", "Chest", "Pause lightly, then press smoothly.", "Dumbbell chest pressing from the floor."),
                 ex("Chest Fly", "Chest", "Hug a big tree; use a light load.", "Dumbbell chest isolation."),
@@ -157,6 +181,22 @@ public final class Coach {
     }
 
     private static List<Exercise> householdOptions(String target) {
+        if ("Back".equals(target)) return options(
+                ex("Backpack Row", target, "Keep the load close and pull your elbow toward your hip.", "Household-weight back training."),
+                ex("Towel Pull-apart", target, "Keep the towel taut and squeeze your shoulder blades.", "Light home upper-back work."),
+                ex("Prone Snow Angel", target, "Move slowly and keep your neck long.", "No-equipment upper-back control."));
+        if ("Shoulders".equals(target)) return options(
+                ex("Water Bottle Lateral Raise", target, "Use a light load and lift only to shoulder height.", "Household shoulder control."),
+                ex("Shoulder Wall Slide", target, "Keep the range smooth and comfortable.", "No-equipment shoulder control."),
+                ex("Pike Push-up", target, "Press the floor away; keep your neck long.", "Bodyweight shoulder pressing."));
+        if ("Core".equals(target)) return options(
+                ex("Dead Bug", target, "Keep your low back gently grounded.", "Floor-based core stability."),
+                ex("Bird Dog", target, "Reach long without rotating through your torso.", "Cross-body trunk control."),
+                ex("Side Plank", target, "Press the floor away and stay tall.", "Lateral core stability."));
+        if ("Endurance".equals(target)) return options(
+                ex("Step-up", target, "Use a stable step and drive through the whole foot.", "Home cardio with a stable step."),
+                ex("Brisk March", target, "Land softly and keep a steady pace.", "Low-impact home conditioning."),
+                ex("Jumping Jack", target, "Choose a step-out version if needed.", "Full-body home cardio."));
         if ("Chest".equals(target)) return options(
                 ex("Push-up", target, "Brace your core; press the floor away.", "No-equipment chest pressing."),
                 ex("Incline Push-up", target, "Body moves as one unit.", "Use a sturdy counter or bench."),
@@ -173,6 +213,26 @@ public final class Coach {
     }
 
     private static List<Exercise> machineOptions(String target) {
+        if ("Back".equals(target)) return options(
+                ex("Lat Pulldown", target, "Keep ribs down and pull toward your upper chest.", "Selectorized vertical pulling."),
+                ex("Seated Cable Row", target, "Stay tall and pull the handle toward your ribs.", "Cable mid-back work."),
+                ex("Machine High Row", target, "Pull through your elbows without shrugging.", "Guided upper-back pulling."),
+                ex("Assisted Pull-up", target, "Keep your shoulders down as you pull.", "Counterweighted back strength."));
+        if ("Shoulders".equals(target)) return options(
+                ex("Machine Shoulder Press", target, "Keep ribs down and press smoothly.", "Guided shoulder pressing."),
+                ex("Cable Lateral Raise", target, "Lift with control and keep a soft elbow.", "Cable side-shoulder resistance."),
+                ex("Reverse Pec Deck", target, "Open your arms without shrugging.", "Machine rear-shoulder work."),
+                ex("Cable Face Pull", target, "Draw the rope toward eye level with control.", "Cable rear-shoulder support."));
+        if ("Core".equals(target)) return options(
+                ex("Cable Pallof Press", target, "Press straight out and resist rotation.", "Cable anti-rotation core work."),
+                ex("Cable Wood Chop", target, "Rotate smoothly through your upper body; keep hips stable.", "Cable rotational core control."),
+                ex("Rotary Torso Machine", target, "Use a comfortable range and move without jerking.", "Guided rotational trunk work."),
+                ex("Captain's Chair Knee Raise", target, "Keep the movement controlled; avoid swinging.", "Supported core control."));
+        if ("Endurance".equals(target)) return options(
+                ex("Treadmill Incline Walk", target, "Choose a sustainable pace and keep a tall posture.", "Low-impact machine cardio."),
+                ex("Stationary Bike", target, "Set the seat comfortably and pedal at a steady rhythm.", "Joint-friendly aerobic work."),
+                ex("Rowing Machine", target, "Drive with legs, then pull; return in control.", "Full-body machine conditioning."),
+                ex("Elliptical Trainer", target, "Keep a smooth, comfortable stride.", "Low-impact aerobic conditioning."));
         if ("Chest".equals(target)) return options(
                 ex("Machine Chest Press", target, "Set handles at mid-chest; stop short of locking out.", "Guided machine pressing."),
                 ex("Seated Cable Press", target, "Press forward without shrugging.", "Controlled cable chest pressing."),
@@ -201,6 +261,24 @@ public final class Coach {
     }
 
     private static List<Exercise> bodyweightOptions(String target) {
+        if ("Back".equals(target)) return options(
+                ex("Prone Snow Angel", target, "Move slowly and keep your neck long.", "No-equipment upper-back control."),
+                ex("Superman Hold", target, "Lift lightly and keep the neck long.", "Back-body endurance."),
+                ex("Prone Y Raise", target, "Reach long without shrugging.", "Bodyweight upper-back and shoulder control."));
+        if ("Shoulders".equals(target)) return options(
+                ex("Pike Push-up", target, "Press the floor away; keep your neck long.", "Bodyweight shoulder pressing."),
+                ex("Shoulder Wall Slide", target, "Keep ribs soft and arms smooth.", "Shoulder mobility and control."),
+                ex("Plank Shoulder Tap", target, "Keep your hips as still as possible.", "Bodyweight shoulder stability."));
+        if ("Core".equals(target)) return options(
+                ex("Dead Bug", target, "Keep your low back gently grounded.", "Deep trunk stability."),
+                ex("Bird Dog", target, "Reach long without twisting.", "Cross-body core control."),
+                ex("Side Plank", target, "Press the floor away and stay tall.", "Lateral trunk stability."),
+                ex("Mountain Climber", target, "Keep shoulders stacked over hands.", "Core control with conditioning."));
+        if ("Endurance".equals(target)) return options(
+                ex("Brisk March", target, "Land softly and keep a steady pace.", "Low-impact aerobic work."),
+                ex("Jumping Jack", target, "Choose a step-out version if needed.", "Full-body aerobic conditioning."),
+                ex("Step-up", target, "Use a stable step and drive through the whole foot.", "Leg and cardio conditioning."),
+                ex("Burpee", target, "Choose a step-back option when needed.", "Higher-intensity full-body conditioning."));
         if ("Chest".equals(target)) return options(
                 ex("Push-up", target, "Brace your core; press the floor away.", "Bodyweight chest pressing."),
                 ex("Incline Push-up", target, "Body moves as one unit.", "A scalable bodyweight press."),

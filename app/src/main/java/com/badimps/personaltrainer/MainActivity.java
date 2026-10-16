@@ -3,7 +3,9 @@ package com.badimps.personaltrainer;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Dialog;
+import android.Manifest;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.Typeface;
@@ -51,6 +53,7 @@ import java.text.SimpleDateFormat;
 
 /** The complete on-device My Personal Trainer experience. */
 public final class MainActivity extends Activity {
+    public static final String EXTRA_START_GUIDED_WORKOUT = "start_guided_workout";
     private final int navy = Color.rgb(16, 23, 42);
     private final int navyPanel = Color.rgb(26, 58, 72);
     private final int coral = Color.rgb(255, 107, 95);
@@ -59,8 +62,8 @@ public final class MainActivity extends Activity {
     private final int ink = Color.rgb(43, 52, 77);
     private final int muted = Color.rgb(107, 122, 147);
     private final int cardLine = Color.rgb(218, 226, 233);
-    /** The six image-led targets in the approved plan-flow reference. */
-    private static final String[] WIZARD_TARGETS = {"Upper", "Lower", "Arms", "Chest", "Legs", "Full Body"};
+    /** Image-led focuses for the approved plan-flow. Core includes trunk work; there is no Abs category. */
+    private static final String[] WIZARD_TARGETS = {"Upper", "Lower", "Arms", "Chest", "Legs", "Full Body", "Back", "Shoulders", "Core", "Endurance"};
 
     private String goal = Coach.GOALS[1];
     private String target = "Full Body";
@@ -77,6 +80,9 @@ public final class MainActivity extends Activity {
     private int planReps = 10;
     private int planRestSeconds = 180;
     private int planCooldownSeconds = WorkoutTiming.DEFAULT_COOLDOWN_SECONDS;
+    private boolean planReminderEnabled;
+    private int planReminderHour = 18;
+    private int planReminderMinute = 0;
     private final String[] weekDays = {"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"};
     /** Monday / Wednesday / Friday is the default weekly rhythm; unselected days are explicit rest days. */
     private boolean[] weeklyWorkoutDays = {true, false, true, false, true, false, false};
@@ -86,7 +92,7 @@ public final class MainActivity extends Activity {
     private final List<List<Coach.Exercise>> weeklySessions = new ArrayList<>();
     private int activeScheduleDay = 2;
     private int dailyScheduledDay = 2;
-    private int selectedWeekOffset = 1;
+    private int selectedWeekOffset;
     private List<Coach.Exercise> session = new ArrayList<>();
     private List<Coach.Exercise> availableExercises = new ArrayList<>();
     private List<Coach.Exercise> selectedExercises = new ArrayList<>();
@@ -138,7 +144,8 @@ public final class MainActivity extends Activity {
         initialisePlanSelections();
         restoreSavedPlan();
         if (hasLocalAccount) {
-            showHome();
+            if (getIntent().getBooleanExtra(EXTRA_START_GUIDED_WORKOUT, false) && !session.isEmpty()) showWorkoutCountdown();
+            else showHome();
         } else {
             showWelcome();
         }
@@ -260,6 +267,63 @@ public final class MainActivity extends Activity {
 
     private String scheduledDateSummary(int index) {
         return new SimpleDateFormat("EEEE, MMM d", Locale.getDefault()).format(selectedWeekDate(index).getTime());
+    }
+
+    /** Planning can move from the current week through the final week that begins this month. */
+    private int maxSelectableWeekOffset() {
+        Calendar current = Calendar.getInstance();
+        current.setFirstDayOfWeek(Calendar.MONDAY);
+        current.set(Calendar.HOUR_OF_DAY, 0);
+        current.set(Calendar.MINUTE, 0);
+        current.set(Calendar.SECOND, 0);
+        current.set(Calendar.MILLISECOND, 0);
+        int sinceMonday = (current.get(Calendar.DAY_OF_WEEK) - Calendar.MONDAY + 7) % 7;
+        current.add(Calendar.DAY_OF_YEAR, -sinceMonday);
+        Calendar monthEnd = Calendar.getInstance();
+        monthEnd.set(Calendar.DAY_OF_MONTH, monthEnd.getActualMaximum(Calendar.DAY_OF_MONTH));
+        monthEnd.set(Calendar.HOUR_OF_DAY, 23);
+        monthEnd.set(Calendar.MINUTE, 59);
+        long days = Math.max(0L, (monthEnd.getTimeInMillis() - current.getTimeInMillis()) / (24L * 60L * 60L * 1000L));
+        return (int) (days / 7L);
+    }
+
+    private boolean[] defaultWeeklyDays() {
+        return new boolean[]{true, false, true, false, true, false, false};
+    }
+
+    private List<List<String>> defaultWeeklyTargets() {
+        ArrayList<List<String>> defaults = new ArrayList<>();
+        boolean[] days = defaultWeeklyDays();
+        for (int i = 0; i < 7; i++) {
+            ArrayList<String> focuses = new ArrayList<>();
+            if (days[i]) focuses.add(target);
+            defaults.add(focuses);
+        }
+        return defaults;
+    }
+
+    private void persistCurrentWeekSchedule() {
+        if (!"Weekly".equals(planMode)) return;
+        WeeklyScheduleStore.save(this, selectedWeekStart(), weeklyWorkoutDays, weeklyDayTargets);
+    }
+
+    private void loadSelectedWeekSchedule() {
+        WeeklyScheduleStore.Schedule stored = WeeklyScheduleStore.load(this, selectedWeekStart(), defaultWeeklyDays(), defaultWeeklyTargets());
+        weeklyWorkoutDays = stored.workoutDays;
+        weeklyDayTargets.clear();
+        weeklyDayTargets.addAll(stored.targets);
+        initialisePlanSelections();
+        syncTrainingDays();
+        if (!weeklyWorkoutDays[activeScheduleDay]) {
+            for (int i = 0; i < weeklyWorkoutDays.length; i++) if (weeklyWorkoutDays[i]) { activeScheduleDay = i; break; }
+        }
+        syncPrimaryTarget();
+    }
+
+    private void selectPlanningWeek(int requestedOffset) {
+        if ("Weekly".equals(planMode)) persistCurrentWeekSchedule();
+        selectedWeekOffset = Math.max(0, Math.min(maxSelectableWeekOffset(), requestedOffset));
+        if ("Weekly".equals(planMode)) loadSelectedWeekSchedule();
     }
 
     private String[] wizardLabels() {
@@ -874,6 +938,8 @@ public final class MainActivity extends Activity {
         AccountStore.Profile profile = AccountStore.get(this);
         LinearLayout body = appPage("Home");
         title(body, "TODAY", "Train with purpose", "Showing up today builds a stronger tomorrow.");
+        WeeklyScheduleStore.Schedule homeSchedule = currentWeekSchedule();
+        int homeTrainingDays = countTrainingDays(homeSchedule.workoutDays);
 
         // Surface the exact saved plan when one exists; a generic recommendation must not
         // silently replace the movements the user chose in the builder.
@@ -901,25 +967,56 @@ public final class MainActivity extends Activity {
 
         gap(body, 20);
         body.addView(heading("This week", 21, Color.WHITE));
-        body.addView(text("Weekly".equals(planMode) ? trainingDays + " workout days · " + (7 - trainingDays) + " rest days" : planSchedule(), 14, mint));
+        body.addView(text("Weekly".equals(planMode) ? homeTrainingDays + " scheduled sessions · " + (7 - homeTrainingDays) + " Rest Days" : planSchedule(), 14, mint));
         gap(body, 9);
         LinearLayout weekly = card();
         LinearLayout weekRow = new LinearLayout(this);
         weekRow.setOrientation(LinearLayout.HORIZONTAL);
         for (int i = 0; i < weekDays.length; i++) {
-            boolean workoutDay = "Weekly".equals(planMode) && weeklyWorkoutDays[i];
-            String state = workoutDay ? "•" : "Rest";
-            TextView day = text(weekDays[i] + "\n" + state, 11, workoutDay ? navy : muted);
+            boolean workoutDay = "Weekly".equals(planMode) ? homeSchedule.workoutDays[i] : "Daily".equals(planMode) && dailyScheduledDay == i;
+            TextView day = text(weekDays[i] + "\n" + (workoutDay ? homeFocusForDay(i, homeSchedule) : "Rest"), 10, workoutDay ? navy : muted);
             day.setGravity(Gravity.CENTER);
-            day.setLineSpacing(dp(5), 1);
-            day.setContentDescription(weekDays[i] + (workoutDay ? ", scheduled workout day" : ", rest day"));
-            weekRow.addView(day, new LinearLayout.LayoutParams(0, dp(49), 1));
+            day.setMaxLines(2);
+            day.setLineSpacing(dp(3), 1);
+            day.setPadding(dp(2), dp(5), dp(2), dp(5));
+            day.setBackground(surface(workoutDay ? mint : Color.rgb(232, 236, 244), 10, 0, Color.TRANSPARENT));
+            day.setContentDescription(weekDays[i] + (workoutDay ? ", " + homeFocusForDay(i, homeSchedule) + " planned" : ", Rest Day"));
+            LinearLayout.LayoutParams dayParams = new LinearLayout.LayoutParams(0, dp(59), 1);
+            dayParams.rightMargin = i == weekDays.length - 1 ? 0 : dp(3);
+            weekRow.addView(day, dayParams);
         }
         weekly.addView(weekRow);
-        TextView legend = text("• workout day  ·  Rest recovery day", 12, muted);
+        TextView legend = text("Mint = planned workout  ·  pale = Rest Day", 12, muted);
         legend.setGravity(Gravity.CENTER);
-        weekly.addView(legend, new LinearLayout.LayoutParams(-1, -2));
+        LinearLayout.LayoutParams legendParams = new LinearLayout.LayoutParams(-1, -2);
+        legendParams.topMargin = dp(8);
+        weekly.addView(legend, legendParams);
         body.addView(weekly);
+
+        gap(body, 12);
+        NutritionRecommendation.Day food = NutritionRecommendation.forToday();
+        LinearLayout fuel = card();
+        fuel.addView(heading("Today’s fuel", 19, ink));
+        fuel.addView(text("Two flexible ideas for today. Adapt them to your appetite, culture, allergies, and budget.", 13, muted));
+        gap(fuel, 8);
+        addMealSuggestion(fuel, "Breakfast", food.breakfastTitle, food.breakfastDetail);
+        gap(fuel, 7);
+        addMealSuggestion(fuel, "Lunch", food.lunchTitle, food.lunchDetail);
+        Button openNutrition = lightAction("Open nutrition ideas");
+        openNutrition.setOnClickListener(view -> showMeals());
+        LinearLayout.LayoutParams nutritionParams = new LinearLayout.LayoutParams(-1, dp(42));
+        nutritionParams.topMargin = dp(10);
+        fuel.addView(openNutrition, nutritionParams);
+        body.addView(fuel);
+
+        gap(body, 12);
+        LinearLayout month = card();
+        JourneyStore.MonthReport monthReport = JourneyStore.monthReport(this);
+        month.addView(heading("Monthly consistency", 19, ink));
+        month.addView(text(monthReport.completedTotal + " completed guided plans  •  " + monthReport.minutesTotal + " active min", 13, muted));
+        gap(month, 8);
+        addMonthlyCompletionChart(month, monthReport);
+        body.addView(month);
 
         gap(body, 12);
         LinearLayout summaryRow = new LinearLayout(this);
@@ -940,6 +1037,69 @@ public final class MainActivity extends Activity {
         Button plans = secondary("View my plan");
         plans.setOnClickListener(view -> showPlans());
         addButton(body, plans);
+    }
+
+    private WeeklyScheduleStore.Schedule currentWeekSchedule() {
+        Calendar current = Calendar.getInstance();
+        current.setFirstDayOfWeek(Calendar.MONDAY);
+        int sinceMonday = (current.get(Calendar.DAY_OF_WEEK) - Calendar.MONDAY + 7) % 7;
+        current.add(Calendar.DAY_OF_YEAR, -sinceMonday);
+        return WeeklyScheduleStore.load(this, current, defaultWeeklyDays(), defaultWeeklyTargets());
+    }
+
+    private int countTrainingDays(boolean[] days) {
+        int count = 0;
+        for (boolean day : days) if (day) count++;
+        return count;
+    }
+
+    private String homeFocusForDay(int index, WeeklyScheduleStore.Schedule schedule) {
+        if (index >= 0 && index < schedule.targets.size() && !schedule.targets.get(index).isEmpty()) return focusSummary(schedule.targets.get(index));
+        return target;
+    }
+
+    private void addMealSuggestion(LinearLayout container, String label, String title, String detail) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.VERTICAL);
+        row.setPadding(dp(10), dp(8), dp(10), dp(8));
+        row.setBackground(surface(Color.rgb(240, 244, 249), 12, 0, Color.TRANSPARENT));
+        TextView mealLabel = heading(label.toUpperCase(Locale.ROOT), 10, Color.rgb(67, 98, 139));
+        mealLabel.setLetterSpacing(.05f);
+        row.addView(mealLabel);
+        row.addView(heading(title, 16, ink));
+        row.addView(text(detail, 12, muted));
+        container.addView(row);
+    }
+
+    private void addMonthlyCompletionChart(LinearLayout container, JourneyStore.MonthReport report) {
+        LinearLayout graph = new LinearLayout(this);
+        graph.setOrientation(LinearLayout.HORIZONTAL);
+        graph.setGravity(Gravity.BOTTOM);
+        int highest = 1;
+        for (int count : report.completedByWeek) highest = Math.max(highest, count);
+        for (int i = 0; i < report.completedByWeek.length; i++) {
+            LinearLayout column = new LinearLayout(this);
+            column.setOrientation(LinearLayout.VERTICAL);
+            column.setGravity(Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
+            TextView count = heading(String.valueOf(report.completedByWeek[i]), 12, ink);
+            count.setGravity(Gravity.CENTER);
+            column.addView(count, new LinearLayout.LayoutParams(-1, dp(19)));
+            View bar = new View(this);
+            int height = dp(14 + (72 * report.completedByWeek[i] / highest));
+            bar.setBackground(surface(mint, 6, 0, Color.TRANSPARENT));
+            LinearLayout.LayoutParams barParams = new LinearLayout.LayoutParams(dp(25), height);
+            barParams.topMargin = dp(3);
+            column.addView(bar, barParams);
+            TextView label = text("W" + (i + 1), 10, muted);
+            label.setGravity(Gravity.CENTER);
+            LinearLayout.LayoutParams labelParams = new LinearLayout.LayoutParams(-1, dp(19));
+            labelParams.topMargin = dp(4);
+            column.addView(label, labelParams);
+            LinearLayout.LayoutParams columnParams = new LinearLayout.LayoutParams(0, dp(121), 1);
+            columnParams.rightMargin = i == report.completedByWeek.length - 1 ? 0 : dp(4);
+            graph.addView(column, columnParams);
+        }
+        container.addView(graph);
     }
 
     private void showPlans() {
@@ -1059,8 +1219,8 @@ public final class MainActivity extends Activity {
         boolean weekly = "Weekly".equals(planMode);
         LinearLayout body = planPage();
         planTitle(body, weekly ? "WEEKLY PLAN" : "DAILY PLAN", weekly ? "Choose your\ntraining week" : "Choose your\nworkout day", weekly
-                ? "Pick a week, select your workout days, then assign each day a focus. Unselected days are Rest Days."
-                : "Choose one date in the upcoming week. Your daily plan will be scheduled only for that day.");
+                ? "Plan this week or an upcoming week through month-end. Each week keeps its own training days and Rest Days."
+                : "Choose one date this week or an upcoming week through month-end. Your daily plan stays attached to that date.");
         addWizardProgress(body, wizardStep(weekly ? "Week" : "Day"));
 
         LinearLayout picker = card();
@@ -1070,7 +1230,8 @@ public final class MainActivity extends Activity {
         Button previous = compactControl("‹");
         previous.setTextSize(24);
         previous.setContentDescription("Show the previous week");
-        previous.setOnClickListener(view -> { selectedWeekOffset--; showPlanSchedule(); });
+        previous.setEnabled(selectedWeekOffset > 0);
+        previous.setOnClickListener(view -> { selectPlanningWeek(selectedWeekOffset - 1); showPlanSchedule(); });
         pickerHeader.addView(previous, new LinearLayout.LayoutParams(dp(44), dp(44)));
         TextView weekTitle = heading(selectedWeekTitle(), 17, ink);
         weekTitle.setGravity(Gravity.CENTER);
@@ -1078,10 +1239,11 @@ public final class MainActivity extends Activity {
         Button following = compactControl("›");
         following.setTextSize(24);
         following.setContentDescription("Show the next week");
-        following.setOnClickListener(view -> { selectedWeekOffset++; showPlanSchedule(); });
+        following.setEnabled(selectedWeekOffset < maxSelectableWeekOffset());
+        following.setOnClickListener(view -> { selectPlanningWeek(selectedWeekOffset + 1); showPlanSchedule(); });
         pickerHeader.addView(following, new LinearLayout.LayoutParams(dp(44), dp(44)));
         picker.addView(pickerHeader);
-        picker.addView(text(weekly ? "Tap a day to mark Train or Rest." : "Tap one day for your workout.", 12, muted));
+        picker.addView(text(weekly ? "Tap a day to mark Train or Rest. Changes stay with this week only." : "Tap one day for your workout. Switching weeks never changes another week.", 12, muted));
         gap(picker, 10);
 
         LinearLayout days = new LinearLayout(this);
@@ -1113,6 +1275,7 @@ public final class MainActivity extends Activity {
                     }
                     activeScheduleDay = dayIndex;
                     syncTrainingDays();
+                    persistCurrentWeekSchedule();
                 } else {
                     dailyScheduledDay = dayIndex;
                 }
@@ -1135,7 +1298,7 @@ public final class MainActivity extends Activity {
             for (int count : new int[]{2, 3, 4, 5}) {
                 Button option = count == trainingDays ? action(count + " days", mint, navy) : action(count + " days", Color.rgb(232, 236, 244), ink);
                 option.setTextSize(11);
-                option.setOnClickListener(view -> { applyTrainingDayCount(count); showPlanSchedule(); });
+                option.setOnClickListener(view -> { applyTrainingDayCount(count); persistCurrentWeekSchedule(); showPlanSchedule(); });
                 LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(42), 1);
                 params.rightMargin = count == 5 ? 0 : dp(5);
                 counts.addView(option, params);
@@ -1153,6 +1316,7 @@ public final class MainActivity extends Activity {
                 toast("Choose at least one workout day.");
                 return;
             }
+            if (weekly) persistCurrentWeekSchedule();
             showPlanTarget();
         });
         addPlanButton(body, next);
@@ -1202,6 +1366,7 @@ public final class MainActivity extends Activity {
                     toggleActiveTarget(choice);
                     session.clear();
                     resetExerciseSelection();
+                    if (weekly) persistCurrentWeekSchedule();
                     showPlanTarget();
                 });
                 LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(planTargetTileHeight()), 1);
@@ -1292,14 +1457,27 @@ public final class MainActivity extends Activity {
         imageArea.setBackgroundColor(Color.WHITE);
         int targetIndex = 0;
         for (int index = 0; index < WIZARD_TARGETS.length; index++) if (WIZARD_TARGETS[index].equals(choice)) targetIndex = index;
-        int[] columnLeft = {4, 515};
-        int[] columnRight = {510, 1021};
-        int[] rowTop = {3, 491, 966};
-        int[] rowBottom = {487, 961, 1533};
-        int column = targetIndex % 2;
-        int row = targetIndex / 2;
-        ReferenceArtworkView artwork = referenceArtwork(R.drawable.workout_focus_tiles,
-                columnLeft[column], rowTop[row], columnRight[column], rowBottom[row]);
+        ReferenceArtworkView artwork;
+        if (targetIndex < 6) {
+            int[] columnLeft = {4, 515};
+            int[] columnRight = {510, 1021};
+            int[] rowTop = {3, 491, 966};
+            int[] rowBottom = {487, 961, 1533};
+            int column = targetIndex % 2;
+            int row = targetIndex / 2;
+            artwork = referenceArtwork(R.drawable.workout_focus_tiles,
+                    columnLeft[column], rowTop[row], columnRight[column], rowBottom[row]);
+        } else {
+            // The extension sheet is a 2×2 grid: Back, Shoulders, Core, Endurance.
+            int extensionIndex = targetIndex - 6;
+            int column = extensionIndex % 2;
+            int row = extensionIndex / 2;
+            int left = column == 0 ? 2 : 629;
+            int right = column == 0 ? 625 : 1252;
+            int top = row == 0 ? 2 : 629;
+            int bottom = row == 0 ? 625 : 1252;
+            artwork = referenceArtwork(R.drawable.workout_focus_tiles_expanded, left, top, right, bottom);
+        }
         imageArea.addView(artwork, new FrameLayout.LayoutParams(-1, -1));
         if (selected) {
             TextView check = heading("✓", hasTallPlanViewport() ? 14 : 12, navy);
@@ -1456,6 +1634,10 @@ public final class MainActivity extends Activity {
     }
 
     private String machineOptionsSummary() {
+        if ("Back".equals(target)) return "Lat pulldown · Cable row · High row · Assisted pull-up";
+        if ("Shoulders".equals(target)) return "Shoulder press · Cable raise · Reverse pec deck · Face pull";
+        if ("Core".equals(target)) return "Pallof press · Cable chop · Rotary torso · Captain’s chair";
+        if ("Endurance".equals(target)) return "Treadmill · Bike · Rower · Elliptical";
         if ("Chest".equals(target)) return "Chest press · Cable press · Pec deck · Assisted dip";
         if ("Legs".equals(target) || "Lower".equals(target)) return "Leg press · Leg curl · Leg extension · Calf raise";
         if ("Arms".equals(target)) return "Cable curl · Pressdown · Assisted dip · Cable row";
@@ -1537,8 +1719,11 @@ public final class MainActivity extends Activity {
         planReps = saved.reps;
         planRestSeconds = WorkoutTiming.clampRestSeconds(saved.restSeconds);
         planCooldownSeconds = WorkoutTiming.normalizeCooldownSeconds(saved.cooldownSeconds);
+        planReminderEnabled = saved.reminderEnabled;
+        planReminderHour = saved.reminderHour;
+        planReminderMinute = saved.reminderMinute;
         weeklyWorkoutDays = decodeWeeklyDays(saved.weeklyDays);
-        selectedWeekOffset = saved.weekOffset;
+        selectedWeekOffset = Math.max(0, Math.min(maxSelectableWeekOffset(), saved.weekOffset));
         dailyScheduledDay = Math.max(0, Math.min(6, saved.scheduledDay));
         activeScheduleDay = dailyScheduledDay;
         selectedTargets.clear();
@@ -1553,6 +1738,7 @@ public final class MainActivity extends Activity {
                 for (int i = 0; i < weeklyWorkoutDays.length; i++) if (weeklyWorkoutDays[i]) { activeScheduleDay = i; break; }
             }
             session = new ArrayList<>(weeklySessions.get(activeScheduleDay));
+            persistCurrentWeekSchedule();
         } else {
             session = prescribeNames(saved.exerciseNames, Coach.planOptions(activeTargets(), selectedEquipmentTypes));
         }
@@ -1935,6 +2121,41 @@ public final class MainActivity extends Activity {
         settings.addView(cooldown);
         body.addView(settings);
         gap(body, 12);
+
+        LinearLayout reminder = card();
+        reminder.addView(heading("Coach workout reminder", 20, ink));
+        reminder.addView(text("Set a local reminder for this plan. Coach " + coachName() + " will greet you full screen when it is time to train.", 13, muted));
+        CheckBox reminderToggle = new CheckBox(this);
+        reminderToggle.setText("Remind me for this plan");
+        reminderToggle.setTextSize(15);
+        reminderToggle.setTextColor(ink);
+        reminderToggle.setButtonTintList(ColorStateList.valueOf(mint));
+        reminderToggle.setChecked(planReminderEnabled);
+        reminderToggle.setContentDescription("Coach workout reminder " + (planReminderEnabled ? "enabled" : "disabled"));
+        reminderToggle.setOnCheckedChangeListener((button, checked) -> {
+            planReminderEnabled = checked;
+            if (checked) ensureNotificationPermission();
+            showPlanSetup();
+        });
+        reminder.addView(reminderToggle);
+        LinearLayout reminderControls = new LinearLayout(this);
+        reminderControls.setOrientation(LinearLayout.HORIZONTAL);
+        Button reminderTime = action("Time · " + WorkoutReminderScheduler.timeLabel(planReminderHour, planReminderMinute), planReminderEnabled ? mint : Color.rgb(232, 236, 244), ink);
+        reminderTime.setTextSize(11);
+        reminderTime.setEnabled(planReminderEnabled);
+        reminderTime.setOnClickListener(view -> openReminderTimePicker());
+        reminderControls.addView(reminderTime, new LinearLayout.LayoutParams(0, dp(44), 1));
+        Button reminderPreview = action("Preview coach reminder", navyPanel, mint);
+        reminderPreview.setTextSize(11);
+        reminderPreview.setOnClickListener(view -> startActivity(new Intent(this, WorkoutReminderActivity.class)));
+        LinearLayout.LayoutParams previewParams = new LinearLayout.LayoutParams(0, dp(44), 1);
+        previewParams.leftMargin = dp(7);
+        reminderControls.addView(reminderPreview, previewParams);
+        LinearLayout.LayoutParams controlsParams = new LinearLayout.LayoutParams(-1, -2);
+        controlsParams.topMargin = dp(7);
+        reminder.addView(reminderControls, controlsParams);
+        body.addView(reminder);
+        gap(body, 12);
         Button build = planPrimary("Build my " + focusSummary(activeTargets()).toLowerCase(Locale.ROOT) + " " + planMode.toLowerCase(Locale.ROOT) + " plan");
         build.setOnClickListener(view -> buildSelectedPlan());
         addPlanButton(body, build);
@@ -1943,6 +2164,20 @@ public final class MainActivity extends Activity {
         back.setContentDescription("Back to exercise choices");
         back.setOnClickListener(view -> showExerciseSelection());
         addPlanBack(body, back);
+    }
+
+    private void openReminderTimePicker() {
+        new android.app.TimePickerDialog(this, (view, hour, minute) -> {
+            planReminderHour = hour;
+            planReminderMinute = minute;
+            showPlanSetup();
+        }, planReminderHour, planReminderMinute, false).show();
+    }
+
+    private void ensureNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 710);
+        }
     }
 
     private void addWorkingStepper(LinearLayout container, String label, String value, Runnable decrease, Runnable increase) {
@@ -1994,8 +2229,14 @@ public final class MainActivity extends Activity {
         } else {
             session = prescribeExercises(selectedExercises);
         }
-        PlanStore.save(this, planMode, target, encodeEquipmentTypes(), sessionMinutes, workingWeightKg, planSets, planReps, planRestSeconds, planCooldownSeconds, weeklyWorkoutDays, encodeFocusTargets(activeTargets()), encodeWeeklyTargets(), encodeWeeklySessionNames(), "Weekly".equals(planMode) ? activeScheduleDay : dailyScheduledDay, selectedWeekOffset, session);
+        persistCurrentWeekSchedule();
+        savePlanWithReminder();
         showPlanReady();
+    }
+
+    private void savePlanWithReminder() {
+        PlanStore.save(this, planMode, target, encodeEquipmentTypes(), sessionMinutes, workingWeightKg, planSets, planReps, planRestSeconds, planCooldownSeconds, planReminderEnabled, planReminderHour, planReminderMinute, weeklyWorkoutDays, encodeFocusTargets(activeTargets()), encodeWeeklyTargets(), encodeWeeklySessionNames(), "Weekly".equals(planMode) ? activeScheduleDay : dailyScheduledDay, selectedWeekOffset, session);
+        WorkoutReminderScheduler.schedule(this, PlanStore.load(this));
     }
 
     private List<Coach.Exercise> prescribeExercises(List<Coach.Exercise> choices) {
@@ -2028,6 +2269,7 @@ public final class MainActivity extends Activity {
         LinearLayout schedule = card();
         schedule.addView(heading("Weekly".equals(planMode) ? "Your weekly templates" : "Scheduled workout", 18, ink));
         schedule.addView(text("Ready when you are  •  " + planSchedule(), 14, muted));
+        schedule.addView(text(planReminderEnabled ? "Coach reminder · " + WorkoutReminderScheduler.timeLabel(planReminderHour, planReminderMinute) : "No coach reminder set", 13, planReminderEnabled ? Color.rgb(50, 116, 103) : muted));
         body.addView(schedule);
         gap(body, 10);
         if ("Weekly".equals(planMode)) {
@@ -2074,7 +2316,8 @@ public final class MainActivity extends Activity {
         gap(body, 10);
         Button scheduleLater = secondary("Schedule for later");
         scheduleLater.setOnClickListener(view -> {
-            PlanStore.save(this, planMode, target, encodeEquipmentTypes(), sessionMinutes, workingWeightKg, planSets, planReps, planRestSeconds, planCooldownSeconds, weeklyWorkoutDays, encodeFocusTargets(activeTargets()), encodeWeeklyTargets(), encodeWeeklySessionNames(), "Weekly".equals(planMode) ? activeScheduleDay : dailyScheduledDay, selectedWeekOffset, session);
+            persistCurrentWeekSchedule();
+            savePlanWithReminder();
             toast("Your " + planSchedule() + " is saved on this device.");
         });
         addButton(body, scheduleLater);
@@ -2127,6 +2370,38 @@ public final class MainActivity extends Activity {
         JourneyStore.Snapshot snapshot = JourneyStore.snapshot(this);
         int planned = plannedSessionsThisWeek();
 
+        LinearLayout history = card();
+        history.addView(heading("This week’s completed plan history", 19, ink));
+        List<JourneyStore.WorkoutRecord> completed = JourneyStore.workoutsThisWeek(this);
+        if (completed.isEmpty()) {
+            history.addView(text("No completed guided workouts yet this week. When you finish a plan, it appears here with its focus and guided time.", 14, muted));
+        } else {
+            SimpleDateFormat dayFormat = new SimpleDateFormat("EEE, MMM d", Locale.getDefault());
+            for (JourneyStore.WorkoutRecord record : completed) {
+                LinearLayout row = new LinearLayout(this);
+                row.setOrientation(LinearLayout.HORIZONTAL);
+                row.setGravity(Gravity.CENTER_VERTICAL);
+                row.setPadding(dp(9), dp(7), dp(9), dp(7));
+                row.setBackground(surface(Color.rgb(240, 244, 249), 11, 0, Color.TRANSPARENT));
+                TextView check = heading("✓", 18, navy);
+                check.setGravity(Gravity.CENTER);
+                check.setBackground(surface(mint, 99, 0, Color.TRANSPARENT));
+                LinearLayout.LayoutParams checkParams = new LinearLayout.LayoutParams(dp(30), dp(30));
+                checkParams.rightMargin = dp(9);
+                row.addView(check, checkParams);
+                LinearLayout copy = new LinearLayout(this);
+                copy.setOrientation(LinearLayout.VERTICAL);
+                copy.addView(heading(record.target, 15, ink));
+                copy.addView(text(dayFormat.format(record.timestamp) + "  •  " + record.minutes + " guided min", 12, muted));
+                row.addView(copy, new LinearLayout.LayoutParams(0, -2, 1));
+                LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(-1, -2);
+                rowParams.topMargin = dp(7);
+                history.addView(row, rowParams);
+            }
+        }
+        body.addView(history);
+        gap(body, 12);
+
         LinearLayout week = card();
         week.addView(heading("This week's rhythm", 19, ink));
         String completion = planned == 0 ? snapshot.workoutsThisWeek + " workouts completed"
@@ -2143,6 +2418,20 @@ public final class MainActivity extends Activity {
         week.addView(text(snapshot.activeMinutesThisWeek + " guided minutes  •  " + snapshot.fuelDaysThisWeek + " fuel check-in days", 14, muted));
         if (!snapshot.lastWorkoutTarget.isEmpty()) week.addView(text("Last completed focus: " + snapshot.lastWorkoutTarget, 13, muted));
         body.addView(week);
+        gap(body, 12);
+
+        JourneyStore.MonthReport report = JourneyStore.monthReport(this);
+        LinearLayout monthly = card();
+        monthly.addView(heading("Monthly progression report", 19, ink));
+        monthly.addView(text(report.completedTotal + " completed plans  •  " + report.minutesTotal + " guided min this month", 14, muted));
+        gap(monthly, 8);
+        addMonthlyCompletionChart(monthly, report);
+        String insight = report.completedTotal == 0
+                ? "Complete your first guided session to begin a private month-long progression record."
+                : report.completedTotal == 1 ? "One plan complete—your next completed plan will make the weekly pattern easier to see."
+                : "Your completed plans are building a more useful month-long consistency pattern.";
+        monthly.addView(text(insight, 13, muted));
+        body.addView(monthly);
         gap(body, 12);
 
         LinearLayout next = card();
@@ -2262,6 +2551,8 @@ public final class MainActivity extends Activity {
         signOut.setOnClickListener(view -> {
             AccountStore.clear(this);
             PlanStore.clear(this);
+            WeeklyScheduleStore.clear(this);
+            WorkoutReminderScheduler.cancel(this);
             WeightStore.clear(this);
             BodyProfileStore.clear(this);
             JourneyStore.clear(this);
@@ -3338,6 +3629,17 @@ public final class MainActivity extends Activity {
         connection.addView(text(BodyProfileStore.summary(this) + "  •  Weight: " + WeightStore.latestLabel(this), 13, muted));
         connection.addView(text("Body details add private trend context only; they do not calculate a diet or prescribe portions.", 12, muted));
         body.addView(connection);
+        gap(body, 12);
+
+        NutritionRecommendation.Day todayFood = NutritionRecommendation.forToday();
+        LinearLayout todayIdeas = card();
+        todayIdeas.addView(heading("Today’s breakfast + lunch", 19, ink));
+        todayIdeas.addView(text("These rotate daily and are flexible ideas—not calorie targets or medical advice.", 13, muted));
+        gap(todayIdeas, 8);
+        addMealSuggestion(todayIdeas, "Breakfast", todayFood.breakfastTitle, todayFood.breakfastDetail);
+        gap(todayIdeas, 7);
+        addMealSuggestion(todayIdeas, "Lunch", todayFood.lunchTitle, todayFood.lunchDetail);
+        body.addView(todayIdeas);
         gap(body, 12);
 
         LinearLayout checkIn = card();

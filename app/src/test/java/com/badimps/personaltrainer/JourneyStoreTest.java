@@ -38,4 +38,13 @@ public final class JourneyStoreTest {
         assertEquals(0, JourneyStore.snapshot(context).todayFuelGoals());
         assertEquals(0, JourneyStore.snapshot(context).fuelDaysThisWeek);
     }
+
+    @Test public void monthlyReportUsesCompletedGuidedPlans() {
+        JourneyStore.recordWorkout(context, "Upper", 30);
+        JourneyStore.recordWorkout(context, "Legs", 45);
+
+        JourneyStore.MonthReport report = JourneyStore.monthReport(context);
+        assertEquals(2, report.completedTotal);
+        assertEquals(75, report.minutesTotal);
+    }
 }

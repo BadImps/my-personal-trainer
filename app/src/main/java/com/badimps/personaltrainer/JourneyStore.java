@@ -20,6 +20,33 @@ public final class JourneyStore {
     public static final int FUEL_PLANTS = 2;
     public static final int FUEL_HYDRATION = 4;
 
+    public static final class WorkoutRecord {
+        public final long timestamp;
+        public final int minutes;
+        public final String target;
+
+        WorkoutRecord(long timestamp, int minutes, String target) {
+            this.timestamp = timestamp;
+            this.minutes = minutes;
+            this.target = target;
+        }
+    }
+
+    /** Calendar-month totals grouped by the week in which a guided workout was completed. */
+    public static final class MonthReport {
+        public final int[] completedByWeek;
+        public final int[] minutesByWeek;
+        public final int completedTotal;
+        public final int minutesTotal;
+
+        MonthReport(int[] completedByWeek, int[] minutesByWeek, int completedTotal, int minutesTotal) {
+            this.completedByWeek = completedByWeek;
+            this.minutesByWeek = minutesByWeek;
+            this.completedTotal = completedTotal;
+            this.minutesTotal = minutesTotal;
+        }
+    }
+
     public static final class Snapshot {
         public final int workoutsThisWeek;
         public final int activeMinutesThisWeek;
@@ -41,9 +68,13 @@ public final class JourneyStore {
     }
 
     public static void recordWorkout(Context context, String target, int activeMinutes) {
+        recordWorkoutAt(context, target, activeMinutes, System.currentTimeMillis());
+    }
+
+    static void recordWorkoutAt(Context context, String target, int activeMinutes, long timestamp) {
         SharedPreferences preferences = preferences(context);
         List<String> events = lines(preferences.getString("workouts", ""));
-        events.add(System.currentTimeMillis() + "|" + Math.max(1, activeMinutes) + "|" + sanitize(target));
+        events.add(timestamp + "|" + Math.max(1, activeMinutes) + "|" + sanitize(target));
         trim(events);
         preferences.edit().putString("workouts", join(events)).apply();
     }
@@ -69,6 +100,37 @@ public final class JourneyStore {
         return snapshotAt(context, System.currentTimeMillis());
     }
 
+    public static List<WorkoutRecord> workoutsThisWeek(Context context) {
+        long now = System.currentTimeMillis();
+        long start = weekStart(now);
+        ArrayList<WorkoutRecord> output = new ArrayList<>();
+        for (WorkoutRecord record : workoutRecords(context)) if (record.timestamp >= start && record.timestamp <= now) output.add(record);
+        output.sort((left, right) -> Long.compare(right.timestamp, left.timestamp));
+        return output;
+    }
+
+    public static MonthReport monthReport(Context context) {
+        Calendar now = Calendar.getInstance();
+        int maxWeek = Math.max(1, now.getActualMaximum(Calendar.WEEK_OF_MONTH));
+        int[] completed = new int[maxWeek];
+        int[] minutes = new int[maxWeek];
+        int totalCompleted = 0;
+        int totalMinutes = 0;
+        int month = now.get(Calendar.MONTH);
+        int year = now.get(Calendar.YEAR);
+        for (WorkoutRecord record : workoutRecords(context)) {
+            Calendar date = Calendar.getInstance();
+            date.setTimeInMillis(record.timestamp);
+            if (date.get(Calendar.MONTH) != month || date.get(Calendar.YEAR) != year) continue;
+            int index = Math.max(0, Math.min(maxWeek - 1, date.get(Calendar.WEEK_OF_MONTH) - 1));
+            completed[index]++;
+            minutes[index] += record.minutes;
+            totalCompleted++;
+            totalMinutes += record.minutes;
+        }
+        return new MonthReport(completed, minutes, totalCompleted, totalMinutes);
+    }
+
     static Snapshot snapshotAt(Context context, long now) {
         SharedPreferences preferences = preferences(context);
         long weekStart = weekStart(now);
@@ -76,21 +138,15 @@ public final class JourneyStore {
         int minutes = 0;
         String lastTarget = "";
         long lastTimestamp = Long.MIN_VALUE;
-        for (String event : lines(preferences.getString("workouts", ""))) {
-            String[] parts = event.split("\\|", 3);
-            if (parts.length != 3) continue;
-            try {
-                long timestamp = Long.parseLong(parts[0]);
-                int duration = Integer.parseInt(parts[1]);
-                if (timestamp >= weekStart && timestamp <= now) {
+        for (WorkoutRecord record : workoutRecords(context)) {
+                if (record.timestamp >= weekStart && record.timestamp <= now) {
                     workouts++;
-                    minutes += Math.max(0, duration);
+                    minutes += Math.max(0, record.minutes);
                 }
-                if (timestamp > lastTimestamp) {
-                    lastTimestamp = timestamp;
-                    lastTarget = parts[2];
+                if (record.timestamp > lastTimestamp) {
+                    lastTimestamp = record.timestamp;
+                    lastTarget = record.target;
                 }
-            } catch (NumberFormatException ignored) {}
         }
         int fuelDays = 0;
         for (String day : lines(preferences.getString("fuel_days", ""))) {
@@ -126,6 +182,18 @@ public final class JourneyStore {
 
     private static String sanitize(String value) {
         return value == null ? "Workout" : value.replace("|", " ").replace("\n", " ");
+    }
+
+    private static List<WorkoutRecord> workoutRecords(Context context) {
+        ArrayList<WorkoutRecord> output = new ArrayList<>();
+        for (String event : lines(preferences(context).getString("workouts", ""))) {
+            String[] parts = event.split("\\|", 3);
+            if (parts.length != 3) continue;
+            try {
+                output.add(new WorkoutRecord(Long.parseLong(parts[0]), Math.max(1, Integer.parseInt(parts[1])), parts[2]));
+            } catch (NumberFormatException ignored) { }
+        }
+        return output;
     }
 
     private static List<String> lines(String value) {

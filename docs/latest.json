@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 24,
-  "versionName": "3.3",
-  "publishedAt": "2026-10-16T11:27:58Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v3.3/app-release.apk",
-  "sha256": "de00d8b87c1d58d7dff5e7c88dda33fe4a9b4a53b89af5e2174803d2e0c8a5e4",
-  "sizeBytes": 33004065,
-  "notes": "Separates the custom 45-second to 8-minute set-rest timer from the 1-, 3-, or 5-minute exercise cooldown presets. Both values persist in the plan and show distinct guided timer screens."
+  "versionCode": 25,
+  "versionName": "3.4",
+  "publishedAt": "2026-10-16T12:30:00Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v3.4/app-release.apk",
+  "sha256": "5cfa80610701baf7ef862dabddd62fcc0feefd742f96099c074d518822adb435",
+  "sizeBytes": 34419493,
+  "notes": "Adds an end-to-end training week, reminder, nutrition, and progress loop. The wizard now includes Back, Shoulders, Core, and Endurance with Dumbbells, At home, Machine-assisted, and Bodyweight exercise choices. Abs remains excluded as its own category."
 }

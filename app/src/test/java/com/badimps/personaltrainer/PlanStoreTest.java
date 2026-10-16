@@ -31,6 +31,8 @@ public final class PlanStoreTest {
             assertEquals("1,0,1,0,1,0,0", saved.weeklyDays);
             assertEquals(4, saved.exerciseNames.size());
             assertEquals(180, saved.cooldownSeconds);
+            assertEquals(false, saved.reminderEnabled);
+            assertEquals(18, saved.reminderHour);
         } finally {
             PlanStore.clear(context);
         }

@@ -2,6 +2,7 @@ package com.badimps.personaltrainer;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 import org.junit.Test;
 
 public class CoachTest {
@@ -29,5 +30,19 @@ public class CoachTest {
     }
     @Test public void eachGoalHasAnOutcomeSummary() {
         for (String goal : Coach.GOALS) assertFalse(Coach.goalSummary(goal).isEmpty());
+    }
+    @Test public void expandedFocusesHaveRecommendationsForEveryEquipmentChoice() {
+        String[] focuses = {"Back", "Shoulders", "Core", "Endurance"};
+        for (String focus : focuses) {
+            for (String equipment : Coach.EQUIPMENT_TYPES) {
+                assertFalse(focus + " should work with " + equipment, Coach.planOptions(focus, equipment).isEmpty());
+            }
+        }
+    }
+    @Test public void coreIsTheOnlyTrunkCategoryInThePlanner() {
+        boolean hasAbsCategory = false;
+        for (String focus : Coach.TARGETS) if ("Abs".equals(focus)) hasAbsCategory = true;
+        assertFalse(hasAbsCategory);
+        assertTrue(Coach.planOptions("Core", "Bodyweight").size() >= 3);
     }
 }
