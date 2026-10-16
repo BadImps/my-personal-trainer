@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 28,
-  "versionName": "3.7",
-  "publishedAt": "2026-10-16T18:36:43Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v3.7/My-Personal-Trainer-3.7.apk",
-  "sha256": "b2ef0337655af35e676fe09c392509d37a6296f8de7d42c841bd51ea82b1c7a2",
+  "versionCode": 29,
+  "versionName": "3.8",
+  "publishedAt": "2026-10-16T19:00:00Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v3.8/My-Personal-Trainer-3.8.apk",
+  "sha256": "77f0e50825cbc799be17b8c3a27fb9ece88fe7444120b169c4a12222b9b5360e",
   "sizeBytes": 84161821,
-  "notes": "Adds a clear home schedule calendar with focus labels, explicit rest days, a today marker, and browsable upcoming weeks. Unscheduled future weeks remain visibly open rather than being confused with rest days."
+  "notes": "Fixes mobile-data update checks that time out before downloading. The app now retries the verified manifest through an independently routed GitHub Raw endpoint and provides a manual release link if both routes are unavailable."
 }
