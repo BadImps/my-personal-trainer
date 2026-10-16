@@ -35,12 +35,20 @@ public final class WorkoutTimingTest {
         assertFalse(WorkoutTiming.isMeaningfullySlower(Arrays.asList(3_000L, 3_000L), 3_200L));
     }
 
-    @Test public void recoveryNeverExceedsFiveMinutes() {
-        WorkoutTiming.SetTracker tracker = new WorkoutTiming.SetTracker(295);
+    @Test public void recoveryNeverExceedsEightMinutes() {
+        WorkoutTiming.SetTracker tracker = new WorkoutTiming.SetTracker(475);
         tracker.startSet(0); tracker.completeSet(1_000);
         tracker.startSet(1_000); tracker.completeSet(2_000);
         tracker.startSet(2_000); tracker.completeSet(4_000);
-        assertEquals(300, tracker.recoverySeconds());
+        assertEquals(480, tracker.recoverySeconds());
+    }
+
+    @Test public void customRecoveryIsClampedToFortyFiveSecondsThroughEightMinutes() {
+        assertEquals(45, WorkoutTiming.clampRestSeconds(10));
+        assertEquals(45, WorkoutTiming.clampRestSeconds(45));
+        assertEquals(225, WorkoutTiming.clampRestSeconds(225));
+        assertEquals(480, WorkoutTiming.clampRestSeconds(480));
+        assertEquals(480, WorkoutTiming.clampRestSeconds(900));
     }
 
     @Test public void setTimeUsesMinuteSecondAndTenthFormat() {

@@ -8,7 +8,9 @@ import java.util.Locale;
 /** Pure set-timing rules, kept independent from Android UI and text-to-speech. */
 public final class WorkoutTiming {
     public static final int REST_BONUS_SECONDS = 10;
-    public static final int MAX_REST_SECONDS = 300;
+    public static final int MIN_REST_SECONDS = 45;
+    public static final int MAX_REST_SECONDS = 8 * 60;
+    public static final int REST_STEP_SECONDS = 15;
     private static final long MINIMUM_SLOWER_MARGIN_MS = 250L;
     private static final double SLOWER_MARGIN_RATIO = 0.05d;
 
@@ -34,7 +36,7 @@ public final class WorkoutTiming {
         private int restBonusSeconds;
 
         public SetTracker(int baseRestSeconds) {
-            this.baseRestSeconds = Math.max(0, baseRestSeconds);
+            this.baseRestSeconds = clampRestSeconds(baseRestSeconds);
         }
 
         public void startSet(long nowMillis) {
@@ -74,6 +76,10 @@ public final class WorkoutTiming {
         long average = (priorDurations.get(end - 1) + priorDurations.get(end - 2)) / 2L;
         long margin = Math.max(MINIMUM_SLOWER_MARGIN_MS, Math.round(average * SLOWER_MARGIN_RATIO));
         return currentDurationMillis > average + margin;
+    }
+
+    public static int clampRestSeconds(int seconds) {
+        return Math.max(MIN_REST_SECONDS, Math.min(MAX_REST_SECONDS, seconds));
     }
 
     public static String formatElapsedMillis(long millis) {

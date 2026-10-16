@@ -35,6 +35,7 @@ import android.widget.ProgressBar;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.ScrollView;
+import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -108,6 +109,8 @@ public final class MainActivity extends Activity {
     private final List<String> setHistory = new ArrayList<>();
     private int openingPhraseIndex;
     private int completionPhraseIndex;
+    private long guidedWorkoutStartedAt;
+    private boolean guidedSessionRecorded;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -843,7 +846,7 @@ public final class MainActivity extends Activity {
             configureSpeechVoices();
             AccountStore.create(this, enteredEmail, usernameValue, passwordValue, selectedTrainer);
             LauncherIconManager.apply(this, AccountStore.get(this).coachName);
-            showPlans();
+            showBodyProfileSetup(true);
         });
         addButton(body, create);
         gap(body, 10);
@@ -1531,7 +1534,7 @@ public final class MainActivity extends Activity {
         workingWeightKg = saved.weightKg;
         planSets = saved.sets;
         planReps = saved.reps;
-        planRestSeconds = Math.max(180, Math.min(300, saved.restSeconds));
+        planRestSeconds = WorkoutTiming.clampRestSeconds(saved.restSeconds);
         weeklyWorkoutDays = decodeWeeklyDays(saved.weeklyDays);
         selectedWeekOffset = saved.weekOffset;
         dailyScheduledDay = Math.max(0, Math.min(6, saved.scheduledDay));
@@ -1868,19 +1871,41 @@ public final class MainActivity extends Activity {
         addWorkingStepper(settings, "Reps", String.valueOf(planReps), () -> planReps = Math.max(1, planReps - 1), () -> planReps = Math.min(30, planReps + 1));
         LinearLayout rest = new LinearLayout(this);
         rest.setOrientation(LinearLayout.VERTICAL);
-        TextView restTitle = heading("Rest between sets", 15, ink);
-        rest.addView(restTitle);
-        LinearLayout restOptions = new LinearLayout(this);
-        restOptions.setOrientation(LinearLayout.HORIZONTAL);
-        for (int seconds : new int[]{180, 240, 300}) {
-            Button option = seconds == planRestSeconds ? action((seconds / 60) + " min", mint, navy) : action((seconds / 60) + " min", Color.rgb(232, 236, 244), ink);
-            option.setTextSize(12);
-            option.setOnClickListener(view -> { planRestSeconds = seconds; showPlanSetup(); });
-            LinearLayout.LayoutParams optionParams = new LinearLayout.LayoutParams(0, dp(43), 1);
-            optionParams.rightMargin = seconds == 300 ? 0 : dp(6);
-            restOptions.addView(option, optionParams);
-        }
-        rest.addView(restOptions);
+        LinearLayout restHeading = new LinearLayout(this);
+        restHeading.setOrientation(LinearLayout.HORIZONTAL);
+        restHeading.setGravity(Gravity.CENTER_VERTICAL);
+        TextView restTitle = heading("Custom rest between sets", 15, ink);
+        restHeading.addView(restTitle, new LinearLayout.LayoutParams(0, -2, 1));
+        TextView restValue = heading(restChoiceLabel(planRestSeconds), 15, navy);
+        restValue.setGravity(Gravity.END);
+        restHeading.addView(restValue, new LinearLayout.LayoutParams(dp(110), -2));
+        rest.addView(restHeading);
+        SeekBar restSlider = new SeekBar(this);
+        int restSteps = (WorkoutTiming.MAX_REST_SECONDS - WorkoutTiming.MIN_REST_SECONDS) / WorkoutTiming.REST_STEP_SECONDS;
+        restSlider.setMax(restSteps);
+        restSlider.setKeyProgressIncrement(1);
+        restSlider.setProgress((WorkoutTiming.clampRestSeconds(planRestSeconds) - WorkoutTiming.MIN_REST_SECONDS) / WorkoutTiming.REST_STEP_SECONDS);
+        restSlider.setProgressTintList(ColorStateList.valueOf(mint));
+        restSlider.setThumbTintList(ColorStateList.valueOf(coral));
+        restSlider.setContentDescription("Custom rest between sets, " + restChoiceLabel(planRestSeconds));
+        restSlider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                planRestSeconds = WorkoutTiming.MIN_REST_SECONDS + progress * WorkoutTiming.REST_STEP_SECONDS;
+                restValue.setText(restChoiceLabel(planRestSeconds));
+                seekBar.setContentDescription("Custom rest between sets, " + restChoiceLabel(planRestSeconds));
+            }
+            @Override public void onStartTrackingTouch(SeekBar seekBar) { }
+            @Override public void onStopTrackingTouch(SeekBar seekBar) { }
+        });
+        rest.addView(restSlider, new LinearLayout.LayoutParams(-1, dp(44)));
+        LinearLayout restRange = new LinearLayout(this);
+        restRange.setOrientation(LinearLayout.HORIZONTAL);
+        TextView minimum = text("45 sec", 12, muted);
+        TextView maximum = text("8 min", 12, muted);
+        maximum.setGravity(Gravity.END);
+        restRange.addView(minimum, new LinearLayout.LayoutParams(0, -2, 1));
+        restRange.addView(maximum, new LinearLayout.LayoutParams(0, -2, 1));
+        rest.addView(restRange);
         settings.addView(rest);
         body.addView(settings);
         gap(body, 12);
@@ -2002,7 +2027,18 @@ public final class MainActivity extends Activity {
         LinearLayout cue = card();
         cue.addView(heading("Coach " + coachName() + "'s focus", 18, ink));
         cue.addView(text("Move with control, choose a comfortable load, and stop if you feel pain.", 14, muted));
+        gap(cue, 6);
+        cue.addView(text(BodyProfileStore.workoutContext(this), 13, muted));
         body.addView(cue);
+        gap(body, 12);
+        LinearLayout nexus = card();
+        nexus.addView(heading("Plan + fuel + progress", 17, ink));
+        nexus.addView(text("This plan becomes a Progress completion when you finish. Nutrition uses " + sessionMinutes + " min and " + focusSummary(activeTargets()) + " to surface practical fuel ideas.", 14, muted));
+        gap(nexus, 9);
+        Button fuel = lightAction("Preview fuel for this plan");
+        fuel.setOnClickListener(view -> showMeals());
+        addButton(nexus, fuel);
+        body.addView(nexus);
         gap(body, 12);
         Button start = planPrimary("Start guided workout");
         start.setOnClickListener(view -> showWorkoutCountdown());
@@ -2059,31 +2095,76 @@ public final class MainActivity extends Activity {
 
     private void showProgress() {
         LinearLayout body = appPage("Progress");
-        title(body, "PROGRESS", "Build consistency", "Track a private weight trend, revisit food ideas, and keep your next workout simple.");
+        title(body, "PROGRESS NEXUS", "See the whole picture", "Your workout completions, active time, simple fuel check-ins, and private body trend now inform one next step.");
+        JourneyStore.Snapshot snapshot = JourneyStore.snapshot(this);
+        int planned = plannedSessionsThisWeek();
+
+        LinearLayout week = card();
+        week.addView(heading("This week's rhythm", 19, ink));
+        String completion = planned == 0 ? snapshot.workoutsThisWeek + " workouts completed"
+                : snapshot.workoutsThisWeek + " of " + planned + " planned workouts completed";
+        week.addView(text(completion, 15, muted));
+        gap(week, 8);
+        ProgressBar completionBar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+        completionBar.setMax(Math.max(1, planned));
+        completionBar.setProgress(Math.min(snapshot.workoutsThisWeek, Math.max(1, planned)));
+        completionBar.setProgressTintList(ColorStateList.valueOf(mint));
+        completionBar.setProgressBackgroundTintList(ColorStateList.valueOf(cardLine));
+        week.addView(completionBar, new LinearLayout.LayoutParams(-1, dp(9)));
+        gap(week, 10);
+        week.addView(text(snapshot.activeMinutesThisWeek + " guided minutes  •  " + snapshot.fuelDaysThisWeek + " fuel check-in days", 14, muted));
+        if (!snapshot.lastWorkoutTarget.isEmpty()) week.addView(text("Last completed focus: " + snapshot.lastWorkoutTarget, 13, muted));
+        body.addView(week);
+        gap(body, 12);
+
+        LinearLayout next = card();
+        next.addView(heading("Your next best step", 19, ink));
+        String nextStep;
+        if (!BodyProfileStore.configured(this) || !WeightStore.configured(this)) {
+            nextStep = "Complete your private age, height, and weight profile so trends have useful context.";
+        } else if (session.isEmpty()) {
+            nextStep = "Build a workout plan. Progress becomes useful after your first completed guided session.";
+        } else if (snapshot.todayFuelGoals() < 3) {
+            nextStep = "Your plan is ready. Check today's flexible fuel goals, then start when you feel ready.";
+        } else {
+            nextStep = "Your plan and fuel check-in are connected. Start your next session or review your trend.";
+        }
+        next.addView(text(nextStep, 15, muted));
+        gap(next, 10);
+        Button workout = primary(session.isEmpty() ? "Build my workout" : "Open my workout");
+        workout.setOnClickListener(view -> { if (session.isEmpty()) showPlans(); else showPlanReady(); });
+        addButton(next, workout);
+        gap(next, 8);
+        Button nutrition = lightAction("Open today's nutrition check-in");
+        nutrition.setOnClickListener(view -> showMeals());
+        addButton(next, nutrition);
+        body.addView(next);
+        gap(body, 12);
+
+        LinearLayout profileCard = card();
+        profileCard.addView(heading("Private body context", 18, ink));
+        profileCard.addView(text(BodyProfileStore.summary(this), 14, muted));
+        profileCard.addView(text("Current weight: " + WeightStore.latestLabel(this) + ". Measurements add context; they never diagnose health or choose a lifting load.", 13, muted));
+        gap(profileCard, 10);
+        Button editProfile = lightAction(BodyProfileStore.configured(this) ? "Edit body profile" : "Complete body profile");
+        editProfile.setOnClickListener(view -> showBodyProfileSetup(false));
+        addButton(profileCard, editProfile);
+        body.addView(profileCard);
+        gap(body, 12);
 
         LinearLayout trend = card();
         trend.addView(heading(WeightStore.configured(this) ? WeightStore.summary(this) : "Set a private starting point", 18, ink));
-        trend.addView(text("Your check-ins stay on this device and are for personal reflection, not diagnosis.", 14, muted));
-        gap(trend, 12);
-        Button weight = primary("Weight trend check-in");
+        trend.addView(text("Look for a multi-week direction alongside workout consistency and fueling—not a verdict from one number.", 14, muted));
+        gap(trend, 10);
+        Button weight = secondary("Weight trend check-in");
         weight.setOnClickListener(view -> showWeightTracker());
         addButton(trend, weight);
         body.addView(trend);
-        gap(body, 12);
+    }
 
-        LinearLayout fuel = card();
-        fuel.addView(heading("Fuel ideas for " + goal, 18, ink));
-        fuel.addView(text("Flexible meal ideas based on your training focus, preferences, and needs.", 14, muted));
-        gap(fuel, 12);
-        Button meals = lightAction("Explore meal ideas");
-        meals.setOnClickListener(view -> showMeals());
-        addButton(fuel, meals);
-        body.addView(fuel);
-        gap(body, 16);
-
-        body.addView(heading("Keep it useful", 20, Color.WHITE));
-        gap(body, 5);
-        body.addView(text("Use the trend as a personal check-in. Adjust load, range, pace, or rest when needed.", 15, Color.rgb(211, 225, 233)));
+    private int plannedSessionsThisWeek() {
+        if (session.isEmpty()) return 0;
+        return "Weekly".equals(planMode) ? Math.max(1, trainingDays) : 1;
     }
 
     private void showProfile() {
@@ -2098,6 +2179,17 @@ public final class MainActivity extends Activity {
         identity.addView(heading(profile.email, 18, ink));
         identity.addView(text("Your local profile is stored on this device.", 14, muted));
         body.addView(identity);
+        gap(body, 12);
+
+        LinearLayout bodyProfile = card();
+        bodyProfile.addView(heading("Body & goal profile", 19, ink));
+        bodyProfile.addView(text(BodyProfileStore.summary(this), 14, muted));
+        bodyProfile.addView(text("Weight: " + WeightStore.latestLabel(this) + "  •  Used locally for trend context across Workouts, Progress, and Nutrition.", 13, muted));
+        bodyProfile.setClickable(true);
+        bodyProfile.setFocusable(true);
+        bodyProfile.setContentDescription("Body and goal profile. " + BodyProfileStore.summary(this));
+        bodyProfile.setOnClickListener(view -> showBodyProfileSetup(false));
+        body.addView(bodyProfile);
         gap(body, 12);
 
         LinearLayout coachSettings = card();
@@ -2143,6 +2235,8 @@ public final class MainActivity extends Activity {
             AccountStore.clear(this);
             PlanStore.clear(this);
             WeightStore.clear(this);
+            BodyProfileStore.clear(this);
+            JourneyStore.clear(this);
             session.clear();
             selectedExercises.clear();
             selectedTrainer = "Female";
@@ -2150,6 +2244,69 @@ public final class MainActivity extends Activity {
             showWelcome();
         });
         addButton(body, signOut);
+    }
+
+    private void showBodyProfileSetup(boolean onboarding) {
+        LinearLayout body = appPage("Settings");
+        title(body, "PRIVATE PROFILE", onboarding ? "Connect your plan" : "Body & goal profile",
+                "Age, height, and weight stay on this device. They add context across Workouts, Progress, and Nutrition; they do not diagnose health or choose a lifting load.");
+
+        LinearLayout consent = card();
+        consent.addView(heading("Why these details help", 18, ink));
+        consent.addView(text("Age can surface age-aware safety context. Height and weight support a private trend. Nutrition remains flexible and does not prescribe calories from these details.", 14, muted));
+        body.addView(consent);
+        gap(body, 12);
+
+        EditText age = input("Age — adults 18+", InputType.TYPE_CLASS_NUMBER);
+        if (BodyProfileStore.configured(this)) age.setText(String.valueOf(BodyProfileStore.age(this)));
+        body.addView(age);
+        gap(body, 9);
+        EditText height = input("Height in centimetres", InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        if (BodyProfileStore.configured(this)) height.setText(String.format(Locale.US, "%.0f", BodyProfileStore.heightCm(this)));
+        body.addView(height);
+        gap(body, 9);
+        EditText current = input("Current weight", InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        if (WeightStore.configured(this)) current.setText(String.format(Locale.US, "%.1f", WeightStore.latest(this)));
+        body.addView(current);
+        gap(body, 9);
+        EditText targetWeight = input("Personal target weight — optional", InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        if (WeightStore.configured(this)) targetWeight.setText(String.format(Locale.US, "%.1f", WeightStore.target(this)));
+        body.addView(targetWeight);
+        gap(body, 12);
+
+        body.addView(heading("Weight unit", 17, Color.WHITE));
+        RadioGroup units = new RadioGroup(this);
+        units.setOrientation(RadioGroup.HORIZONTAL);
+        boolean usePounds = WeightStore.configured(this) && "lb".equals(WeightStore.unit(this));
+        units.addView(unitOption(R.id.unit_kg, "kg", !usePounds));
+        units.addView(unitOption(R.id.unit_lb, "lb", usePounds));
+        body.addView(units);
+        gap(body, 14);
+
+        Button save = primary("Save and connect my pages");
+        save.setOnClickListener(view -> {
+            try {
+                int enteredAge = Integer.parseInt(age.getText().toString().trim());
+                float enteredHeight = Float.parseFloat(height.getText().toString().trim());
+                float enteredWeight = Float.parseFloat(current.getText().toString().trim());
+                if (enteredWeight <= 0) throw new IllegalArgumentException();
+                String targetText = targetWeight.getText().toString().trim();
+                float enteredTarget = targetText.isEmpty() ? enteredWeight : Float.parseFloat(targetText);
+                if (enteredTarget <= 0) throw new IllegalArgumentException();
+                String unit = units.getCheckedRadioButtonId() == R.id.unit_lb ? "lb" : "kg";
+                BodyProfileStore.save(this, enteredAge, enteredHeight);
+                WeightStore.updateProfile(this, enteredWeight, enteredTarget, unit);
+                toast("Your private profile now connects all three pages.");
+                if (onboarding) showPlans(); else showProfile();
+            } catch (Exception ignored) {
+                toast("Enter an adult age 18–100, height 100–250 cm, and positive weight.");
+            }
+        });
+        addButton(body, save);
+        gap(body, 9);
+        Button skip = secondary(onboarding ? "Skip for now" : "Back to account");
+        skip.setOnClickListener(view -> { if (onboarding) showPlans(); else showProfile(); });
+        addButton(body, skip);
     }
 
     private void showCoachCustomization() {
@@ -2561,6 +2718,8 @@ public final class MainActivity extends Activity {
         timingExerciseIndex = -1;
         setTracker = null;
         setHistory.clear();
+        guidedWorkoutStartedAt = SystemClock.elapsedRealtime();
+        guidedSessionRecorded = false;
         showSetCountIn(0, 1, true);
     }
 
@@ -2732,12 +2891,21 @@ public final class MainActivity extends Activity {
 
     private void finishSet(int index, int set, Coach.Exercise exercise, int recoverySeconds) {
         stopSetClock();
-        String[] completions = {
-                "Congrats, you have completed this set. Time to take a rest.",
-                "Good work, you have completed this set. Time to take a rest.",
-                "This set is complete. Well done. Time to take a rest."
-        };
-        String completion = completions[completionPhraseIndex++ % completions.length];
+        boolean exerciseComplete = set >= exercise.sets;
+        boolean hasNextExercise = index + 1 < session.size();
+        String completion;
+        if (exerciseComplete && hasNextExercise) {
+            completion = "Great, you have completed this exercise. Cooldown before you begin next exercise.";
+        } else if (exerciseComplete) {
+            completion = "Great, you have completed this exercise.";
+        } else {
+            String[] completions = {
+                    "Congrats, you have completed this set. Time to take a rest.",
+                    "Good work, you have completed this set. Time to take a rest.",
+                    "This set is complete. Well done. Time to take a rest."
+            };
+            completion = completions[completionPhraseIndex++ % completions.length];
+        }
         Runnable next = () -> continueAfterCompletedSet(index, set, exercise, recoverySeconds);
         if (CoachPreferences.usesCompletionDialogue(profile().dialogueMode)) {
             speakCoach(completion, TextToSpeech.QUEUE_FLUSH, next);
@@ -2755,7 +2923,7 @@ public final class MainActivity extends Activity {
     private void showRest(int index, int set, Coach.Exercise exercise, int secondsRemaining, boolean running, boolean betweenExercises) {
         stopSetClock();
         LinearLayout body = appPage("Workouts");
-        title(body, "REST CLOCK", betweenExercises ? "Exercise complete · recover" : "Set complete · recover", betweenExercises ? "Your next exercise begins after Coach " + coachName() + " gives your selected count-in." : "Your next set begins after your selected count-in.");
+        title(body, betweenExercises ? "COOLDOWN" : "REST CLOCK", betweenExercises ? "Cooldown before next exercise" : "Set complete · recover", betweenExercises ? "Recover for your selected time. Your next exercise begins after Coach " + coachName() + " gives your count-in." : "Your next set begins after your selected count-in.");
         LinearLayout timerCard = card();
         TextView timer = heading(format(secondsRemaining), 52, ink);
         timer.setGravity(Gravity.CENTER);
@@ -2843,6 +3011,15 @@ public final class MainActivity extends Activity {
 
     private String format(int seconds) {
         return String.format(Locale.US, "%02d:%02d", seconds / 60, seconds % 60);
+    }
+
+    private String restChoiceLabel(int seconds) {
+        int safe = WorkoutTiming.clampRestSeconds(seconds);
+        int minutes = safe / 60;
+        int remainder = safe % 60;
+        if (minutes == 0) return remainder + " sec";
+        if (remainder == 0) return minutes + (minutes == 1 ? " min" : " min");
+        return minutes + " min " + remainder + " sec";
     }
 
     private void say(String words) {
@@ -3117,18 +3294,77 @@ public final class MainActivity extends Activity {
 
     private void showMeals() {
         LinearLayout body = appPage("Nutrition");
-        title(body, "FUEL IDEAS", "Simple meals for " + goal, "Use these as flexible ideas. Adjust portions and ingredients to your preferences, budget, allergies, and dietary needs.");
+        title(body, "NUTRITION NEXUS", "Fuel the plan you built", "Use flexible food-group goals around your workout, then let Progress show the pattern beside your training consistency.");
+        JourneyStore.Snapshot snapshot = JourneyStore.snapshot(this);
+
+        LinearLayout connection = card();
+        connection.addView(heading(session.isEmpty() ? "No workout connected yet" : target + "  •  " + sessionMinutes + " min", 19, ink));
+        connection.addView(text(session.isEmpty()
+                ? "Build a plan and this page will connect meal ideas to its focus and duration."
+                : "Goal: " + goal + "  •  Equipment: " + equipmentSummary(), 14, muted));
+        gap(connection, 7);
+        connection.addView(text(BodyProfileStore.summary(this) + "  •  Weight: " + WeightStore.latestLabel(this), 13, muted));
+        connection.addView(text("Body details add private trend context only; they do not calculate a diet or prescribe portions.", 12, muted));
+        body.addView(connection);
+        gap(body, 12);
+
+        LinearLayout checkIn = card();
+        checkIn.addView(heading("Today's simple fuel check-in", 19, ink));
+        checkIn.addView(text(snapshot.todayFuelGoals() + " of 3 checked  •  Progress counts this as one day when you check any goal.", 13, muted));
+        gap(checkIn, 9);
+        addButton(checkIn, fuelGoalButton("Protein food included", JourneyStore.FUEL_PROTEIN, snapshot.todayFuelMask));
+        gap(checkIn, 7);
+        addButton(checkIn, fuelGoalButton("Fruit or colourful vegetables included", JourneyStore.FUEL_PLANTS, snapshot.todayFuelMask));
+        gap(checkIn, 7);
+        addButton(checkIn, fuelGoalButton("Hydration checked", JourneyStore.FUEL_HYDRATION, snapshot.todayFuelMask));
+        body.addView(checkIn);
+        gap(body, 12);
+
+        LinearLayout timing = card();
+        timing.addView(heading("Around your workout", 18, ink));
+        String before = session.isEmpty() ? "Plan first: workout timing will appear here."
+                : "Before: choose familiar food and fluids that feel comfortable before your " + sessionMinutes + "-minute session.";
+        timing.addView(text(before, 14, muted));
+        gap(timing, 5);
+        timing.addView(text("After: return to a balanced meal or snack with a protein food, produce, and a grain or other carbohydrate you enjoy.", 14, muted));
+        if (sessionMinutes >= 90) {
+            gap(timing, 5);
+            timing.addView(text("Longer session: plan access to fluids and avoid experimenting with unfamiliar foods during training.", 14, muted));
+        }
+        body.addView(timing);
+        gap(body, 14);
+
+        body.addView(heading("Meal ideas for " + goal, 20, Color.WHITE));
+        gap(body, 8);
         for (String meal : Coach.meals(goal)) {
             LinearLayout mealCard = card();
             mealCard.addView(heading(meal, 18, ink));
-            mealCard.addView(text("A balanced option to adapt around your day and training.", 14, muted));
+            mealCard.addView(text("Adapt ingredients and portions to appetite, culture, budget, allergies, and medical guidance.", 14, muted));
             body.addView(mealCard);
             gap(body, 9);
         }
-        gap(body, 7);
-        body.addView(heading("General fuel suggestion", 19, Color.WHITE));
         gap(body, 5);
-        body.addView(text("Aim for protein and colourful plants across the day, carbohydrates around training if useful, and regular hydration. For medical nutrition or weight-change targets, consult a registered dietitian.", 15, Color.rgb(211, 225, 233)));
+        Button workout = primary(session.isEmpty() ? "Build a connected workout" : "Open connected workout");
+        workout.setOnClickListener(view -> { if (session.isEmpty()) showPlans(); else showPlanReady(); });
+        addButton(body, workout);
+        gap(body, 8);
+        Button progress = secondary("See workout + nutrition progress");
+        progress.setOnClickListener(view -> showProgress());
+        addButton(body, progress);
+        gap(body, 12);
+        body.addView(text("These are general wellness ideas, not medical nutrition treatment. For allergies, medical conditions, eating concerns, pregnancy, or specific weight-change targets, consult a qualified clinician or registered dietitian.", 13, Color.rgb(211, 225, 233)));
+    }
+
+    private Button fuelGoalButton(String label, int flag, int mask) {
+        boolean selected = (mask & flag) != 0;
+        Button button = action((selected ? "✓  " : "○  ") + label, selected ? mint : Color.rgb(235, 240, 246), ink);
+        button.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+        button.setContentDescription(label + (selected ? ", checked" : ", not checked"));
+        button.setOnClickListener(view -> {
+            JourneyStore.toggleFuelGoal(this, flag);
+            showMeals();
+        });
+        return button;
     }
 
     private void showUpdate() {
@@ -3220,9 +3456,28 @@ public final class MainActivity extends Activity {
     private void showComplete() {
         if (restTimer != null) restTimer.cancel();
         stopSetClock();
+        if (!guidedSessionRecorded) {
+            long elapsed = guidedWorkoutStartedAt == 0 ? 60_000L : Math.max(60_000L, SystemClock.elapsedRealtime() - guidedWorkoutStartedAt);
+            JourneyStore.recordWorkout(this, target, (int) Math.max(1, Math.round(elapsed / 60_000d)));
+            guidedSessionRecorded = true;
+        }
+        JourneyStore.Snapshot snapshot = JourneyStore.snapshot(this);
         LinearLayout body = appPage("Workouts");
-        title(body, "SESSION COMPLETE", "Strong work", "You completed your " + target + " plan. Hydrate, recover, and let your next session start with a fresh choice.");
-        Button home = primary("Return home");
+        title(body, "SESSION COMPLETE", "Strong work", "Your " + target + " workout now appears in Progress. Complete a simple fuel check-in to close the loop.");
+        LinearLayout linked = card();
+        linked.addView(heading(snapshot.workoutsThisWeek + " workouts  •  " + snapshot.activeMinutesThisWeek + " guided min", 19, ink));
+        linked.addView(text("This week  •  " + snapshot.fuelDaysThisWeek + " nutrition check-in days", 14, muted));
+        body.addView(linked);
+        gap(body, 12);
+        Button fuel = primary("Log recovery fuel");
+        fuel.setOnClickListener(view -> showMeals());
+        addButton(body, fuel);
+        gap(body, 8);
+        Button progress = secondary("View connected progress");
+        progress.setOnClickListener(view -> showProgress());
+        addButton(body, progress);
+        gap(body, 8);
+        Button home = lightAction("Return home");
         home.setOnClickListener(view -> showHome());
         addButton(body, home);
     }

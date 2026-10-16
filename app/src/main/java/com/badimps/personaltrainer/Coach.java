@@ -124,7 +124,7 @@ public final class Coach {
 
     public static String durationSummary(int minutes) {
         int movements = minutes <= 45 ? 4 : minutes <= 60 ? 6 : minutes <= 110 ? 8 : 10;
-        return movements + " recommended movements · 3–5 min recovery";
+        return movements + " recommended movements · custom 45 sec–8 min rest";
     }
 
     /** Creates a session-specific copy without mutating the offline exercise catalogue. */

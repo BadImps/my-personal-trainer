@@ -66,3 +66,11 @@ Workout planning accepts one or two equipment categories and merges compatible e
 Coach audio now follows Taskmaster’s proven Android Text-to-Speech workflow. The Voice Organizer previews every installed offline English voice and lets the listener label it Male, Female, or Unlabelled. Those device-local labels are matched to the selected coach’s gender and regional accent; a known female voice can never be substituted for Leo, Mark, or Stephen, and a known male voice can never be substituted for Mia, Amy, or Claudia.
 
 Exercise posters, training-area artwork, equipment artwork, and looping videos preserve their source aspect ratios inside clipped tiles. Cached artwork and a transparent video preparation frame remove stretched first frames and reduce visual flicker.
+
+## 3.2 connected wellness nexus
+
+Workouts, Progress, and Nutrition now share one private device-local journey. Completed guided sessions update weekly workout totals and guided minutes; simple nutrition check-ins update the same Progress view; and each page offers a direct next step into the others. An optional adult body profile captures age, height, current weight, and a personal target with clear privacy and safety boundaries.
+
+Rest between sets is now adjustable from 45 seconds through 8 minutes in 15-second steps. The last set of an exercise uses the dedicated cooldown dialogue before the next exercise begins.
+
+The evidence review and product decisions are documented in `docs/WORKOUT_PROGRESS_NUTRITION_NEXUS.md`.

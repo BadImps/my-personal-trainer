@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 22,
-  "versionName": "3.1",
-  "publishedAt": "2026-10-16T01:18:00Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v3.1/app-release.apk",
-  "sha256": "44a6beb6d8f7a53a6d64c463296d067a69ee691d81e91c45610738a848f9473a",
-  "sizeBytes": 32997365,
-  "notes": "Uses Taskmaster’s preview-and-label voice workflow so installed offline voices are explicitly identified as Male, Female, or Unlabelled before coach matching. Wrong-gender fallback is blocked. Exercise posters, tile artwork, and 30 fps video loops now preserve their aspect ratios and avoid stretched first frames."
+  "versionCode": 23,
+  "versionName": "3.2",
+  "publishedAt": "2026-10-16T01:47:50Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v3.2/app-release.apk",
+  "sha256": "2e43fcbd926371e0b1691055ee43edd06185f44516b2c799195b33ed2d68089e",
+  "sizeBytes": 33003485,
+  "notes": "Connects Workouts, Progress, and Nutrition through private device-local completion, guided-minute, and daily fuel signals. Adds an optional adult age, height, and weight profile; custom 45-second to 8-minute set recovery; and the requested last-set cooldown dialogue."
 }
