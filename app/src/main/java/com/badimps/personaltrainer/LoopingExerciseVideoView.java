@@ -3,6 +3,7 @@ package com.badimps.personaltrainer;
 import android.content.Context;
 import android.content.res.AssetFileDescriptor;
 import android.graphics.Matrix;
+import android.graphics.RectF;
 import android.graphics.SurfaceTexture;
 import android.media.MediaPlayer;
 import android.view.Surface;
@@ -27,7 +28,8 @@ public final class LoopingExerciseVideoView extends TextureView implements Textu
         super(context);
         this.videoResource = videoResource;
         setSurfaceTextureListener(this);
-        setOpaque(true);
+        setOpaque(false);
+        setAlpha(0f);
     }
 
     @Override protected void onAttachedToWindow() {
@@ -109,14 +111,15 @@ public final class LoopingExerciseVideoView extends TextureView implements Textu
         float containedScale = Math.min(getWidth() / (float) videoWidth, getHeight() / (float) videoHeight);
         float containedWidth = videoWidth * containedScale;
         float containedHeight = videoHeight * containedScale;
-        float scaleX = containedWidth / getWidth();
-        float scaleY = containedHeight / getHeight();
         float dx = (getWidth() - containedWidth) / 2f;
         float dy = (getHeight() - containedHeight) / 2f;
         Matrix matrix = new Matrix();
-        matrix.setScale(scaleX, scaleY);
-        matrix.postTranslate(dx, dy);
+        matrix.setRectToRect(
+                new RectF(0f, 0f, getWidth(), getHeight()),
+                new RectF(dx, dy, dx + containedWidth, dy + containedHeight),
+                Matrix.ScaleToFit.FILL);
         setTransform(matrix);
+        setAlpha(1f);
     }
 
     private void releasePlayer() {

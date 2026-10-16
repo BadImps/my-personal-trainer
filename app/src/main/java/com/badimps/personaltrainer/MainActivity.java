@@ -1,7 +1,9 @@
 package com.badimps.personaltrainer;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.app.Dialog;
+import android.content.Intent;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.Typeface;
@@ -39,7 +41,6 @@ import android.widget.Toast;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -94,6 +95,10 @@ public final class MainActivity extends Activity {
     private final Map<String, Runnable> speechDoneCallbacks = new HashMap<>();
     private boolean ttsReady;
     private Voice coachTtsVoice;
+    private boolean coachVoiceVerified;
+    private float coachSpeechPitch = 1f;
+    private float coachSpeechRate = .92f;
+    private String coachVoiceStatus = "Checking installed Android voices…";
     private ToneGenerator toneGenerator;
     private long speechSequence;
     private long speechGeneration;
@@ -661,8 +666,9 @@ public final class MainActivity extends Activity {
         ImageView poster = new ImageView(this);
         int visual = ExerciseVisuals.forExercise(this, trainer, exercise.name);
         if (visual != 0) poster.setImageResource(visual);
-        poster.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        poster.setBackground(surface(navyPanel, 14, 0, Color.TRANSPARENT));
+        poster.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        poster.setBackground(surface(paper, 14, 1, cardLine));
+        poster.setPadding(dp(1), dp(1), dp(1), dp(1));
         poster.setClipToOutline(true);
         poster.setContentDescription(null);
         return poster;
@@ -1279,6 +1285,7 @@ public final class MainActivity extends Activity {
         tile.setClipToOutline(true);
         elevatePlanSurface(tile, selected);
         FrameLayout imageArea = new FrameLayout(this);
+        imageArea.setBackgroundColor(Color.WHITE);
         int targetIndex = 0;
         for (int index = 0; index < WIZARD_TARGETS.length; index++) if (WIZARD_TARGETS[index].equals(choice)) targetIndex = index;
         int[] columnLeft = {4, 515};
@@ -1474,6 +1481,7 @@ public final class MainActivity extends Activity {
         tile.setClipToOutline(true);
         elevatePlanSurface(tile, selected);
         FrameLayout imageArea = new FrameLayout(this);
+        imageArea.setBackgroundColor(Color.WHITE);
         int equipmentIndex = 0;
         for (int index = 0; index < Coach.EQUIPMENT_TYPES.length; index++) if (Coach.EQUIPMENT_TYPES[index].equals(label)) equipmentIndex = index;
         int column = equipmentIndex % 2;
@@ -2197,8 +2205,23 @@ public final class MainActivity extends Activity {
         gap(body, 12);
 
         LinearLayout note = card();
-        note.addView(heading("Voice availability", 15, ink));
-        note.addView(text("Android uses the closest installed regional voice for Spanish, US, or UK delivery. You can add more voices in your phone’s text-to-speech settings.", 13, muted));
+        note.addView(heading("Coach voice", 17, ink));
+        note.addView(text(coachVoiceStatus, 13, muted));
+        gap(note, 9);
+        Button previewVoice = primary(coachVoiceVerified ? "Preview Coach " + profile.coachName + "’s voice" : "Assign a voice to Coach " + profile.coachName);
+        previewVoice.setOnClickListener(view -> {
+            if (coachVoiceVerified) speakCoach("Hi, I’m " + profile.coachName + ". Let’s get ready for your workout.", TextToSpeech.QUEUE_FLUSH, null);
+            else showVoiceOrganizer();
+        });
+        addButton(note, previewVoice);
+        gap(note, 7);
+        Button organizeVoices = secondary("Preview & label installed voices");
+        organizeVoices.setOnClickListener(view -> showVoiceOrganizer());
+        addButton(note, organizeVoices);
+        gap(note, 7);
+        Button voiceSettings = lightAction("Open Android voice settings");
+        voiceSettings.setOnClickListener(view -> openVoiceSettings());
+        addButton(note, voiceSettings);
         body.addView(note);
         gap(body, 12);
         Button back = secondary("Back to account");
@@ -2246,6 +2269,145 @@ public final class MainActivity extends Activity {
         applyKeepPhoneAwake(updated.keepPhoneAwake);
         configureSpeechVoices();
         showCoachCustomization();
+    }
+
+    private void openVoiceSettings() {
+        try {
+            startActivity(new Intent("com.android.settings.TTS_SETTINGS"));
+        } catch (RuntimeException unavailable) {
+            startActivity(new Intent("android.settings.ACCESSIBILITY_SETTINGS"));
+        }
+    }
+
+    /** Taskmaster-style organizer: listen first, then explicitly label the installed system voice. */
+    private void showVoiceOrganizer() {
+        stopSpeech();
+        LinearLayout body = appPage("Settings");
+        title(body, "VOICE ORGANIZER", "Preview & label voices", "Android voice names do not reliably identify gender. Listen to each installed offline voice, then label it Male, Female, or Unlabelled. Your labels stay on this phone.");
+
+        List<Voice> installed = offlineEnglishVoices();
+        if (!ttsReady || installed.isEmpty()) {
+            LinearLayout empty = card();
+            empty.addView(heading("No offline English voices found", 18, ink));
+            empty.addView(text("Install English voice data in Android’s Text-to-Speech settings, then return here to preview and label it.", 14, muted));
+            gap(empty, 10);
+            Button settings = secondary("Open Android voice settings");
+            settings.setOnClickListener(view -> openVoiceSettings());
+            addButton(empty, settings);
+            body.addView(empty);
+        } else {
+            body.addView(chip(installed.size() + (installed.size() == 1 ? " OFFLINE VOICE" : " OFFLINE VOICES")));
+            gap(body, 12);
+            String engine = currentVoiceEngine();
+            for (Voice candidate : installed) {
+                LinearLayout item = card();
+                String savedLabel = CoachVoiceLabels.label(this, engine, candidate.getName());
+                CoachVoiceSelector.Gender detected = CoachVoiceSelector.detectGender(voiceCandidate(candidate, engine));
+                String visibleLabel = savedLabel;
+                if ("Not reviewed".equals(savedLabel) && detected != CoachVoiceSelector.Gender.UNKNOWN) {
+                    visibleLabel = "Detected " + voiceGenderName(detected) + " · tap Label to confirm";
+                }
+                item.addView(heading(voiceLocaleLabel(candidate) + "  ·  " + visibleLabel, 17, ink));
+                TextView technicalName = text(candidate.getName(), 12, muted);
+                technicalName.setMaxLines(2);
+                item.addView(technicalName);
+                gap(item, 10);
+
+                LinearLayout actions = new LinearLayout(this);
+                actions.setOrientation(LinearLayout.HORIZONTAL);
+                Button preview = lightAction("Listen");
+                preview.setOnClickListener(view -> previewInstalledVoice(candidate));
+                LinearLayout.LayoutParams previewParams = new LinearLayout.LayoutParams(0, dp(48), 1);
+                previewParams.rightMargin = dp(7);
+                actions.addView(preview, previewParams);
+                Button label = secondary("Label voice");
+                label.setOnClickListener(view -> labelInstalledVoice(candidate));
+                LinearLayout.LayoutParams labelParams = new LinearLayout.LayoutParams(0, dp(48), 1);
+                labelParams.leftMargin = dp(7);
+                actions.addView(label, labelParams);
+                item.addView(actions, new LinearLayout.LayoutParams(-1, dp(48)));
+                body.addView(item);
+                gap(body, 9);
+            }
+        }
+
+        Button done = primary("Done — match my coach");
+        done.setOnClickListener(view -> {
+            configureSpeechVoices();
+            showCoachCustomization();
+        });
+        addButton(body, done);
+        gap(body, 8);
+        Button back = lightAction("Back to coach settings");
+        back.setOnClickListener(view -> showCoachCustomization());
+        addButton(body, back);
+    }
+
+    private void labelInstalledVoice(Voice candidate) {
+        previewInstalledVoice(candidate);
+        new AlertDialog.Builder(this)
+                .setTitle(voiceLocaleLabel(candidate))
+                .setMessage("Listen to the sample, then label this voice. This choice is saved on this phone and used to keep male and female coaches distinct.")
+                .setPositiveButton("Male", (dialog, which) -> saveVoiceLabel(candidate, CoachVoiceSelector.Gender.MALE))
+                .setNegativeButton("Female", (dialog, which) -> saveVoiceLabel(candidate, CoachVoiceSelector.Gender.FEMALE))
+                .setNeutralButton("Keep Unlabelled", (dialog, which) -> saveVoiceLabel(candidate, CoachVoiceSelector.Gender.UNKNOWN))
+                .show();
+    }
+
+    private void saveVoiceLabel(Voice candidate, CoachVoiceSelector.Gender gender) {
+        CoachVoiceLabels.set(this, currentVoiceEngine(), candidate.getName(), gender);
+        configureSpeechVoices();
+        toast("Voice labelled " + voiceGenderName(gender));
+        showVoiceOrganizer();
+    }
+
+    private void previewInstalledVoice(Voice candidate) {
+        if (!ttsReady || voice == null) {
+            toast("Wait for speech to finish loading.");
+            return;
+        }
+        stopSpeech();
+        voice.setVoice(candidate);
+        voice.setPitch(1f);
+        voice.setSpeechRate(.92f);
+        voice.speak("This is an installed voice preview. Listen, then choose the matching label.", TextToSpeech.QUEUE_FLUSH, null, "voice-label-preview-" + (++speechSequence));
+    }
+
+    private List<Voice> offlineEnglishVoices() {
+        ArrayList<Voice> result = new ArrayList<>();
+        if (voice == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) return result;
+        Set<Voice> available = voice.getVoices();
+        if (available == null) return result;
+        for (Voice candidate : available) {
+            Locale locale = candidate.getLocale();
+            Set<String> features = candidate.getFeatures();
+            boolean missing = features != null && features.contains(TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED);
+            if (locale != null && "en".equalsIgnoreCase(locale.getLanguage()) && !candidate.isNetworkConnectionRequired() && !missing) result.add(candidate);
+        }
+        result.sort((first, second) -> {
+            int localeOrder = voiceLocaleLabel(first).compareToIgnoreCase(voiceLocaleLabel(second));
+            return localeOrder != 0 ? localeOrder : first.getName().compareToIgnoreCase(second.getName());
+        });
+        return result;
+    }
+
+    private String voiceLocaleLabel(Voice candidate) {
+        Locale locale = candidate.getLocale();
+        if (locale == null) return "Unknown language";
+        String language = locale.getDisplayLanguage(Locale.ENGLISH);
+        String country = locale.getDisplayCountry(Locale.ENGLISH);
+        return country.isEmpty() ? language : language + " (" + country + ")";
+    }
+
+    private String currentVoiceEngine() {
+        if (voice == null || voice.getDefaultEngine() == null) return "android-default";
+        return voice.getDefaultEngine();
+    }
+
+    private String voiceGenderName(CoachVoiceSelector.Gender gender) {
+        if (gender == CoachVoiceSelector.Gender.MALE) return "Male";
+        if (gender == CoachVoiceSelector.Gender.FEMALE) return "Female";
+        return "Unlabelled";
     }
 
     // Plan wizard
@@ -2712,36 +2874,62 @@ public final class MainActivity extends Activity {
 
     private void configureSpeechVoices() {
         if (voice == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) return;
-        Set<Voice> installed = voice.getVoices();
-        if (installed == null || installed.isEmpty()) return;
+        List<Voice> installed = offlineEnglishVoices();
         String activeCoach = AccountStore.exists(this) ? profile().coachName : CoachPreferences.defaultCoach(selectedTrainer);
         CoachPreferences.CoachOption option = CoachPreferences.coach(activeCoach);
         voice.setLanguage(option.locale);
-        ArrayList<Voice> regional = new ArrayList<>();
-        ArrayList<Voice> english = new ArrayList<>();
-        for (Voice candidate : installed) {
-            if (candidate.getLocale() == null || !"en".equals(candidate.getLocale().getLanguage())) continue;
-            english.add(candidate);
-            if (option.locale.getCountry().equalsIgnoreCase(candidate.getLocale().getCountry())) regional.add(candidate);
+        coachSpeechRate = "Spanish accent".equals(option.accent) ? .90f : "US accent".equals(option.accent) ? .95f : .92f;
+        boolean male = "Male".equals(option.gender);
+        coachSpeechPitch = male ? .86f : 1.08f;
+        coachTtsVoice = voice.getVoice();
+        coachVoiceVerified = false;
+        if (installed.isEmpty()) {
+            coachTtsVoice = null;
+            coachVoiceStatus = "No offline English voice is installed. Open Android voice settings and install a " + option.gender.toLowerCase(Locale.ROOT) + " " + option.accent.replace(" accent", "") + " voice.";
+            return;
         }
-        regional.sort(Comparator.comparing(Voice::getName));
-        english.sort(Comparator.comparing(Voice::getName));
-        boolean maleTrainer = "Male".equals(option.gender);
-        coachTtsVoice = findNamedVoice(regional, maleTrainer ? "male" : "female");
-        if (coachTtsVoice == null && !regional.isEmpty()) coachTtsVoice = regional.get(maleTrainer ? regional.size() - 1 : 0);
-        if (coachTtsVoice == null) coachTtsVoice = findNamedVoice(english, maleTrainer ? "male" : "female");
-        if (coachTtsVoice == null && !english.isEmpty()) coachTtsVoice = english.get(maleTrainer ? english.size() - 1 : 0);
+        ArrayList<CoachVoiceSelector.Candidate> candidates = new ArrayList<>();
+        Map<String, Voice> voicesByName = new HashMap<>();
+        String engine = currentVoiceEngine();
+        for (Voice candidate : installed) {
+            candidates.add(voiceCandidate(candidate, engine));
+            voicesByName.put(candidate.getName(), candidate);
+        }
+        CoachVoiceSelector.Selection selection = CoachVoiceSelector.select(candidates, option);
+        if (selection == null) {
+            coachTtsVoice = null;
+            coachVoiceStatus = "No installed voice is labelled " + option.gender + ". Use Preview & label installed voices to assign one; the wrong-gender voice will never be substituted.";
+            return;
+        }
+        coachTtsVoice = voicesByName.get(selection.candidate.id);
+        coachVoiceVerified = selection.genderMatched;
+        if (coachVoiceVerified) coachSpeechPitch = 1f;
+        String gender = option.gender.toLowerCase(Locale.ROOT);
+        String accent = option.accent.replace(" accent", "");
+        if (selection.exactMatch()) {
+            coachVoiceStatus = "Coach " + option.name + " is matched to an installed " + gender + " " + accent + " voice.";
+        } else if (selection.genderMatched) {
+            coachVoiceStatus = "Coach " + option.name + " is using an installed " + gender + " English voice. Install a " + gender + " " + accent + " voice for an exact accent match.";
+        } else {
+            coachTtsVoice = null;
+            coachVoiceStatus = "Coach " + option.name + " has no verified " + gender + " voice yet. Use Preview & label installed voices; coach speech stays off until a matching voice is confirmed.";
+        }
     }
 
-    private Voice findNamedVoice(List<Voice> voices, String token) {
-        if (token == null) return null;
-        for (Voice candidate : voices) {
-            if (candidate.getName().toLowerCase(Locale.ROOT).contains(token)) return candidate;
-        }
-        return null;
+    private CoachVoiceSelector.Candidate voiceCandidate(Voice candidate, String engine) {
+        return new CoachVoiceSelector.Candidate(candidate.getName(), candidate.getLocale(), candidate.getFeatures(),
+                candidate.getQuality(), candidate.getLatency(), candidate.isNetworkConnectionRequired(),
+                CoachVoiceLabels.assigned(this, engine, candidate.getName()));
     }
 
     private void speakCoach(String words, int queueMode, Runnable done) {
+        if (!coachVoiceVerified || coachTtsVoice == null) {
+            final long generation = speechGeneration;
+            if (done != null) workoutHandler.postDelayed(() -> {
+                if (generation == speechGeneration) done.run();
+            }, 350L);
+            return;
+        }
         speakWithVoice(words, queueMode, coachTtsVoice, done);
     }
 
@@ -2758,6 +2946,8 @@ public final class MainActivity extends Activity {
             return;
         }
         if (selectedVoice != null) voice.setVoice(selectedVoice);
+        voice.setPitch(coachSpeechPitch);
+        voice.setSpeechRate(coachSpeechRate);
         String utteranceId = "speech-" + (++speechSequence);
         if (done != null) speechDoneCallbacks.put(utteranceId, done);
         int result = voice.speak(words, queueMode, null, utteranceId);

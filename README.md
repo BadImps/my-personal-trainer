@@ -60,3 +60,9 @@ The Workout page is now a focused five-step builder: Plan type, Training area, E
 Account Settings now includes Customize your Coach with six choices: Mia and Leo (Spanish delivery), Amy and Mark (US delivery), and Claudia and Stephen (UK delivery). Audio can be set to Full Dialogue, Minimal, No Dialogue with low 3–1 beeps plus a high start beep, or No Sound. Keep Phone Awake prevents the display from sleeping while the app is open.
 
 Workout planning accepts one or two equipment categories and merges compatible exercises without duplicates. Training-area and equipment tiles use new high-resolution artwork. Press and hold an exercise to open a detailed animated form preview. All 88 offline demonstrations use looping 30 fps local video for stable, flicker-free motion.
+
+## 3.1 verified coach voices and fitted media
+
+Coach audio now follows Taskmaster’s proven Android Text-to-Speech workflow. The Voice Organizer previews every installed offline English voice and lets the listener label it Male, Female, or Unlabelled. Those device-local labels are matched to the selected coach’s gender and regional accent; a known female voice can never be substituted for Leo, Mark, or Stephen, and a known male voice can never be substituted for Mia, Amy, or Claudia.
+
+Exercise posters, training-area artwork, equipment artwork, and looping videos preserve their source aspect ratios inside clipped tiles. Cached artwork and a transparent video preparation frame remove stretched first frames and reduce visual flicker.

@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 21,
-  "versionName": "3.0",
-  "publishedAt": "2026-10-15T23:52:33Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v3.0/app-release.apk",
-  "sha256": "cea36d888304eae0b82a1c46961c321615410841b22a3a440cff45ab9b0f5cac",
-  "sizeBytes": 32990281,
-  "notes": "Adds six selectable coaches with Spanish, US, and UK delivery, four dialogue and sound modes, Keep Phone Awake, one-or-two equipment selection, sharper training and equipment artwork, and animated press-and-hold exercise details. All 88 offline exercise videos loop at 30 fps for smooth, stable playback."
+  "versionCode": 22,
+  "versionName": "3.1",
+  "publishedAt": "2026-10-16T01:18:00Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v3.1/app-release.apk",
+  "sha256": "44a6beb6d8f7a53a6d64c463296d067a69ee691d81e91c45610738a848f9473a",
+  "sizeBytes": 32997365,
+  "notes": "Uses Taskmaster’s preview-and-label voice workflow so installed offline voices are explicitly identified as Male, Female, or Unlabelled before coach matching. Wrong-gender fallback is blocked. Exercise posters, tile artwork, and 30 fps video loops now preserve their aspect ratios and avoid stretched first frames."
 }
