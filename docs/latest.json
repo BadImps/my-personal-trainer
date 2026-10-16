@@ -3,7 +3,7 @@
   "versionCode": 25,
   "versionName": "3.4",
   "publishedAt": "2026-10-16T12:30:00Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v3.4/app-release.apk",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v3.4/My-Personal-Trainer-3.4.apk",
   "sha256": "5cfa80610701baf7ef862dabddd62fcc0feefd742f96099c074d518822adb435",
   "sizeBytes": 34419493,
   "notes": "Adds an end-to-end training week, reminder, nutrition, and progress loop. The wizard now includes Back, Shoulders, Core, and Endurance with Dumbbells, At home, Machine-assisted, and Bodyweight exercise choices. Abs remains excluded as its own category."
