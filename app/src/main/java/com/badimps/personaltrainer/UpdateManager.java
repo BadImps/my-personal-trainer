@@ -101,7 +101,9 @@ public final class UpdateManager {
             // Transport failures can safely use the independently routed mirror. A downloaded
             // manifest that fails validation remains a visible safety failure.
             try {
-                return checkEndpoint(FALLBACK_ENDPOINT);
+                // Raw GitHub may cache the branch URL. A distinct query key keeps a carrier
+                // fallback from receiving an older manifest after a new release is published.
+                return checkEndpoint(FALLBACK_ENDPOINT + "?checkedAt=" + System.currentTimeMillis());
             } catch (Exception fallbackError) {
                 fallbackError.addSuppressed(primaryError);
                 throw new IOException("Could not reach either update service", fallbackError);
