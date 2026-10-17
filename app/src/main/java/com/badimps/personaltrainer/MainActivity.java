@@ -167,6 +167,10 @@ public final class MainActivity extends Activity {
     private int schedulerHour = 18;
     private int schedulerMinute;
     private int schedulerDurationMinutes = 45;
+    /** Timer-only endurance session: no location request, map trace, or background GPS service. */
+    private String manualEnduranceMode;
+    private long manualEnduranceStartedAt;
+    private Runnable manualEnduranceTimer;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -662,7 +666,7 @@ public final class MainActivity extends Activity {
         rail.addView(divider, dividerParams);
 
         addPlanRailItem(rail, "Home", R.drawable.ic_nav_home, false, view -> { stopGuidedRuntime(); showHome(); });
-        addPlanRailItem(rail, "Workouts", R.drawable.ic_nav_plan, true, view -> { stopGuidedRuntime(); showPlans(); });
+        addPlanRailItem(rail, "Workouts", R.drawable.ic_nav_workouts, true, view -> { stopGuidedRuntime(); showPlans(); });
         addPlanRailItem(rail, "Progress", R.drawable.ic_nav_progress, false, view -> { stopGuidedRuntime(); showProgress(); });
         addPlanRailItem(rail, "Nutrition", R.drawable.ic_nav_nutrition, false, view -> { stopGuidedRuntime(); showMeals(); });
         addPlanRailItem(rail, "Endurance", R.drawable.ic_nav_endurance, false, view -> { stopGuidedRuntime(); showEndurance(); });
@@ -730,7 +734,7 @@ public final class MainActivity extends Activity {
         rail.addView(divider, dividerParams);
 
         addRailItem(rail, "Home", R.drawable.ic_nav_home, activeScreen, view -> { stopGuidedRuntime(); showHome(); });
-        addRailItem(rail, "Workouts", R.drawable.ic_nav_plan, activeScreen, view -> { stopGuidedRuntime(); showPlans(); });
+        addRailItem(rail, "Workouts", R.drawable.ic_nav_workouts, activeScreen, view -> { stopGuidedRuntime(); showPlans(); });
         addRailItem(rail, "Progress", R.drawable.ic_nav_progress, activeScreen, view -> { stopGuidedRuntime(); showProgress(); });
         addRailItem(rail, "Nutrition", R.drawable.ic_nav_nutrition, activeScreen, view -> { stopGuidedRuntime(); showMeals(); });
         addRailItem(rail, "Endurance", R.drawable.ic_nav_endurance, activeScreen, view -> { stopGuidedRuntime(); showEndurance(); });
@@ -4878,6 +4882,10 @@ public final class MainActivity extends Activity {
      */
     private void showEndurance() {
         LinearLayout body = appPage("Endurance");
+        if (manualEnduranceMode != null) {
+            showManualEnduranceSession();
+            return;
+        }
         title(body, "ENDURANCE", "Map your next move", "Plan a walking, running, or cycling route, then open it in your installed map app. Route details stay on this phone.");
         LiveTrackingStore.Session live = LiveTrackingStore.current(this);
         if (live.active) {
@@ -5177,11 +5185,67 @@ public final class MainActivity extends Activity {
         LiveTrackingStore.Session active = LiveTrackingStore.current(this);
         if (!active.active) {
             gap(tile, 8);
+            Button timerOnly = lightAction("Start " + name.toLowerCase(Locale.ROOT) + " without live tracking");
+            timerOnly.setOnClickListener(view -> startManualEndurance(mode));
+            addButton(tile, timerOnly);
+            gap(tile, 7);
             Button start = secondary("Start live " + name.toLowerCase(Locale.ROOT));
             start.setOnClickListener(view -> requestLiveTracking(mode));
             addButton(tile, start);
         }
         body.addView(tile);
+    }
+
+    /** A location-free alternative for treadmill, indoor-bike, or privacy-first endurance sessions. */
+    private void startManualEndurance(String mode) {
+        manualEnduranceMode = mode;
+        manualEnduranceStartedAt = SystemClock.elapsedRealtime();
+        showManualEnduranceSession();
+    }
+
+    private void showManualEnduranceSession() {
+        LinearLayout body = appPage("Endurance");
+        final int sessionPage = pageGeneration;
+        String activity = appointmentAbbreviation(manualEnduranceMode);
+        title(body, "ENDURANCE", activity + " in progress", "Timer-only session. Location, map tracing, and live tracking are off.");
+        LinearLayout sessionCard = card();
+        sessionCard.addView(heading(activity.toUpperCase(Locale.ROOT) + " · NO LIVE TRACKING", 17, ink));
+        TextView elapsed = heading("00:00", 48, ink);
+        elapsed.setGravity(Gravity.CENTER);
+        elapsed.setContentDescription("Elapsed time");
+        sessionCard.addView(elapsed, new LinearLayout.LayoutParams(-1, dp(86)));
+        sessionCard.addView(text("Use this for indoor sessions, a treadmill, stationary bike, or whenever you prefer not to share location.", 14, muted));
+        body.addView(sessionCard);
+        gap(body, 12);
+        Button finish = primary("Finish and save to Progress");
+        finish.setOnClickListener(view -> {
+            long duration = Math.max(60_000L, SystemClock.elapsedRealtime() - manualEnduranceStartedAt);
+            int minutes = Math.max(1, Math.round(duration / 60_000f));
+            JourneyStore.recordWorkout(this, "Endurance · " + manualEnduranceMode, minutes);
+            endManualEnduranceSession();
+            toast("Timer-only endurance session saved to Progress.");
+            showProgress();
+        });
+        addButton(body, finish);
+        gap(body, 8);
+        Button cancel = secondary("Cancel session");
+        cancel.setOnClickListener(view -> { endManualEnduranceSession(); showEndurance(); });
+        addButton(body, cancel);
+        manualEnduranceTimer = new Runnable() {
+            @Override public void run() {
+                if (manualEnduranceMode == null || pageGeneration != sessionPage) return;
+                elapsed.setText(formatLiveDuration(SystemClock.elapsedRealtime() - manualEnduranceStartedAt));
+                workoutHandler.postDelayed(this, 250L);
+            }
+        };
+        workoutHandler.post(manualEnduranceTimer);
+    }
+
+    private void endManualEnduranceSession() {
+        if (manualEnduranceTimer != null) workoutHandler.removeCallbacks(manualEnduranceTimer);
+        manualEnduranceTimer = null;
+        manualEnduranceMode = null;
+        manualEnduranceStartedAt = 0L;
     }
 
     private void addLiveTrackingCard(LinearLayout body, LiveTrackingStore.Session live) {
