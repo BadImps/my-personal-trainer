@@ -26,6 +26,7 @@ import android.speech.tts.TextToSpeech;
 import android.speech.tts.UtteranceProgressListener;
 import android.speech.tts.Voice;
 import android.text.InputType;
+import android.text.method.PasswordTransformationMethod;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
@@ -216,7 +217,11 @@ public final class MainActivity extends FragmentActivity {
         restoreSavedPlan();
         if (hasLocalAccount) {
             AccountStore.Profile profile = AccountStore.get(this);
-            if (profile.biometricUnlock || !profile.rememberSignIn) showLogin();
+            // Biometric unlock is an account-entry method, not an extra tap on the login form.
+            // It must be requested automatically whenever the member enabled it; cancelling it
+            // simply leaves the same masked password form available as a fallback.
+            if (profile.biometricUnlock) showLogin(true);
+            else if (!profile.rememberSignIn) showLogin();
             else if (getIntent().getBooleanExtra(EXTRA_START_GUIDED_WORKOUT, false) && !session.isEmpty()) showWorkoutCountdown();
             else showHome();
         } else {
@@ -1114,6 +1119,7 @@ public final class MainActivity extends FragmentActivity {
         field.setTextColor(ink);
         field.setHintTextColor(muted);
         field.setInputType(inputType);
+        applyPasswordMask(field, inputType);
         field.setSingleLine(true);
         field.setPadding(dp(15), dp(7), dp(15), dp(7));
         field.setBackground(surface(paper, 14, 1, cardLine));
@@ -1133,11 +1139,21 @@ public final class MainActivity extends FragmentActivity {
         field.setTextColor(Color.WHITE);
         field.setHintTextColor(Color.rgb(196, 210, 226));
         field.setInputType(inputType);
+        applyPasswordMask(field, inputType);
         field.setSingleLine(true);
         field.setPadding(dp(15), dp(6), dp(15), dp(6));
         field.setBackground(surface(Color.rgb(22, 38, 64), 14, 1, Color.rgb(62, 91, 122)));
         field.setLayoutParams(new LinearLayout.LayoutParams(-1, dp(52)));
         return field;
+    }
+
+    /** Enforce masking even when a device-wide "show passwords" preference is enabled. */
+    private void applyPasswordMask(EditText field, int inputType) {
+        int variation = inputType & InputType.TYPE_MASK_VARIATION;
+        if (variation == InputType.TYPE_TEXT_VARIATION_PASSWORD
+                || variation == InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD) {
+            field.setTransformationMethod(PasswordTransformationMethod.getInstance());
+        }
     }
 
     private void toast(String value) { Toast.makeText(this, value, Toast.LENGTH_SHORT).show(); }
@@ -1151,7 +1167,14 @@ public final class MainActivity extends FragmentActivity {
         showLogin();
     }
 
-    private void showLogin() {
+    private void showLogin() { showLogin(false); }
+
+    /**
+     * Uses the same locked hero form for password and biometric entry.  The prompt starts only
+     * for a fresh launch with biometric unlock enabled; manual returns to Login never surprise
+     * the member with another prompt.
+     */
+    private void showLogin(boolean autoRequestBiometric) {
         LinearLayout body = signedOutPage();
         // This is one locked template for every coach.  Do not branch the layout by coach:
         // Settings supplies only the selected portrait and its identifying label below.
@@ -1293,6 +1316,12 @@ public final class MainActivity extends FragmentActivity {
         register.setOnClickListener(view -> showRegistration());
         applyPressMotion(register);
         content.addView(register, new LinearLayout.LayoutParams(-1, dp(49)));
+
+        if (autoRequestBiometric && AccountStore.exists(this) && profile().biometricUnlock) {
+            content.post(() -> {
+                if (content.isAttachedToWindow()) authenticateWithBiometrics();
+            });
+        }
     }
 
     private void openSignedInHome() {
