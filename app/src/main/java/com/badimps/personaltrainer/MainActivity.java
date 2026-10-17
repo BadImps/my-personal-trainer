@@ -577,6 +577,15 @@ public final class MainActivity extends Activity {
         });
     }
 
+    /** Selected navigation gets one quiet acknowledgement, rather than a distracting loop. */
+    private void animateSelectedIcon(ImageView icon, boolean selected) {
+        if (reducedMotion || !selected) return;
+        icon.setScaleX(.84f);
+        icon.setScaleY(.84f);
+        icon.setAlpha(.55f);
+        icon.animate().scaleX(1f).scaleY(1f).alpha(1f).setStartDelay(90L).setDuration(180L).start();
+    }
+
     private LinearLayout planCoachRail() {
         AccountStore.Profile profile = AccountStore.get(this);
         String trainerName = profile.coachName;
@@ -632,6 +641,7 @@ public final class MainActivity extends Activity {
         symbol.setImageTintList(ColorStateList.valueOf(selected ? navy : mint));
         symbol.setContentDescription(null);
         item.addView(symbol, new LinearLayout.LayoutParams(dp(21), dp(21)));
+        animateSelectedIcon(symbol, selected);
         TextView caption = text(label, 8, selected ? navy : mint);
         caption.setGravity(Gravity.CENTER);
         caption.setSingleLine(true);
@@ -700,6 +710,7 @@ public final class MainActivity extends Activity {
         symbol.setContentDescription(null);
         symbol.setPadding(dp(2), dp(2), dp(2), dp(2));
         item.addView(symbol, new LinearLayout.LayoutParams(dp(26), dp(26)));
+        animateSelectedIcon(symbol, selected);
 
         TextView caption = text(label, 9, selected ? navy : mint);
         caption.setGravity(Gravity.CENTER);
