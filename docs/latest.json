@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 37,
-  "versionName": "4.6",
-  "publishedAt": "2026-10-17T04:29:44Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v4.6/app-release.apk",
-  "sha256": "f249b9b8e3fb27aea659f646697ddac6fafdfa23d4501610b4f9fd4254acee61",
+  "versionCode": 38,
+  "versionName": "4.7",
+  "publishedAt": "2026-10-17T05:13:00Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v4.7/app-release.apk",
+  "sha256": "71e4c4c0a11ae038fb9bcb246c6ef92e9611e31509cab23d5db6e565b779bbad",
   "sizeBytes": 84161825,
-  "notes": "Implements the approved weight-reference rail with separated labels, height-based range endpoints, current and target markers, and a clear status panel."
+  "notes": "Visual refinement: Midnight, Ocean, and High Contrast themes; a reduced-motion setting; smoother page transitions; tactile actions; and selected-navigation icon motion."
 }
