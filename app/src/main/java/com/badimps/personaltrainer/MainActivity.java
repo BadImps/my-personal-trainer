@@ -2994,11 +2994,11 @@ public final class MainActivity extends Activity {
             LinearLayout.LayoutParams legendParams = new LinearLayout.LayoutParams(-1, -2);
             legendParams.topMargin = dp(5);
             reference.addView(legend, legendParams);
-            ReferenceWeightRangeView chart = new ReferenceWeightRangeView(this);
-            chart.setValues(current, scaleTarget,
+            WeightReferenceBarsView chart = new WeightReferenceBarsView(this);
+            chart.setValues(WeightStore.starting(this), current, scaleTarget,
                     BodyInsights.fromKg(BodyInsights.referenceWeightLowKg(heightCm), unit),
                     BodyInsights.fromKg(BodyInsights.referenceWeightHighKg(heightCm), unit), unit);
-            LinearLayout.LayoutParams chartParams = new LinearLayout.LayoutParams(-1, dp(82));
+            LinearLayout.LayoutParams chartParams = new LinearLayout.LayoutParams(-1, dp(104));
             chartParams.topMargin = dp(3);
             reference.addView(chart, chartParams);
             reference.addView(text(String.format(Locale.US, "BMI screening value: %.1f. One screening measure, not a verdict.", BodyInsights.bmi(heightCm, current, unit)), 11, muted));

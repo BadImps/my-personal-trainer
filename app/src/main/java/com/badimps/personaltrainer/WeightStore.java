@@ -15,6 +15,7 @@ public final class WeightStore {
     }
     public static void checkIn(Context c,float current){p(c).edit().putFloat("latest",current).apply();}
     public static float latest(Context c){return p(c).getFloat("latest",0);}
+    public static float starting(Context c){return p(c).getFloat("start",0);}
     public static float target(Context c){return p(c).getFloat("target",0);}
     public static String unit(Context c){return p(c).getString("unit","kg");}
     public static String latestLabel(Context c){return configured(c)?String.format(java.util.Locale.US,"%.1f %s",latest(c),unit(c)):"Not set";}
