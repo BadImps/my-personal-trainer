@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 35,
-  "versionName": "4.4",
-  "publishedAt": "2026-10-16T23:51:38Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v4.4/app-release.apk",
-  "sha256": "940bc44f4e3af60793d6f552c032d52383dda132cf81a09774144e8066b2d951",
+  "versionCode": 36,
+  "versionName": "4.5",
+  "publishedAt": "2026-10-17T03:49:17Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v4.5/app-release.apk",
+  "sha256": "ce9a62a1e2ca971f1c2e764df53bd09497246579f7f0fa9ac80bf698a426ca99",
   "sizeBytes": 84161825,
-  "notes": "Refines Private Body Context with a clear current-weight and personal-target card, mint reference scale, two-mile guide, and weekly movement summary."
+  "notes": "Updates Private Body Context with clear current-weight and target panels plus a labeled weight journey graph and height-based adult screening reference band."
 }
