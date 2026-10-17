@@ -637,6 +637,7 @@ public final class MainActivity extends Activity {
         addPlanRailItem(rail, "Workouts", R.drawable.ic_nav_plan, true, view -> { stopGuidedRuntime(); showPlans(); });
         addPlanRailItem(rail, "Progress", R.drawable.ic_nav_progress, false, view -> { stopGuidedRuntime(); showProgress(); });
         addPlanRailItem(rail, "Nutrition", R.drawable.ic_nav_nutrition, false, view -> { stopGuidedRuntime(); showMeals(); });
+        addPlanRailItem(rail, "Endurance", R.drawable.ic_nav_endurance, false, view -> { stopGuidedRuntime(); showEndurance(); });
         addPlanRailItem(rail, "Body", R.drawable.ic_nav_body, false, view -> { stopGuidedRuntime(); showBodyContext(); });
         addPlanRailItem(rail, "Settings", R.drawable.ic_nav_settings, false, view -> { stopGuidedRuntime(); showProfile(); });
         return rail;
@@ -703,6 +704,7 @@ public final class MainActivity extends Activity {
         addRailItem(rail, "Workouts", R.drawable.ic_nav_plan, activeScreen, view -> { stopGuidedRuntime(); showPlans(); });
         addRailItem(rail, "Progress", R.drawable.ic_nav_progress, activeScreen, view -> { stopGuidedRuntime(); showProgress(); });
         addRailItem(rail, "Nutrition", R.drawable.ic_nav_nutrition, activeScreen, view -> { stopGuidedRuntime(); showMeals(); });
+        addRailItem(rail, "Endurance", R.drawable.ic_nav_endurance, activeScreen, view -> { stopGuidedRuntime(); showEndurance(); });
         addRailItem(rail, "Body", R.drawable.ic_nav_body, activeScreen, view -> { stopGuidedRuntime(); showBodyContext(); });
         addRailItem(rail, "Settings", R.drawable.ic_nav_settings, activeScreen, view -> { stopGuidedRuntime(); showProfile(); });
         return rail;
@@ -3225,6 +3227,7 @@ public final class MainActivity extends Activity {
             WeightStore.clear(this);
             BodyProfileStore.clear(this);
             MealPlanStore.clear(this);
+            EndurancePlanStore.clear(this);
             JourneyStore.clear(this);
             SetTimeStore.clear(this);
             session.clear();
@@ -4834,6 +4837,195 @@ public final class MainActivity extends Activity {
         Button back = secondary("Back to Today’s Fuel");
         back.setOnClickListener(view -> showMeals());
         addButton(body, back);
+    }
+
+    /**
+     * A deliberate route-planning surface. Maps owns map data and navigation; this app only keeps
+     * the plan the person chose and never requests their location in the background.
+     */
+    private void showEndurance() {
+        LinearLayout body = appPage("Endurance");
+        title(body, "ENDURANCE", "Map your next move", "Plan a walking, running, or cycling route, then open it in your installed map app. Route details stay on this phone.");
+        body.addView(heading("Choose an activity", 20, Color.WHITE));
+        gap(body, 9);
+        addEnduranceActivity(body, EndurancePlanStore.WALKING, "Walking", "A steady, low-impact route for everyday movement.");
+        gap(body, 10);
+        addEnduranceActivity(body, EndurancePlanStore.RUNNING, "Running", "Set a pace-focused route; maps will use a walking route as the closest running option.");
+        gap(body, 10);
+        addEnduranceActivity(body, EndurancePlanStore.CYCLING, "Cycling", "Plan a route for two wheels with a cycling map handoff.");
+        gap(body, 14);
+
+        LinearLayout guidance = card();
+        guidance.addView(heading("Build gradually", 18, ink));
+        guidance.addView(text("Choose a distance, duration, and effort that fit your current ability. General activity guidance can be useful, but pace, route safety, weather, and health needs are personal.", 14, muted));
+        body.addView(guidance);
+    }
+
+    private void addEnduranceActivity(LinearLayout body, String mode, String name, String description) {
+        EndurancePlanStore.Plan plan = EndurancePlanStore.load(this, mode);
+        LinearLayout tile = card();
+        tile.addView(heading(name, 21, ink));
+        tile.addView(text(description, 14, muted));
+        gap(tile, 8);
+        if (plan == null) {
+            tile.addView(text("No route saved yet.", 13, muted));
+            gap(tile, 10);
+            Button create = primary("Plan a " + name.toLowerCase(Locale.ROOT));
+            create.setOnClickListener(view -> showEndurancePlanner(mode));
+            addButton(tile, create);
+        } else {
+            tile.addView(text(plan.name + "  •  " + formatDistance(plan.distanceKm) + "  •  " + plan.minutes + " min  •  " + plan.effort, 14, ink));
+            tile.addView(text("Destination: " + plan.destination, 13, muted));
+            gap(tile, 9);
+            Button map = lightAction("Open saved route in Maps");
+            map.setOnClickListener(view -> openEnduranceMap(plan));
+            addButton(tile, map);
+            gap(tile, 7);
+            Button complete = primary("Log " + plan.minutes + " min to Progress");
+            complete.setOnClickListener(view -> {
+                JourneyStore.recordWorkout(this, "Endurance · " + mode, plan.minutes);
+                toast("Endurance session added to local Progress.");
+                showProgress();
+            });
+            addButton(tile, complete);
+            gap(tile, 7);
+            Button edit = secondary("Edit or remove route");
+            edit.setOnClickListener(view -> showEndurancePlanner(mode));
+            addButton(tile, edit);
+        }
+        body.addView(tile);
+    }
+
+    private void showEndurancePlanner(String mode) {
+        EndurancePlanStore.Plan existing = EndurancePlanStore.load(this, mode);
+        LinearLayout body = appPage("Endurance");
+        String action = enduranceAction(mode);
+        title(body, "ENDURANCE ROUTE", "Plan your " + action, "Set a destination or loop landmark, a target distance, and a time. You choose whether to open an external map app.");
+
+        EditText name = input("Route name", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+        EditText origin = input("Starting point (optional)", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+        EditText destination = input("Destination or loop landmark", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+        EditText distance = input("Target distance in km", InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        EditText minutes = input("Target minutes", InputType.TYPE_CLASS_NUMBER);
+        float defaultDistance = defaultDistance(mode);
+        int defaultMinutes = defaultMinutes(mode);
+        name.setText(existing == null ? mode + " route" : existing.name);
+        origin.setText(existing == null ? "" : existing.origin);
+        destination.setText(existing == null ? "" : existing.destination);
+        distance.setText(String.valueOf(existing == null ? defaultDistance : existing.distanceKm));
+        minutes.setText(String.valueOf(existing == null ? defaultMinutes : existing.minutes));
+        body.addView(name); gap(body, 8);
+        body.addView(origin); gap(body, 8);
+        body.addView(destination); gap(body, 8);
+        body.addView(distance); gap(body, 8);
+        body.addView(minutes); gap(body, 12);
+
+        body.addView(heading("Effort", 18, Color.WHITE));
+        RadioGroup effort = new RadioGroup(this);
+        effort.setOrientation(LinearLayout.HORIZONTAL);
+        effort.setPadding(0, dp(4), 0, dp(4));
+        String selectedEffort = existing == null ? "Steady" : existing.effort;
+        addEnduranceEffort(effort, "Relaxed", selectedEffort);
+        addEnduranceEffort(effort, "Steady", selectedEffort);
+        addEnduranceEffort(effort, "Challenging", selectedEffort);
+        body.addView(effort);
+        gap(body, 12);
+
+        Button map = lightAction("Preview route in Maps");
+        map.setOnClickListener(view -> {
+            if (destination.getText().toString().trim().isEmpty()) {
+                destination.setError("Add a destination or loop landmark first");
+                return;
+            }
+            openEnduranceMap(mode, origin.getText().toString(), destination.getText().toString());
+        });
+        addButton(body, map);
+        gap(body, 8);
+        Button save = primary("Save " + action + " plan");
+        save.setOnClickListener(view -> saveEndurancePlan(mode, name, origin, destination, distance, minutes, effort));
+        addButton(body, save);
+        if (existing != null) {
+            gap(body, 8);
+            Button remove = secondary("Remove saved route");
+            remove.setOnClickListener(view -> {
+                EndurancePlanStore.remove(this, mode);
+                toast(mode + " route removed.");
+                showEndurance();
+            });
+            addButton(body, remove);
+        }
+        gap(body, 8);
+        Button back = secondary("Back to Endurance");
+        back.setOnClickListener(view -> showEndurance());
+        addButton(body, back);
+    }
+
+    private void addEnduranceEffort(RadioGroup group, String label, String selected) {
+        RadioButton option = new RadioButton(this);
+        option.setId(View.generateViewId());
+        option.setText(label);
+        option.setTextSize(13);
+        option.setTextColor(Color.WHITE);
+        option.setButtonTintList(ColorStateList.valueOf(mint));
+        option.setChecked(label.equals(selected));
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, -2, 1f);
+        group.addView(option, params);
+    }
+
+    private void saveEndurancePlan(String mode, EditText name, EditText origin, EditText destination,
+                                   EditText distance, EditText minutes, RadioGroup effort) {
+        try {
+            float distanceKm = Float.parseFloat(distance.getText().toString().trim());
+            int targetMinutes = Integer.parseInt(minutes.getText().toString().trim());
+            int checked = effort.getCheckedRadioButtonId();
+            String effortText = checked == View.NO_ID ? "Steady" : ((RadioButton) effort.findViewById(checked)).getText().toString();
+            EndurancePlanStore.save(this, mode, name.getText().toString(), origin.getText().toString(),
+                    destination.getText().toString(), distanceKm, targetMinutes, effortText);
+            toast(mode + " route saved on this device.");
+            showEndurance();
+        } catch (NumberFormatException e) {
+            toast("Enter a valid distance and target minutes.");
+        } catch (IllegalArgumentException e) {
+            toast(e.getMessage());
+        }
+    }
+
+    private void openEnduranceMap(EndurancePlanStore.Plan plan) {
+        openEnduranceMap(plan.mode, plan.origin, plan.destination);
+    }
+
+    /** Google Maps directions supports walking and cycling; walking is the honest fallback for runs. */
+    private void openEnduranceMap(String mode, String origin, String destination) {
+        Uri.Builder route = new Uri.Builder().scheme("https").authority("www.google.com")
+                .appendPath("maps").appendPath("dir")
+                .appendQueryParameter("api", "1")
+                .appendQueryParameter("destination", destination.trim())
+                .appendQueryParameter("travelmode", EndurancePlanStore.CYCLING.equals(mode) ? "bicycling" : "walking");
+        if (origin != null && !origin.trim().isEmpty()) route.appendQueryParameter("origin", origin.trim());
+        try {
+            startActivity(Intent.createChooser(new Intent(Intent.ACTION_VIEW, route.build()), "Map route with"));
+        } catch (RuntimeException e) {
+            toast("No map app is available to open this route.");
+        }
+    }
+
+    private String enduranceAction(String mode) {
+        if (EndurancePlanStore.CYCLING.equals(mode)) return "ride";
+        return EndurancePlanStore.RUNNING.equals(mode) ? "run" : "walk";
+    }
+
+    private float defaultDistance(String mode) {
+        if (EndurancePlanStore.CYCLING.equals(mode)) return 10f;
+        return EndurancePlanStore.RUNNING.equals(mode) ? 5f : 3f;
+    }
+
+    private int defaultMinutes(String mode) {
+        if (EndurancePlanStore.CYCLING.equals(mode)) return 45;
+        return EndurancePlanStore.RUNNING.equals(mode) ? 35 : 35;
+    }
+
+    private String formatDistance(float distanceKm) {
+        return distanceKm == (int) distanceKm ? ((int) distanceKm) + " km" : String.format(Locale.US, "%.1f km", distanceKm);
     }
 
     private String conciseNetworkError(Exception error) {
