@@ -130,6 +130,8 @@ public final class MainActivity extends Activity {
     /** Kept separately so the between-exercise report can show actual cooldown, not just set rest. */
     private long guidedSetRestMillis;
     private long guidedCooldownMillis;
+    /** Rest completed for the exercise currently being shown in the cooldown report. */
+    private long currentExerciseSetRestMillis;
     /** Recovery deliberately skipped by the user; it is removed from the workout allowance. */
     private long skippedCooldownMillis;
     private long skippedSetRestMillis;
@@ -3822,6 +3824,7 @@ public final class MainActivity extends Activity {
         guidedWorkoutAllowanceMillis = Math.max(1L, sessionMinutes) * 60_000L;
         guidedSetRestMillis = 0L;
         guidedCooldownMillis = 0L;
+        currentExerciseSetRestMillis = 0L;
         skippedSetRestMillis = 0L;
         skippedCooldownMillis = 0L;
         recoverySegmentStartedAt = -1L;
@@ -3888,6 +3891,7 @@ public final class MainActivity extends Activity {
             timingExerciseIndex = index;
             setTracker = new WorkoutTiming.SetTracker(exercise.restSeconds);
             currentExerciseSetTimes.clear();
+            currentExerciseSetRestMillis = 0L;
         }
         LinearLayout body = appPage("Workouts");
         addWorkoutRemainingHeader(body);
@@ -4153,36 +4157,23 @@ public final class MainActivity extends Activity {
         container.addView(card);
     }
 
-    /** A live session roll-up shown while recovering, without changing the exercise leaderboard. */
-    private TextView[] addTotalWorkoutCard(LinearLayout container, Coach.Exercise currentExercise, boolean currentExerciseCompleted) {
-        long activeMillis = activeWorkoutSetMillis(currentExercise, currentExerciseCompleted);
-        long setRestMillis = guidedSetRestMillis;
-        long cooldownMillis = guidedCooldownMillis + (recoverySegmentIsCooldown ? activeRecoverySegmentMillis() : 0L);
-        long skippedMillis = skippedSetRestMillis + skippedCooldownMillis;
-        long totalMillis = Math.max(0L, activeMillis + setRestMillis + cooldownMillis - skippedMillis);
+    /** A per-exercise roll-up shown during the following cooldown, without changing its leaderboard. */
+    private TextView[] addTotalWorkoutCard(LinearLayout container, Coach.Exercise currentExercise) {
+        long activeMillis = currentExercise == null ? 0L : currentExerciseSummary(currentExercise).totalActiveMillis;
+        long setRestMillis = currentExerciseSetRestMillis;
+        long totalMillis = activeMillis + setRestMillis;
         LinearLayout card = card();
-        TextView label = heading("TOTAL WORKOUT", 11, muted);
+        TextView label = heading("TOTAL EXERCISE", 11, muted);
         label.setLetterSpacing(.08f);
         card.addView(label);
-        card.addView(text("Completed set rests + this live cooldown", 13, muted));
+        card.addView(text("Completed work and set rest for this exercise", 13, muted));
         gap(card, 8);
         TextView active = addWorkoutTotalRow(card, "Active set time", WorkoutTiming.formatElapsedMillis(activeMillis), false);
         TextView rest = addWorkoutTotalRow(card, "Set rest total", WorkoutTiming.formatElapsedMillis(setRestMillis), false);
-        TextView cooldown = addWorkoutTotalRow(card, "Cooldown (live)", WorkoutTiming.formatElapsedMillis(cooldownMillis), false);
-        TextView skipped = addWorkoutTotalRow(card, "Skipped", "−" + WorkoutTiming.formatElapsedMillis(skippedMillis), false);
         gap(card, 5);
         TextView grand = addWorkoutTotalRow(card, "GRAND TOTAL", WorkoutTiming.formatElapsedMillis(totalMillis), true);
         container.addView(card);
-        return new TextView[]{active, rest, cooldown, skipped, grand};
-    }
-
-    private long activeWorkoutSetMillis(Coach.Exercise currentExercise, boolean currentExerciseCompleted) {
-        long activeMillis = 0L;
-        for (SetTimeStore.ExerciseSummary completed : completedExerciseSetTimes) activeMillis += completed.totalActiveMillis;
-        if (!currentExerciseCompleted && currentExercise != null && currentExerciseSetTimes.size() > 0) {
-            activeMillis += currentExerciseSummary(currentExercise).totalActiveMillis;
-        }
-        return activeMillis;
+        return new TextView[]{active, rest, grand};
     }
 
     private TextView addWorkoutTotalRow(LinearLayout container, String label, String value, boolean grandTotal) {
@@ -4204,15 +4195,11 @@ public final class MainActivity extends Activity {
     }
 
     private void updateTotalWorkoutViews(TextView[] views, long activeMillis) {
-        if (views == null || views.length < 5) return;
-        long setRestMillis = guidedSetRestMillis;
-        long cooldownMillis = guidedCooldownMillis + (recoverySegmentIsCooldown ? activeRecoverySegmentMillis() : 0L);
-        long skippedMillis = skippedSetRestMillis + skippedCooldownMillis;
+        if (views == null || views.length < 3) return;
+        long setRestMillis = currentExerciseSetRestMillis;
         views[0].setText(WorkoutTiming.formatElapsedMillis(activeMillis));
         views[1].setText(WorkoutTiming.formatElapsedMillis(setRestMillis));
-        views[2].setText(WorkoutTiming.formatElapsedMillis(cooldownMillis));
-        views[3].setText("−" + WorkoutTiming.formatElapsedMillis(skippedMillis));
-        views[4].setText(WorkoutTiming.formatElapsedMillis(Math.max(0L, activeMillis + setRestMillis + cooldownMillis - skippedMillis)));
+        views[2].setText(WorkoutTiming.formatElapsedMillis(activeMillis + setRestMillis));
     }
 
     private long activeRecoverySegmentMillis() {
@@ -4229,7 +4216,10 @@ public final class MainActivity extends Activity {
     private void endRecoverySegment() {
         if (recoverySegmentStartedAt < 0L) return;
         if (recoverySegmentIsCooldown) guidedCooldownMillis += activeRecoverySegmentMillis();
-        else guidedSetRestMillis += activeRecoverySegmentMillis();
+        else {
+            guidedSetRestMillis += activeRecoverySegmentMillis();
+            currentExerciseSetRestMillis += activeRecoverySegmentMillis();
+        }
         recoverySegmentStartedAt = -1L;
         recoverySegmentIsCooldown = false;
     }
@@ -4339,11 +4329,10 @@ public final class MainActivity extends Activity {
         gap(body, 12);
         addSetTimesCard(body, currentExerciseSummary(exercise), false);
         gap(body, 12);
-        final boolean currentExerciseCompleted = betweenExercises;
-        final long activeSetMillis = activeWorkoutSetMillis(exercise, currentExerciseCompleted);
+        final long activeSetMillis = currentExerciseSummary(exercise).totalActiveMillis;
         final TextView[] totalWorkout;
         if (betweenExercises) {
-            totalWorkout = addTotalWorkoutCard(body, exercise, true);
+            totalWorkout = addTotalWorkoutCard(body, exercise);
             gap(body, 12);
         } else {
             totalWorkout = null;
