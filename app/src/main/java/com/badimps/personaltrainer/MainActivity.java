@@ -127,6 +127,12 @@ public final class MainActivity extends Activity {
     private int openingPhraseIndex;
     private int completionPhraseIndex;
     private long guidedWorkoutStartedAt;
+    /** Time actually spent in rest or cooldown countdowns during the current guided workout. */
+    private long guidedRecoveryMillis;
+    private long recoverySegmentStartedAt = -1L;
+    /** The active scroll surface is retained so in-place option changes do not throw a user to the top. */
+    private ScrollView activeScrollView;
+    private int pendingScrollRestore = -1;
     private boolean guidedSessionRecorded;
     private boolean guidedWorkoutAborted;
     private UpdateManager.Info pendingOtaInstall;
@@ -489,6 +495,7 @@ public final class MainActivity extends Activity {
         LinearLayout body = column();
         scroll.addView(body, new ScrollView.LayoutParams(-1, -2));
         setContentView(scroll);
+        activateScroll(scroll);
         animatePage(scroll);
         return body;
     }
@@ -510,6 +517,7 @@ public final class MainActivity extends Activity {
         shell.addView(coachRail(activeScreen), new LinearLayout.LayoutParams(dp(82), -1));
         shell.addView(scroll, new LinearLayout.LayoutParams(0, -1, 1));
         setContentView(shell);
+        activateScroll(scroll);
         animatePage(scroll);
         return body;
     }
@@ -546,8 +554,27 @@ public final class MainActivity extends Activity {
         shell.addView(planCoachRail(), new LinearLayout.LayoutParams(dp(76), -1));
         shell.addView(scroll, new LinearLayout.LayoutParams(0, -1, 1));
         setContentView(shell);
+        activateScroll(scroll);
         animatePage(scroll);
         return body;
+    }
+
+    /** Restores an explicitly requested in-place refresh only after the replacement page is laid out. */
+    private void activateScroll(ScrollView scroll) {
+        activeScrollView = scroll;
+        if (pendingScrollRestore < 0) return;
+        int restore = pendingScrollRestore;
+        pendingScrollRestore = -1;
+        scroll.post(() -> scroll.scrollTo(0, restore));
+    }
+
+    private void preserveScrollForRefresh() {
+        pendingScrollRestore = activeScrollView == null ? -1 : activeScrollView.getScrollY();
+    }
+
+    private void refreshPlanKeepingScroll(Runnable refresh) {
+        preserveScrollForRefresh();
+        refresh.run();
     }
 
     private void beginNewPage() {
@@ -1731,7 +1758,7 @@ public final class MainActivity extends Activity {
                 } else {
                     dailyScheduledDay = dayIndex;
                 }
-                showPlanSchedule();
+                refreshPlanKeepingScroll(this::showPlanSchedule);
             });
             LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(58), 1);
             params.rightMargin = i == weekDays.length - 1 ? 0 : dp(3);
@@ -1750,7 +1777,7 @@ public final class MainActivity extends Activity {
             for (int count : new int[]{2, 3, 4, 5}) {
                 Button option = count == trainingDays ? action(count + " days", mint, navy) : action(count + " days", Color.rgb(232, 236, 244), ink);
                 option.setTextSize(11);
-                option.setOnClickListener(view -> { applyTrainingDayCount(count); persistCurrentWeekSchedule(); showPlanSchedule(); });
+                option.setOnClickListener(view -> { applyTrainingDayCount(count); persistCurrentWeekSchedule(); refreshPlanKeepingScroll(this::showPlanSchedule); });
                 LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(42), 1);
                 params.rightMargin = count == 5 ? 0 : dp(5);
                 counts.addView(option, params);
@@ -1819,7 +1846,7 @@ public final class MainActivity extends Activity {
                     session.clear();
                     resetExerciseSelection();
                     if (weekly) persistCurrentWeekSchedule();
-                    showPlanTarget();
+                    refreshPlanKeepingScroll(this::showPlanTarget);
                 });
                 LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(planTargetTileHeight()), 1);
                 params.rightMargin = offset == 0 ? dp(planGridGap()) : 0;
@@ -1968,7 +1995,7 @@ public final class MainActivity extends Activity {
             final int value = minutes[i];
             Button option = !customDuration && sessionMinutes == value ? action(labels[i], mint, navy) : action(labels[i], Color.rgb(232, 236, 244), ink);
             option.setTextSize(10);
-            option.setOnClickListener(view -> { sessionMinutes = value; customDuration = false; resetExerciseSelection(); showPlanDuration(); });
+            option.setOnClickListener(view -> { sessionMinutes = value; customDuration = false; resetExerciseSelection(); refreshPlanKeepingScroll(this::showPlanDuration); });
             LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(48), 1);
             params.rightMargin = dp(i == minutes.length - 1 ? 0 : 5);
             options.addView(option, params);
@@ -1981,7 +2008,7 @@ public final class MainActivity extends Activity {
         custom.setOnClickListener(view -> {
             customDuration = true;
             if (sessionMinutes == 45 || sessionMinutes == 60 || sessionMinutes == 110) sessionMinutes = 75;
-            showPlanDuration();
+            refreshPlanKeepingScroll(this::showPlanDuration);
         });
         lengthCard.addView(custom, customParams);
         if (customDuration) addDurationStepper(lengthCard);
@@ -2009,14 +2036,14 @@ public final class MainActivity extends Activity {
         row.addView(heading("Custom minutes", 15, ink), new LinearLayout.LayoutParams(0, dp(44), 1));
         Button minus = compactControl("−");
         minus.setContentDescription("Decrease custom workout length by five minutes");
-        minus.setOnClickListener(view -> { sessionMinutes = Math.max(20, sessionMinutes - 5); resetExerciseSelection(); showPlanDuration(); });
+        minus.setOnClickListener(view -> { sessionMinutes = Math.max(20, sessionMinutes - 5); resetExerciseSelection(); refreshPlanKeepingScroll(this::showPlanDuration); });
         row.addView(minus, new LinearLayout.LayoutParams(dp(42), dp(42)));
         TextView minutes = heading(sessionMinutes + " min", 14, ink);
         minutes.setGravity(Gravity.CENTER);
         row.addView(minutes, new LinearLayout.LayoutParams(dp(76), dp(42)));
         Button plus = compactControl("+");
         plus.setContentDescription("Increase custom workout length by five minutes");
-        plus.setOnClickListener(view -> { sessionMinutes = Math.min(180, sessionMinutes + 5); resetExerciseSelection(); showPlanDuration(); });
+        plus.setOnClickListener(view -> { sessionMinutes = Math.min(180, sessionMinutes + 5); resetExerciseSelection(); refreshPlanKeepingScroll(this::showPlanDuration); });
         row.addView(plus, new LinearLayout.LayoutParams(dp(42), dp(42)));
         container.addView(row);
     }
@@ -2048,7 +2075,7 @@ public final class MainActivity extends Activity {
                     equipmentType = selectedEquipmentTypes.get(0);
                     session.clear();
                     resetExerciseSelection();
-                    showPlanEquipment();
+                    refreshPlanKeepingScroll(this::showPlanEquipment);
                 });
                 LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(planEquipmentTileHeight()), 1);
                 params.rightMargin = offset == 0 ? dp(planGridGap()) : 0;
@@ -2337,7 +2364,7 @@ public final class MainActivity extends Activity {
         all.setOnClickListener(view -> {
             if (selectedExercises.size() == availableExercises.size()) selectedExercises.clear();
             else selectedExercises = new ArrayList<>(availableExercises);
-            showExerciseSelection();
+            refreshPlanKeepingScroll(this::showExerciseSelection);
         });
         selectionBar.addView(all, new LinearLayout.LayoutParams(dp(hasTallPlanViewport() ? 94 : 82), dp(hasTallPlanViewport() ? 36 : 27)));
         TextView selectionCount = heading(selectedExercises.size() + " selected", hasTallPlanViewport() ? 12 : 10, navy);
@@ -2368,7 +2395,7 @@ public final class MainActivity extends Activity {
             row.setContentDescription((selected ? "Selected " : "Not selected ") + exercise.name + ". Tap to change selection. Press and hold for details and animation.");
             row.setOnClickListener(view -> {
                 toggleExercise(exercise);
-                showExerciseSelection();
+                refreshPlanKeepingScroll(this::showExerciseSelection);
             });
             row.setOnLongClickListener(view -> {
                 showExercisePreviewDialog(exercise);
@@ -2485,7 +2512,7 @@ public final class MainActivity extends Activity {
                 day.setOnClickListener(view -> {
                     weeklyWorkoutDays[dayIndex] = !weeklyWorkoutDays[dayIndex];
                     syncTrainingDays();
-                    showPlanSetup();
+                    refreshPlanKeepingScroll(this::showPlanSetup);
                 });
                 LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(51), 1);
                 params.rightMargin = i == weekDays.length - 1 ? 0 : dp(3);
@@ -2563,7 +2590,7 @@ public final class MainActivity extends Activity {
             option.setContentDescription("Cooldown between exercises, " + restChoiceLabel(seconds) + (selected ? ", selected" : ""));
             option.setOnClickListener(view -> {
                 planCooldownSeconds = seconds;
-                showPlanSetup();
+                refreshPlanKeepingScroll(this::showPlanSetup);
             });
             LinearLayout.LayoutParams optionParams = new LinearLayout.LayoutParams(0, dp(44), 1);
             optionParams.rightMargin = seconds == WorkoutTiming.COOLDOWN_PRESET_SECONDS[WorkoutTiming.COOLDOWN_PRESET_SECONDS.length - 1] ? 0 : dp(6);
@@ -2587,7 +2614,7 @@ public final class MainActivity extends Activity {
         reminderToggle.setOnCheckedChangeListener((button, checked) -> {
             planReminderEnabled = checked;
             if (checked) ensureNotificationPermission();
-            showPlanSetup();
+            refreshPlanKeepingScroll(this::showPlanSetup);
         });
         reminder.addView(reminderToggle);
         LinearLayout reminderControls = new LinearLayout(this);
@@ -2622,7 +2649,7 @@ public final class MainActivity extends Activity {
         new android.app.TimePickerDialog(this, (view, hour, minute) -> {
             planReminderHour = hour;
             planReminderMinute = minute;
-            showPlanSetup();
+            refreshPlanKeepingScroll(this::showPlanSetup);
         }, planReminderHour, planReminderMinute, false).show();
     }
 
@@ -2642,7 +2669,7 @@ public final class MainActivity extends Activity {
         minus.setContentDescription("Decrease " + label);
         minus.setOnClickListener(view -> {
             decrease.run();
-            showPlanSetup();
+            refreshPlanKeepingScroll(this::showPlanSetup);
         });
         row.addView(minus, new LinearLayout.LayoutParams(dp(42), dp(42)));
         TextView number = heading(value, 15, ink);
@@ -2652,7 +2679,7 @@ public final class MainActivity extends Activity {
         plus.setContentDescription("Increase " + label);
         plus.setOnClickListener(view -> {
             increase.run();
-            showPlanSetup();
+            refreshPlanKeepingScroll(this::showPlanSetup);
         });
         row.addView(plus, new LinearLayout.LayoutParams(dp(42), dp(42)));
         container.addView(row);
@@ -3785,6 +3812,8 @@ public final class MainActivity extends Activity {
         currentExerciseSetTimes.clear();
         completedExerciseSetTimes.clear();
         guidedWorkoutStartedAt = SystemClock.elapsedRealtime();
+        guidedRecoveryMillis = 0L;
+        recoverySegmentStartedAt = -1L;
         guidedSessionRecorded = false;
         guidedWorkoutAborted = false;
         showSetCountIn(0, 1, true);
@@ -3999,16 +4028,20 @@ public final class MainActivity extends Activity {
             row.setPadding(dp(11), dp(9), dp(11), dp(9));
             boolean best = summary.isLeaderboardLeader(entry);
             row.setBackground(surface(best ? Color.rgb(226, 249, 243) : Color.rgb(240, 244, 249), 13, best ? 1 : 0, best ? mint : Color.TRANSPARENT));
+            LinearLayout setLabel = new LinearLayout(this);
+            setLabel.setOrientation(LinearLayout.HORIZONTAL);
+            setLabel.setGravity(Gravity.CENTER_VERTICAL);
             TextView set = heading("Set " + entry.setNumber, 15, ink);
-            row.addView(set, new LinearLayout.LayoutParams(0, -2, 1));
+            setLabel.addView(set, new LinearLayout.LayoutParams(-2, -2));
             if (best) {
                 TextView star = heading("★", 20, coral);
                 star.setContentDescription("Fastest set");
                 LinearLayout.LayoutParams starParams = new LinearLayout.LayoutParams(-2, -2);
-                starParams.rightMargin = dp(8);
-                row.addView(star, starParams);
+                starParams.leftMargin = dp(4);
+                setLabel.addView(star, starParams);
                 row.setElevation(dp(5));
             }
+            row.addView(setLabel, new LinearLayout.LayoutParams(0, -2, 1));
             TextView duration = heading(WorkoutTiming.formatElapsedMillis(entry.durationMillis), 16, ink);
             duration.setGravity(Gravity.END);
             row.addView(duration, new LinearLayout.LayoutParams(dp(104), -2));
@@ -4027,6 +4060,74 @@ public final class MainActivity extends Activity {
             card.addView(total);
         }
         container.addView(card);
+    }
+
+    /** A live session roll-up shown while recovering, without changing the exercise leaderboard. */
+    private TextView[] addTotalWorkoutCard(LinearLayout container, Coach.Exercise currentExercise, boolean currentExerciseCompleted) {
+        long activeMillis = activeWorkoutSetMillis(currentExercise, currentExerciseCompleted);
+        long recoveryMillis = guidedRecoveryMillis + activeRecoverySegmentMillis();
+        long totalMillis = activeMillis + recoveryMillis;
+        LinearLayout card = card();
+        TextView label = heading("TOTAL WORKOUT", 11, muted);
+        label.setLetterSpacing(.08f);
+        card.addView(label);
+        card.addView(text("Live time so far", 13, muted));
+        gap(card, 8);
+        TextView active = addWorkoutTotalRow(card, "Active set time", WorkoutTiming.formatElapsedMillis(activeMillis), false);
+        TextView recovery = addWorkoutTotalRow(card, "Rest + cooldown", WorkoutTiming.formatElapsedMillis(recoveryMillis), false);
+        gap(card, 5);
+        TextView grand = addWorkoutTotalRow(card, "GRAND TOTAL", WorkoutTiming.formatElapsedMillis(totalMillis), true);
+        container.addView(card);
+        return new TextView[]{active, recovery, grand};
+    }
+
+    private long activeWorkoutSetMillis(Coach.Exercise currentExercise, boolean currentExerciseCompleted) {
+        long activeMillis = 0L;
+        for (SetTimeStore.ExerciseSummary completed : completedExerciseSetTimes) activeMillis += completed.totalActiveMillis;
+        if (!currentExerciseCompleted && currentExercise != null && currentExerciseSetTimes.size() > 0) {
+            activeMillis += currentExerciseSummary(currentExercise).totalActiveMillis;
+        }
+        return activeMillis;
+    }
+
+    private TextView addWorkoutTotalRow(LinearLayout container, String label, String value, boolean grandTotal) {
+        LinearLayout row = new LinearLayout(this);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(dp(11), dp(9), dp(11), dp(9));
+        row.setBackground(surface(grandTotal ? Color.rgb(226, 249, 243) : Color.rgb(240, 244, 249), 13,
+                grandTotal ? 1 : 0, grandTotal ? mint : Color.TRANSPARENT));
+        TextView name = heading(label, grandTotal ? 13 : 14, grandTotal ? ink : muted);
+        if (grandTotal) name.setLetterSpacing(.04f);
+        row.addView(name, new LinearLayout.LayoutParams(0, -2, 1));
+        TextView duration = heading(value, grandTotal ? 18 : 16, ink);
+        duration.setGravity(Gravity.END);
+        row.addView(duration, new LinearLayout.LayoutParams(dp(112), -2));
+        LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(-1, -2);
+        rowParams.topMargin = dp(6);
+        container.addView(row, rowParams);
+        return duration;
+    }
+
+    private void updateTotalWorkoutViews(TextView[] views, long activeMillis) {
+        if (views == null || views.length < 3) return;
+        long recoveryMillis = guidedRecoveryMillis + activeRecoverySegmentMillis();
+        views[0].setText(WorkoutTiming.formatElapsedMillis(activeMillis));
+        views[1].setText(WorkoutTiming.formatElapsedMillis(recoveryMillis));
+        views[2].setText(WorkoutTiming.formatElapsedMillis(activeMillis + recoveryMillis));
+    }
+
+    private long activeRecoverySegmentMillis() {
+        return recoverySegmentStartedAt < 0L ? 0L : Math.max(0L, SystemClock.elapsedRealtime() - recoverySegmentStartedAt);
+    }
+
+    private void beginRecoverySegment() {
+        if (recoverySegmentStartedAt < 0L) recoverySegmentStartedAt = SystemClock.elapsedRealtime();
+    }
+
+    private void endRecoverySegment() {
+        if (recoverySegmentStartedAt < 0L) return;
+        guidedRecoveryMillis += activeRecoverySegmentMillis();
+        recoverySegmentStartedAt = -1L;
     }
 
     private void showExerciseSetSummary(int index, Coach.Exercise exercise) {
@@ -4110,6 +4211,7 @@ public final class MainActivity extends Activity {
         pause.setContentDescription((running ? "Pause " : "Resume ") + (betweenExercises ? "cooldown" : "rest") + " countdown");
         pause.setOnClickListener(view -> {
             if (restTimer != null) restTimer.cancel();
+            endRecoverySegment();
             stopSpeech();
             showRest(index, set, exercise, remaining[0], !running, betweenExercises);
         });
@@ -4119,6 +4221,7 @@ public final class MainActivity extends Activity {
         Button skip = lightAction(betweenExercises ? "Skip cooldown" : "Skip rest");
         skip.setOnClickListener(view -> {
             if (restTimer != null) restTimer.cancel();
+            endRecoverySegment();
             stopSpeech();
             advance(index, set, exercise);
         });
@@ -4127,21 +4230,29 @@ public final class MainActivity extends Activity {
         gap(body, 12);
         addSetTimesCard(body, currentExerciseSummary(exercise), false);
         gap(body, 12);
+        final boolean currentExerciseCompleted = betweenExercises;
+        final long activeSetMillis = activeWorkoutSetMillis(exercise, currentExerciseCompleted);
+        TextView[] totalWorkout = addTotalWorkoutCard(body, exercise, currentExerciseCompleted);
+        gap(body, 12);
         Button emergency = emergencyStopButton();
         emergency.setOnClickListener(view -> showEmergencyStopConfirmation(index, set,
                 () -> showRest(index, set, exercise, remaining[0], true, betweenExercises)));
         addButton(body, emergency);
         if (!running) return;
+        beginRecoverySegment();
         restTimer = new CountDownTimer(secondsRemaining * 1000L, 1000) {
             @Override public void onTick(long left) {
                 int seconds = (int) Math.ceil(left / 1000d);
                 remaining[0] = seconds;
                 timer.setText(format(seconds));
                 timer.setContentDescription((betweenExercises ? "Cooldown" : "Rest") + " time remaining " + seconds + " seconds");
+                updateTotalWorkoutViews(totalWorkout, activeSetMillis);
             }
 
             @Override public void onFinish() {
+                endRecoverySegment();
                 timer.setText("00:00");
+                updateTotalWorkoutViews(totalWorkout, activeSetMillis);
                 advance(index, set, exercise);
             }
         }.start();
@@ -4157,6 +4268,7 @@ public final class MainActivity extends Activity {
 
     private void showEmergencyStopConfirmation(int index, int set, Runnable continueAction) {
         if (restTimer != null) restTimer.cancel();
+        endRecoverySegment();
         stopSetClock();
         stopSpeech();
         LinearLayout body = appPage("Workouts");
@@ -4173,6 +4285,8 @@ public final class MainActivity extends Activity {
             setTracker = null;
             currentExerciseSetTimes.clear();
             completedExerciseSetTimes.clear();
+            guidedRecoveryMillis = 0L;
+            recoverySegmentStartedAt = -1L;
             showHome();
         });
         addButton(body, end);
@@ -4333,6 +4447,7 @@ public final class MainActivity extends Activity {
         // invalidates delayed count-in callbacks before they can write Progress data.
         if (guidedWorkoutStartedAt > 0L && !guidedSessionRecorded) guidedWorkoutAborted = true;
         if (restTimer != null) restTimer.cancel();
+        endRecoverySegment();
         restTimer = null;
         stopSetClock();
         stopSpeech();
