@@ -682,6 +682,36 @@ public final class MainActivity extends Activity {
         gap(body, 20);
     }
 
+    /** Fixed visual hierarchy for the approved Private Body Context reference screen. */
+    private void bodyReferenceTitle(LinearLayout body) {
+        TextView label = heading("PRIVATE BODY CONTEXT", 12, mint);
+        label.setLetterSpacing(.07f);
+        body.addView(label);
+        gap(body, 5);
+        TextView headline = heading("Your numbers, clearly", 27, Color.WHITE);
+        headline.setSingleLine(true);
+        headline.setHorizontallyScrolling(false);
+        body.addView(headline);
+        gap(body, 5);
+        body.addView(text("This information is private to you, always.", 16, Color.rgb(211, 225, 233)));
+        gap(body, 15);
+    }
+
+    private LinearLayout bodyReferenceCard() {
+        LinearLayout view = new LinearLayout(this);
+        view.setOrientation(LinearLayout.VERTICAL);
+        view.setPadding(dp(14), dp(14), dp(14), dp(14));
+        view.setBackground(surface(paper, 18, 1, cardLine));
+        view.setElevation(dp(2));
+        return view;
+    }
+
+    private View bodyReferenceDivider() {
+        View divider = new View(this);
+        divider.setBackgroundColor(Color.rgb(222, 226, 235));
+        return divider;
+    }
+
     /** Typography, rhythm and spacing from the supplied 360-unit wizard artwork. */
     private void planTitle(LinearLayout body, String eyebrow, String main, String copy) {
         TextView label = heading(eyebrow.toUpperCase(Locale.ROOT), hasTallPlanViewport() ? 10 : 9, mint);
@@ -2894,8 +2924,7 @@ public final class MainActivity extends Activity {
     /** Dedicated, local-only body context reached directly from the left navigation rail. */
     private void showBodyContext() {
         LinearLayout body = appPage("Body");
-        title(body, "PRIVATE BODY CONTEXT", "Your numbers, clearly",
-                "This information is private to you, always.");
+        bodyReferenceTitle(body);
 
         if (!BodyProfileStore.configured(this) || !WeightStore.configured(this)) {
             LinearLayout start = darkCard();
@@ -2922,44 +2951,57 @@ public final class MainActivity extends Activity {
         // Keep the reference scale meaningful until the optional target is supplied.
         float scaleTarget = targetWeight > 0f ? targetWeight : current;
 
-        LinearLayout identity = card();
+        LinearLayout identity = bodyReferenceCard();
         LinearLayout metricLabels = new LinearLayout(this);
         metricLabels.setGravity(Gravity.CENTER_VERTICAL);
-        metricLabels.addView(heading("CURRENT WEIGHT", 11, muted), new LinearLayout.LayoutParams(0, -2, 1));
-        metricLabels.addView(heading("PERSONAL TARGET", 11, muted), new LinearLayout.LayoutParams(0, -2, 1));
+        metricLabels.addView(heading("CURRENT WEIGHT", 10, muted), new LinearLayout.LayoutParams(0, -2, 1));
+        metricLabels.addView(heading("PERSONAL TARGET", 10, muted), new LinearLayout.LayoutParams(0, -2, 1));
         identity.addView(metricLabels);
         LinearLayout metrics = new LinearLayout(this);
         metrics.setGravity(Gravity.CENTER_VERTICAL);
         LinearLayout currentMetric = new LinearLayout(this);
         currentMetric.setOrientation(LinearLayout.VERTICAL);
-        currentMetric.addView(heading(WeightStore.latestLabel(this), 34, navy));
+        currentMetric.addView(heading(WeightStore.latestLabel(this), 31, navy));
         currentMetric.addView(text("●  NOW", 12, coral));
         metrics.addView(currentMetric, new LinearLayout.LayoutParams(0, -2, 1));
+        View verticalDivider = bodyReferenceDivider();
+        metrics.addView(verticalDivider, new LinearLayout.LayoutParams(dp(1), dp(72)));
         LinearLayout targetMetric = new LinearLayout(this);
         targetMetric.setOrientation(LinearLayout.VERTICAL);
         targetMetric.addView(heading("◎", 30, navy));
         targetMetric.addView(heading(targetLabel, 21, navy));
-        metrics.addView(targetMetric, new LinearLayout.LayoutParams(0, -2, 1));
+        LinearLayout.LayoutParams targetMetricParams = new LinearLayout.LayoutParams(0, -2, 1);
+        targetMetricParams.leftMargin = dp(12);
+        metrics.addView(targetMetric, targetMetricParams);
         LinearLayout.LayoutParams metricsParams = new LinearLayout.LayoutParams(-1, -2);
         metricsParams.topMargin = dp(7);
         identity.addView(metrics, metricsParams);
+        View identityDivider = bodyReferenceDivider();
+        LinearLayout.LayoutParams identityDividerParams = new LinearLayout.LayoutParams(-1, dp(1));
+        identityDividerParams.topMargin = dp(10);
+        identityDividerParams.bottomMargin = dp(10);
+        identity.addView(identityDivider, identityDividerParams);
         identity.addView(text("Adult screening reference: " + BodyInsights.referenceRange(heightCm, unit), 17, navy));
         identity.addView(text("Screening only — not a diagnosis or ideal weight.", 13, muted));
         body.addView(identity);
         gap(body, 12);
 
-        LinearLayout reference = card();
+        LinearLayout reference = bodyReferenceCard();
         if (BodyInsights.usesAdultReference(age)) {
-            reference.addView(heading("WEIGHT REFERENCE", 12, muted));
-            reference.addView(text("●  Now · " + WeightStore.latestLabel(this) + "        ◎  Target · " + targetLabel, 15, ink));
+            reference.addView(heading("WEIGHT REFERENCE", 11, muted));
+            TextView legend = text("●  Now · " + WeightStore.latestLabel(this) + "     ◎  Target · " + targetLabel, 11, ink);
+            legend.setSingleLine(true);
+            LinearLayout.LayoutParams legendParams = new LinearLayout.LayoutParams(-1, -2);
+            legendParams.topMargin = dp(5);
+            reference.addView(legend, legendParams);
             ReferenceWeightRangeView chart = new ReferenceWeightRangeView(this);
             chart.setValues(current, scaleTarget,
                     BodyInsights.fromKg(BodyInsights.referenceWeightLowKg(heightCm), unit),
                     BodyInsights.fromKg(BodyInsights.referenceWeightHighKg(heightCm), unit), unit);
-            LinearLayout.LayoutParams chartParams = new LinearLayout.LayoutParams(-1, dp(118));
-            chartParams.topMargin = dp(8);
+            LinearLayout.LayoutParams chartParams = new LinearLayout.LayoutParams(-1, dp(82));
+            chartParams.topMargin = dp(3);
             reference.addView(chart, chartParams);
-            reference.addView(text(String.format(Locale.US, "Current BMI screening value: %.1f. BMI is one screening measure, not a verdict.", BodyInsights.bmi(heightCm, current, unit)), 12, muted));
+            reference.addView(text(String.format(Locale.US, "BMI screening value: %.1f. One screening measure, not a verdict.", BodyInsights.bmi(heightCm, current, unit)), 11, muted));
         } else {
             reference.addView(heading("Age-specific growth context", 19, Color.WHITE));
             reference.addView(text("For ages 18–19, this app does not apply an adult BMI range. Growth and weight context require a sex- and age-specific clinical chart, so talk with a qualified healthcare professional if you want an assessment.", 14, Color.rgb(202, 216, 234)));
@@ -2967,40 +3009,26 @@ public final class MainActivity extends Activity {
         body.addView(reference);
         gap(body, 12);
 
-        LinearLayout movement = card();
-        movement.addView(heading("TWO-MILE RUN GUIDE", 12, muted));
-        movement.addView(heading(BodyInsights.twoMilePracticeRange(age), 34, navy));
+        LinearLayout movement = bodyReferenceCard();
+        movement.addView(heading("TWO-MILE RUN GUIDE", 11, muted));
+        movement.addView(heading(BodyInsights.twoMilePracticeRange(age), 32, navy));
         movement.addView(text("Age-aware practice range — adjustable, not a pass/fail test.", 14, muted));
+        View movementDivider = bodyReferenceDivider();
+        LinearLayout.LayoutParams movementDividerParams = new LinearLayout.LayoutParams(-1, dp(1));
+        movementDividerParams.topMargin = dp(11);
+        movementDividerParams.bottomMargin = dp(11);
+        movement.addView(movementDivider, movementDividerParams);
         TextView paceCopy = text("🏃  2 miles  •  your selected pace", 15, navy);
+        paceCopy.setContentDescription("Two miles at your selected practice pace");
         movement.addView(paceCopy);
-        SeekBar pace = new SeekBar(this);
-        pace.setMax(6); // 2.0 through 5.0 mph in 0.5-mph steps.
-        pace.setProgress(Math.max(0, Math.min(6, Math.round((BodyProfileStore.walkingPaceMph(this) - 2f) * 2f))));
-        pace.setProgressTintList(ColorStateList.valueOf(mint));
-        pace.setThumbTintList(ColorStateList.valueOf(coral));
-        pace.setContentDescription("Comfortable walking pace, currently " + BodyProfileStore.walkingPaceMph(this) + " miles per hour");
-        pace.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            @Override public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
-                float selectedPace = 2f + progress * .5f;
-                paceCopy.setText("🏃  2 miles  •  " + String.format(Locale.US, "%.1f mph selected pace", selectedPace));
-                bar.setContentDescription("Comfortable walking pace, " + selectedPace + " miles per hour");
-                if (fromUser) BodyProfileStore.setWalkingPaceMph(MainActivity.this, selectedPace);
-            }
-            @Override public void onStartTrackingTouch(SeekBar bar) { }
-            @Override public void onStopTrackingTouch(SeekBar bar) { }
-        });
-        LinearLayout.LayoutParams paceParams = new LinearLayout.LayoutParams(-1, dp(42));
-        paceParams.topMargin = dp(7);
-        movement.addView(pace, paceParams);
         body.addView(movement);
         gap(body, 12);
 
-        LinearLayout activity = card();
-        activity.addView(heading("THIS WEEK", 12, muted));
+        LinearLayout activity = bodyReferenceCard();
+        activity.addView(heading("THIS WEEK", 11, muted));
         int plannedMinutes = session.isEmpty() ? 0 : plannedSessionsThisWeek() * sessionMinutes;
         activity.addView(heading(plannedMinutes + " / 150 min", 30, navy));
         activity.addView(text("planned movement", 14, muted));
-        activity.addView(text(BodyInsights.weeklyActivityContext(plannedMinutes, age), 12, muted));
         body.addView(activity);
         gap(body, 12);
 
