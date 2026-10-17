@@ -8,7 +8,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
-/** Keeps the meals a person explicitly chooses to add after reviewing an online answer. */
+/** Keeps the meal ideas a person explicitly saves on this device. */
 public final class MealPlanStore {
     private static final String FILE = "meal_plan";
     private static final String KEY = "selected_meals";

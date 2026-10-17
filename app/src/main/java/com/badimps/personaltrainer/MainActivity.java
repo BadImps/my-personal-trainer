@@ -57,7 +57,6 @@ import java.text.SimpleDateFormat;
 /** The complete on-device My Personal Trainer experience. */
 public final class MainActivity extends Activity {
     public static final String EXTRA_START_GUIDED_WORKOUT = "start_guided_workout";
-    private static final int REQUEST_LOCAL_GEMMA_MODEL = 715;
     private int navy = Color.rgb(16, 23, 42);
     private int navyPanel = Color.rgb(26, 58, 72);
     private int coral = Color.rgb(255, 107, 95);
@@ -192,7 +191,6 @@ public final class MainActivity extends Activity {
         stopOtaStatusPolling();
         workoutHandler.removeCallbacksAndMessages(null);
         speechDoneCallbacks.clear();
-        GemmaOnDeviceCoach.close();
         if (voice != null) voice.shutdown();
         if (toneGenerator != null) toneGenerator.release();
         super.onDestroy();
@@ -213,24 +211,6 @@ public final class MainActivity extends Activity {
     @Override protected void onPause() {
         stopOtaStatusPolling();
         super.onPause();
-    }
-
-    @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode != REQUEST_LOCAL_GEMMA_MODEL || resultCode != RESULT_OK || data == null || data.getData() == null) return;
-        toast("Installing your private model… this can take a moment.");
-        new Thread(() -> {
-            try {
-                GemmaOnDeviceCoach.close();
-                LocalAiModelStore.install(this, data.getData());
-                runOnUiThread(() -> {
-                    toast("Private Gemma model installed. It can now enhance offline Coach answers.");
-                    showAiCoachOptions();
-                });
-            } catch (Exception error) {
-                runOnUiThread(() -> toast("Could not install that local model: " + conciseNetworkError(error)));
-            }
-        }).start();
     }
 
     private int dp(int value) {
@@ -3244,7 +3224,6 @@ public final class MainActivity extends Activity {
             WorkoutReminderScheduler.cancel(this);
             WeightStore.clear(this);
             BodyProfileStore.clear(this);
-            GeminiCoachSettings.clear(this);
             MealPlanStore.clear(this);
             JourneyStore.clear(this);
             SetTimeStore.clear(this);
@@ -3428,38 +3407,6 @@ public final class MainActivity extends Activity {
         wake.addView(text("Prevents the screen from sleeping while the app is open. Your normal timeout returns when this is off.", 14, muted));
         keepAwake.setOnCheckedChangeListener((button, checked) -> updateCoachSettings(profile.coachName, profile.dialogueMode, checked));
         body.addView(wake);
-        gap(body, 12);
-
-        LinearLayout gemma = card();
-        gemma.addView(heading("Private Gemma model", 19, ink));
-        if (GemmaOnDeviceCoach.installed(this)) {
-            gemma.addView(text("Installed locally • " + humanFileSize(LocalAiModelStore.sizeBytes(this)) + ". It only improves private Coach wording; your food estimates remain transparent local rules.", 14, muted));
-            gap(gemma, 8);
-            Button replaceModel = secondary("Replace downloaded Gemma model");
-            replaceModel.setOnClickListener(view -> chooseLocalGemmaModel());
-            addButton(gemma, replaceModel);
-            gap(gemma, 7);
-            Button removeModel = lightAction("Remove Gemma model");
-            removeModel.setOnClickListener(view -> {
-                GemmaOnDeviceCoach.close();
-                LocalAiModelStore.clear(this);
-                toast("Gemma removed. Your free private Coach is still ready.");
-                showCoachCustomization();
-            });
-            addButton(gemma, removeModel);
-        } else {
-            gemma.addView(text("Optional • Gemma 3 1B is about 584 MB. It stays on this phone and is never required for the free private Coach.", 14, muted));
-            gemma.addView(text("Download it from the official model page, accept its terms there, then return here to install the downloaded file.", 13, muted));
-            gap(gemma, 8);
-            Button downloadModel = secondary("Download Gemma model (official) — about 584 MB");
-            downloadModel.setOnClickListener(view -> openOfficialGemmaDownload());
-            addButton(gemma, downloadModel);
-            gap(gemma, 7);
-            Button installModel = primary("Install downloaded Gemma model");
-            installModel.setOnClickListener(view -> chooseLocalGemmaModel());
-            addButton(gemma, installModel);
-        }
-        body.addView(gemma);
         gap(body, 12);
 
         LinearLayout note = card();
@@ -4711,39 +4658,39 @@ public final class MainActivity extends Activity {
 
     private void showMeals() {
         LinearLayout body = appPage("Nutrition");
-        title(body, "NUTRITION NEXUS", "Fuel the plan you built", "Use flexible food-group goals around your workout, then let Progress show the pattern beside your training consistency.");
+        title(body, "TODAY'S FUEL", "Simple food ideas, connected", "Save flexible meal ideas and check in on everyday habits. Progress shows the pattern beside your training consistency.");
         JourneyStore.Snapshot snapshot = JourneyStore.snapshot(this);
 
         LinearLayout connection = card();
-        connection.addView(heading(session.isEmpty() ? "No workout connected yet" : target + "  •  " + sessionMinutes + " min", 19, ink));
+        connection.addView(heading(session.isEmpty() ? "Plan your movement first" : "Today’s movement: " + target + "  •  " + sessionMinutes + " min", 19, ink));
         connection.addView(text(session.isEmpty()
-                ? "Build a plan and this page will connect meal ideas to its focus and duration."
+                ? "Choose a workout whenever you are ready. Food ideas remain available without a plan."
                 : "Goal: " + goal + "  •  Equipment: " + equipmentSummary(), 14, muted));
         gap(connection, 7);
-        connection.addView(text(BodyProfileStore.summary(this) + "  •  Weight: " + WeightStore.latestLabel(this), 13, muted));
-        connection.addView(text("Body details add private trend context only; they do not calculate a diet or prescribe portions.", 12, muted));
+        connection.addView(text("Keep food choices familiar, practical, and suited to your appetite, culture, budget, allergies, and any clinical guidance.", 13, muted));
         body.addView(connection);
         gap(body, 12);
 
         NutritionRecommendation.Day todayFood = NutritionRecommendation.forToday();
         LinearLayout todayIdeas = card();
         todayIdeas.addView(heading("Today’s breakfast + lunch", 19, ink));
-        todayIdeas.addView(text("These rotate daily and are flexible ideas—not calorie targets or medical advice.", 13, muted));
+        todayIdeas.addView(text("Fresh ideas rotate each day. Save any idea you want to revisit; none are calorie targets or medical advice.", 13, muted));
         gap(todayIdeas, 8);
         addMealSuggestion(todayIdeas, "Breakfast", todayFood.breakfastTitle, todayFood.breakfastDetail);
         gap(todayIdeas, 7);
         addMealSuggestion(todayIdeas, "Lunch", todayFood.lunchTitle, todayFood.lunchDetail);
+        gap(todayIdeas, 10);
+        addButton(todayIdeas, saveMealIdeaButton("Save breakfast idea", todayFood.breakfastTitle));
+        gap(todayIdeas, 7);
+        addButton(todayIdeas, saveMealIdeaButton("Save lunch idea", todayFood.lunchTitle));
         body.addView(todayIdeas);
-        gap(body, 12);
-
-        addAskCoachFoodCard(body);
         gap(body, 12);
 
         List<String> plannedMeals = MealPlanStore.meals(this);
         if (!plannedMeals.isEmpty()) {
             LinearLayout savedMeals = card();
             savedMeals.addView(heading("Meals added to my plan", 19, ink));
-            savedMeals.addView(text("You chose these after reviewing an online Coach answer. They stay on this device.", 13, muted));
+            savedMeals.addView(text("Your locally saved meal ideas. Edit this list whenever your week changes.", 13, muted));
             for (String meal : plannedMeals) {
                 gap(savedMeals, 7);
                 Button remove = lightAction("✓  " + meal + "   Remove");
@@ -4769,7 +4716,7 @@ public final class MainActivity extends Activity {
         gap(body, 12);
 
         LinearLayout timing = card();
-        timing.addView(heading("Around your workout", 18, ink));
+        timing.addView(heading("Fuel around your workout", 18, ink));
         String before = session.isEmpty() ? "Plan first: workout timing will appear here."
                 : "Before: choose familiar food and fluids that feel comfortable before your " + sessionMinutes + "-minute session.";
         timing.addView(text(before, 14, muted));
@@ -4782,12 +4729,14 @@ public final class MainActivity extends Activity {
         body.addView(timing);
         gap(body, 14);
 
-        body.addView(heading("Meal ideas for " + goal, 20, Color.WHITE));
+        body.addView(heading("Flexible ideas for " + goal, 20, Color.WHITE));
         gap(body, 8);
         for (String meal : Coach.meals(goal)) {
             LinearLayout mealCard = card();
             mealCard.addView(heading(meal, 18, ink));
             mealCard.addView(text("Adapt ingredients and portions to appetite, culture, budget, allergies, and medical guidance.", 14, muted));
+            gap(mealCard, 8);
+            addButton(mealCard, saveMealIdeaButton("Save this idea", meal));
             body.addView(mealCard);
             gap(body, 9);
         }
@@ -4803,314 +4752,22 @@ public final class MainActivity extends Activity {
         body.addView(text("These are general wellness ideas, not medical nutrition treatment. For allergies, medical conditions, eating concerns, pregnancy, or specific weight-change targets, consult a qualified clinician or registered dietitian.", 13, Color.rgb(211, 225, 233)));
     }
 
-    /**
-     * Food coaching is deliberately branched: private local estimates always work, an optional
-     * local Gemma model improves wording, and Gemini stays an explicit online choice.
-     */
-    private void addAskCoachFoodCard(LinearLayout body) {
-        LinearLayout coach = card();
-        coach.addView(heading("Ask Coach " + coachName(), 19, ink));
-        coach.addView(text("Type a meal or food for a private, free check on this device. It uses built-in food patterns for a broad range; it does not upload your meal, body details, or an API key.", 14, muted));
-        gap(coach, 9);
-        EditText meal = input("Example: chicken, rice, and vegetables", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES | InputType.TYPE_TEXT_FLAG_MULTI_LINE);
-        meal.setSingleLine(false);
-        meal.setMinLines(2);
-        coach.addView(meal);
-        gap(coach, 8);
-        TextView privacy = text(GemmaOnDeviceCoach.installed(this)
-                        ? "Private local Coach is ready with your on-device Gemma wording model. Nutrition estimates still come from the app's transparent local rules."
-                        : "Private local Coach is ready. You can optionally add a Gemma model later for richer on-device wording; it is never required.",
-                12, muted);
-        coach.addView(privacy);
-        gap(coach, 10);
-        ProgressBar loading = new ProgressBar(this);
-        loading.setIndeterminateTintList(ColorStateList.valueOf(mint));
-        loading.setVisibility(View.GONE);
-        coach.addView(loading, new LinearLayout.LayoutParams(dp(30), dp(30)));
-        LinearLayout resultHost = new LinearLayout(this);
-        resultHost.setOrientation(LinearLayout.VERTICAL);
-        coach.addView(resultHost);
-        Button askLocal = primary(GemmaOnDeviceCoach.installed(this) ? "Ask Coach privately — enhanced" : "Ask Coach privately — free");
-        askLocal.setOnClickListener(view -> {
-            String question = meal.getText().toString().trim();
-            if (question.isEmpty()) {
-                meal.setError("Tell your coach which meal or food you want to ask about.");
-                meal.requestFocus();
-                return;
-            }
-            askLocalFoodCoach(question, askLocal, loading, resultHost);
-        });
-        addButton(coach, askLocal);
-        gap(coach, 8);
-        Button aiOptions = secondary("Private AI options");
-        aiOptions.setOnClickListener(view -> showAiCoachOptions());
-        addButton(coach, aiOptions);
-        gap(coach, 8);
-        Button online = lightAction(GeminiCoachSettings.configured(this) ? "Ask Coach online — optional" : "Set up optional online Gemini");
-        online.setOnClickListener(view -> {
-            if (GeminiCoachSettings.configured(this)) {
-                String question = meal.getText().toString().trim();
-                if (question.isEmpty()) {
-                    meal.setError("Tell your coach which meal or food you want to ask about.");
-                    meal.requestFocus();
-                    return;
-                }
-                askFoodCoach(question, online, loading, resultHost);
-            } else {
-                showGeminiSetup();
-            }
-        });
-        addButton(coach, online);
-        body.addView(coach);
-    }
-
-    private void askLocalFoodCoach(String meal, Button ask, ProgressBar loading, LinearLayout resultHost) {
-        ask.setEnabled(false);
-        loading.setVisibility(View.VISIBLE);
-        resultHost.removeAllViews();
-        resultHost.addView(text("Coach " + coachName() + " is checking your meal privately on this device…", 13, muted));
-        new Thread(() -> {
-            OfflineFoodCoach.Result local = OfflineFoodCoach.analyse(meal, goal, target, sessionMinutes);
-            String enhanced = "";
-            if (GemmaOnDeviceCoach.installed(this)) {
-                try {
-                    enhanced = GemmaOnDeviceCoach.explain(this, "Meal: " + meal + "\nLocal summary: " + local.summary
-                            + "\nLocal calorie range: " + local.calories + "\nPlan fit: " + local.planFit);
-                } catch (Exception ignored) {
-                    // The deterministic local answer remains complete if a model is too large for this device.
-                }
-            }
-            final String wording = enhanced;
-            runOnUiThread(() -> {
-                loading.setVisibility(View.GONE);
-                ask.setEnabled(true);
-                showLocalFoodCoachResult(resultHost, meal, local, wording);
-            });
-        }).start();
-    }
-
-    private void showLocalFoodCoachResult(LinearLayout resultHost, String meal, OfflineFoodCoach.Result result, String enhancedWording) {
-        resultHost.removeAllViews();
-        gap(resultHost, 10);
-        LinearLayout answer = new LinearLayout(this);
-        answer.setOrientation(LinearLayout.VERTICAL);
-        answer.setPadding(dp(12), dp(12), dp(12), dp(12));
-        answer.setBackground(surface(Color.rgb(239, 248, 246), 14, 1, mint));
-        answer.addView(heading("Private free Coach answer", 16, ink));
-        answer.addView(text(enhancedWording == null || enhancedWording.trim().isEmpty() ? result.summary : enhancedWording, 14, muted));
-        gap(answer, 6);
-        answer.addView(text("Estimated calories: " + result.calories, 14, ink));
-        answer.addView(text("Nutrition note: " + result.healthNote, 13, muted));
-        answer.addView(text("Plan fit: " + result.planFit, 13, muted));
-        answer.addView(text("Private local ranges are not a food label, diagnosis, or treatment. Check packaging, ingredients, allergies, and clinical guidance where relevant.", 12, muted));
-        resultHost.addView(answer);
-        gap(resultHost, 8);
-        Button add = action("Add this meal to my plan", mint, navy);
-        add.setContentDescription("Add " + meal + " to my meal plan");
-        add.setOnClickListener(view -> {
+    private Button saveMealIdeaButton(String label, String meal) {
+        boolean saved = MealPlanStore.meals(this).contains(meal);
+        Button button = lightAction(saved ? "✓  Saved to my ideas" : "+  " + label);
+        button.setContentDescription((saved ? "Saved " : "Save ") + meal);
+        button.setOnClickListener(view -> {
             MealPlanStore.add(this, meal);
-            toast("Added to your local meal plan.");
+            toast("Saved to your local meal ideas.");
             showMeals();
         });
-        addButton(resultHost, add);
-    }
-
-    private void askFoodCoach(String meal, Button ask, ProgressBar loading, LinearLayout resultHost) {
-        ask.setEnabled(false);
-        loading.setVisibility(View.VISIBLE);
-        resultHost.removeAllViews();
-        TextView checking = text("Coach " + coachName() + " is checking your meal with your optional online Gemini service…", 13, muted);
-        resultHost.addView(checking);
-        boolean includeBody = GeminiCoachSettings.sharesBodyContext(this) && BodyProfileStore.configured(this) && WeightStore.configured(this);
-        GeminiFoodCoach.Request request = new GeminiFoodCoach.Request(meal, goal, target, sessionMinutes,
-                includeBody ? BodyProfileStore.age(this) : 0,
-                includeBody ? BodyProfileStore.heightCm(this) : 0f,
-                includeBody ? WeightStore.latest(this) : 0f,
-                includeBody ? WeightStore.unit(this) : "",
-                includeBody ? BodyProfileStore.gender(this) : "",
-                includeBody);
-        new Thread(() -> {
-            try {
-                GeminiFoodCoach.Result result = GeminiFoodCoach.ask(GeminiCoachSettings.endpoint(this), request);
-                runOnUiThread(() -> {
-                    loading.setVisibility(View.GONE);
-                    ask.setEnabled(true);
-                    showFoodCoachResult(resultHost, meal, result);
-                });
-            } catch (Exception error) {
-                runOnUiThread(() -> {
-                    loading.setVisibility(View.GONE);
-                    ask.setEnabled(true);
-                    resultHost.removeAllViews();
-                    resultHost.addView(text("Coach could not reach the Gemini service. Check your connection and secure service address, then try again. " + conciseNetworkError(error), 13, coral));
-                });
-            }
-        }).start();
-    }
-
-    private void showFoodCoachResult(LinearLayout resultHost, String meal, GeminiFoodCoach.Result result) {
-        resultHost.removeAllViews();
-        gap(resultHost, 10);
-        LinearLayout answer = new LinearLayout(this);
-        answer.setOrientation(LinearLayout.VERTICAL);
-        answer.setPadding(dp(12), dp(12), dp(12), dp(12));
-        answer.setBackground(surface(Color.rgb(239, 248, 246), 14, 1, mint));
-        answer.addView(heading("Online Gemini Coach answer", 16, ink));
-        answer.addView(text(result.summary, 14, muted));
-        gap(answer, 6);
-        answer.addView(text("Estimated calories: " + result.calories, 14, ink));
-        answer.addView(text("Nutrition note: " + result.healthNote, 13, muted));
-        answer.addView(text("Plan fit: " + result.planFit, 13, muted));
-        answer.addView(text("Online estimates can be incomplete. Check packaging, ingredients, allergies, and clinical guidance where relevant.", 12, muted));
-        resultHost.addView(answer);
-        gap(resultHost, 8);
-        Button add = action("Add this meal to my plan", mint, navy);
-        add.setContentDescription("Add " + meal + " to my meal plan");
-        add.setOnClickListener(view -> {
-            MealPlanStore.add(this, meal);
-            toast("Added to your local meal plan.");
-            showMeals();
-        });
-        addButton(resultHost, add);
+        return button;
     }
 
     private String conciseNetworkError(Exception error) {
         String message = error.getMessage();
         if (message == null || message.trim().isEmpty()) return "";
         return message.length() > 110 ? message.substring(0, 110) + "…" : message;
-    }
-
-    private void showAiCoachOptions() {
-        LinearLayout body = appPage("Nutrition");
-        title(body, "PRIVATE AI OPTIONS", "Choose where Coach thinks", "The free local Coach is always available. A downloaded Gemma model can improve its wording privately; Gemini is a separate, optional online service.");
-
-        LinearLayout local = card();
-        local.addView(heading("Free local Coach", 19, ink));
-        local.addView(text("Ready now • Uses on-device food patterns to provide broad common-portion estimates and plan-fit context. No account, internet connection, model download, or API key is needed.", 14, muted));
-        body.addView(local);
-        gap(body, 12);
-
-        LinearLayout gemma = card();
-        gemma.addView(heading("Optional on-device Gemma", 19, ink));
-        if (GemmaOnDeviceCoach.installed(this)) {
-            gemma.addView(text("Installed locally • " + humanFileSize(LocalAiModelStore.sizeBytes(this)) + ". It only improves the wording of the private answer; calorie ranges remain transparent local estimates.", 14, muted));
-            gap(gemma, 9);
-            Button replace = secondary("Replace local Gemma model");
-            replace.setOnClickListener(view -> chooseLocalGemmaModel());
-            addButton(gemma, replace);
-            gap(gemma, 8);
-            Button remove = lightAction("Remove local Gemma model");
-            remove.setOnClickListener(view -> {
-                try {
-                    GemmaOnDeviceCoach.close();
-                    LocalAiModelStore.clear(this);
-                    toast("Private Gemma model removed. Free local Coach remains available.");
-                    showAiCoachOptions();
-                } catch (Exception error) {
-                    toast("Could not remove the local model.");
-                }
-            });
-            addButton(gemma, remove);
-        } else {
-            gemma.addView(text("Not installed. Gemma runs locally but needs a compatible .litertlm model you have separately downloaded. Models are large, may be slow on older phones, and are not bundled into the app or silently downloaded.", 14, muted));
-            gemma.addView(text("For best results, use an Android-compatible Gemma 3 1B LiteRT-LM model and keep enough free storage. If your phone cannot run it, the standard free local Coach continues to work.", 13, muted));
-            gap(gemma, 9);
-            Button install = primary("Choose downloaded Gemma model");
-            install.setOnClickListener(view -> chooseLocalGemmaModel());
-            addButton(gemma, install);
-        }
-        body.addView(gemma);
-        gap(body, 12);
-
-        LinearLayout online = card();
-        online.addView(heading("Optional online Gemini", 19, ink));
-        online.addView(text(GeminiCoachSettings.configured(this)
-                ? "Connected to your HTTPS service. It runs only when you press the online button, and body context remains opt-in."
-                : "Not connected. This route requires your own secure HTTPS gateway so no API key is stored in the APK.", 14, muted));
-        gap(online, 9);
-        Button configure = secondary(GeminiCoachSettings.configured(this) ? "Edit online Gemini connection" : "Set up optional online Gemini");
-        configure.setOnClickListener(view -> showGeminiSetup());
-        addButton(online, configure);
-        body.addView(online);
-        gap(body, 14);
-        Button back = secondary("Back to Nutrition");
-        back.setOnClickListener(view -> showMeals());
-        addButton(body, back);
-    }
-
-    private void chooseLocalGemmaModel() {
-        Intent pick = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-        pick.addCategory(Intent.CATEGORY_OPENABLE);
-        pick.setType("*/*");
-        startActivityForResult(pick, REQUEST_LOCAL_GEMMA_MODEL);
-    }
-
-    /** Opens the gated, official model page rather than silently fetching a licensed model. */
-    private void openOfficialGemmaDownload() {
-        new AlertDialog.Builder(this)
-                .setTitle("Download private Gemma")
-                .setMessage("Gemma 3 1B is a large optional model (about 584 MB). The official download requires you to review and accept Gemma's terms in your browser. It stays separate from the app and is never downloaded silently or charged to your mobile data without your action.")
-                .setNegativeButton("Not now", null)
-                .setPositiveButton("Open official download", (dialog, which) -> {
-                    try {
-                        startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("https://huggingface.co/litert-community/Gemma3-1B-IT")));
-                        toast("After the download finishes, return here and tap Install downloaded Gemma model.");
-                    } catch (RuntimeException unavailable) {
-                        toast("No browser is available to open the Gemma model page.");
-                    }
-                })
-                .show();
-    }
-
-    private String humanFileSize(long bytes) {
-        if (bytes >= 1024L * 1024L * 1024L) return String.format(Locale.US, "%.1f GB", bytes / (1024f * 1024f * 1024f));
-        return String.format(Locale.US, "%.0f MB", bytes / (1024f * 1024f));
-    }
-
-    private void showGeminiSetup() {
-        LinearLayout body = appPage("Nutrition");
-        title(body, "OPTIONAL ONLINE GEMINI", "Connect your Gemini service", "The private free Coach works without this. Use a user-owned HTTPS gateway only when you want an online AI answer; your Gemini API key stays outside the app.");
-        LinearLayout privacy = card();
-        privacy.addView(heading("Private by default", 19, ink));
-        privacy.addView(text("Do not paste an API key here. Android apps can be reverse engineered, so the key belongs in a secure server or cloud secret manager—not in this APK. Until you opt in below, Coach sends only the meal and selected plan context.", 14, muted));
-        body.addView(privacy);
-        gap(body, 12);
-        EditText endpoint = input("Secure Gemini service URL — https://", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
-        endpoint.setText(GeminiCoachSettings.endpoint(this));
-        body.addView(endpoint);
-        gap(body, 10);
-        LinearLayout sharing = card();
-        CheckBox includeContext = new CheckBox(this);
-        includeContext.setText("Share my entered body context with Gemini");
-        includeContext.setTextSize(16);
-        includeContext.setTextColor(ink);
-        includeContext.setButtonTintList(ColorStateList.valueOf(mint));
-        includeContext.setChecked(GeminiCoachSettings.sharesBodyContext(this));
-        sharing.addView(includeContext);
-        sharing.addView(text("Optional: age, selected gender, height, and current weight are sent only with this request. They otherwise remain on this device. Never use this option for a medical diagnosis or emergency.", 13, muted));
-        body.addView(sharing);
-        gap(body, 12);
-        LinearLayout contract = card();
-        contract.addView(heading("Gateway response", 18, ink));
-        contract.addView(text("Your service should accept JSON containing meal, goal, workoutFocus, workoutMinutes, and optional bodyContext; return summary, estimatedCalories, healthNote, and planFit. The app displays the answer and lets you choose whether to save the meal locally.", 13, muted));
-        body.addView(contract);
-        gap(body, 14);
-        Button save = primary("Save secure connection");
-        save.setOnClickListener(view -> {
-            try {
-                GeminiCoachSettings.save(this, endpoint.getText().toString(), includeContext.isChecked());
-                toast("Gemini service connection saved. Ask Coach from Nutrition whenever you are online.");
-                showMeals();
-            } catch (Exception error) {
-                endpoint.setError("Enter a complete HTTPS service address.");
-                endpoint.requestFocus();
-            }
-        });
-        addButton(body, save);
-        gap(body, 8);
-        Button back = secondary("Back to Nutrition");
-        back.setOnClickListener(view -> showMeals());
-        addButton(body, back);
     }
 
     private Button fuelGoalButton(String label, int flag, int mask) {

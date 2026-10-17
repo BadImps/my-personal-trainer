@@ -81,9 +81,7 @@ Set rest and exercise cooldown are now deliberately separate controls. Set rest 
 
 ## 3.6 free-first private Coach
 
-Nutrition now works without any cloud account: **Ask Coach privately — free** runs locally, uses transparent common-portion food-pattern ranges, and never uploads the meal or body context. People can optionally add a separately downloaded on-device Gemma LiteRT-LM model for richer private wording, or configure their own HTTPS Gemini gateway for a distinct opt-in online answer. The calorie estimate always remains a labelled broad local estimate rather than an LLM guess.
-
-Coach Settings now includes **Download Gemma model (official)**. It opens the official gated Gemma download page so the person can accept the model terms, download a compatible `.litertlm` model, and return to **Install downloaded Gemma model**. The app never embeds a model credential or silently accepts model terms on someone’s behalf.
+Nutrition is a private, offline fuel companion: daily breakfast and lunch ideas rotate automatically, any idea can be saved locally, and three simple food-and-hydration check-ins connect to Progress beside completed workouts. It does not estimate calories, use a model, send food or body information anywhere, or prescribe portions.
 
 Guided workouts now preserve a local **Set Times** leaderboard for every normally completed exercise. The recovery screen places it directly above Emergency stop, orders completed sets from fastest to slowest, marks the personal best, and shows active-set totals. Those details appear under the corresponding completed workout in Progress; emergency-stopped workouts are never written there.
 

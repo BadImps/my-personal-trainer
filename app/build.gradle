@@ -1,6 +1,5 @@
 plugins {
     id 'com.android.application'
-    id 'org.jetbrains.kotlin.android'
 }
 
 android {
@@ -27,17 +26,9 @@ android {
     buildTypes { release { signingConfig signingConfigs.otaCompatibility } }
 }
 
-// Keep the new optional Kotlin LiteRT-LM wrapper compatible with the existing Java 17 app.
-tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
-    compilerOptions.jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
-}
-
 dependencies {
     implementation 'androidx.core:core:1.17.0'
     implementation 'androidx.activity:activity:1.11.0'
-    // The optional Gemma enhancement runs entirely on-device. Its large model is selected by
-    // the person after installation; it is never bundled into, or downloaded by, this APK.
-    implementation 'com.google.ai.edge.litertlm:litertlm-android:0.18.0'
     testImplementation 'junit:junit:4.13.2'
     testImplementation 'org.robolectric:robolectric:4.16'
 }
