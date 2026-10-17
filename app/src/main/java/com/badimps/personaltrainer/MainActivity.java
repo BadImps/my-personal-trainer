@@ -162,6 +162,7 @@ public final class MainActivity extends Activity {
     private String pendingLiveTrackingMode;
     private BroadcastReceiver liveTrackingReceiver;
     private int schedulerMonthOffset;
+    private int homeCalendarMonthOffset;
     private Calendar schedulerSelectedDate = Calendar.getInstance();
     private String schedulerActivity = EndurancePlanStore.WALKING;
     private int schedulerHour = 18;
@@ -1215,21 +1216,14 @@ public final class MainActivity extends Activity {
         for (int i = 0; i < weekDays.length; i++) {
             boolean workoutDay = homeWeekConfirmed && homeSchedule.workoutDays[i];
             boolean isToday = homeWeekOffset == 0 && isToday(homeWeekStart, i);
-            String detail = workoutDay ? homeFocusForDay(i, homeSchedule) : homeWeekConfirmed ? "REST\nDAY" : "OPEN";
-            TextView day = text(weekDays[i] + "\n" + homeWeekDate(homeWeekStart, i) + "\n" + detail, 9, workoutDay ? navy : muted);
-            day.setGravity(Gravity.CENTER);
-            day.setMaxLines(4);
-            day.setLineSpacing(dp(3), 1);
-            day.setPadding(dp(2), dp(5), dp(2), dp(5));
-            day.setBackground(surface(workoutDay ? mint : Color.rgb(232, 236, 244), 10, isToday ? 2 : 0, isToday ? coral : Color.TRANSPARENT));
-            day.setContentDescription(weekDays[i] + " " + homeWeekDate(homeWeekStart, i)
-                    + (workoutDay ? ", " + homeFocusForDay(i, homeSchedule) + " planned" : homeWeekConfirmed ? ", Rest Day" : ", no plan set"));
-            LinearLayout.LayoutParams dayParams = new LinearLayout.LayoutParams(0, dp(76), 1);
+            Calendar date = homeDate(homeWeekStart, i);
+            LinearLayout day = homeScheduleDayTile(date, i, workoutDay, homeWeekConfirmed, homeSchedule, isToday);
+            LinearLayout.LayoutParams dayParams = new LinearLayout.LayoutParams(0, dp(90), 1);
             dayParams.rightMargin = i == weekDays.length - 1 ? 0 : dp(3);
             weekRow.addView(day, dayParams);
         }
         weekly.addView(weekRow);
-        TextView legend = text("Mint = planned workout  ·  slate = Rest Day" + (homeWeekConfirmed ? "" : "  ·  open = not planned"), 12, Color.rgb(202, 216, 234));
+        TextView legend = text("Mint = workout  ·  coral = endurance  ·  slate = rest" + (homeWeekConfirmed ? "" : "  ·  open = not planned"), 12, Color.rgb(202, 216, 234));
         legend.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams legendParams = new LinearLayout.LayoutParams(-1, -2);
         legendParams.topMargin = dp(8);
@@ -1434,29 +1428,48 @@ public final class MainActivity extends Activity {
     private void showMonthScheduleDialog() {
         Calendar month = Calendar.getInstance();
         month.set(Calendar.DAY_OF_MONTH, 1);
+        month.add(Calendar.MONTH, homeCalendarMonthOffset);
         Dialog dialog = new Dialog(this);
         LinearLayout content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
         content.setPadding(dp(18), dp(18), dp(18), dp(18));
         content.setBackgroundColor(paper);
-        content.addView(heading("Workout calendar", 22, ink));
-        content.addView(text(new SimpleDateFormat("MMMM yyyy", Locale.getDefault()).format(month.getTime()) + " · planned workout dates", 13, muted));
+        content.addView(heading("Training calendar", 22, ink));
+        content.addView(text("Every scheduled strength session, rest day, and endurance appointment.", 13, muted));
+        LinearLayout monthHeader = new LinearLayout(this);
+        monthHeader.setGravity(Gravity.CENTER_VERTICAL);
+        Button previous = action("‹", Color.WHITE, ink);
+        previous.setContentDescription("Previous month");
+        previous.setOnClickListener(view -> { homeCalendarMonthOffset--; dialog.dismiss(); showMonthScheduleDialog(); });
+        monthHeader.addView(previous, new LinearLayout.LayoutParams(dp(42), dp(42)));
+        TextView monthLabel = heading(new SimpleDateFormat("MMMM yyyy", Locale.getDefault()).format(month.getTime()), 19, ink);
+        monthLabel.setGravity(Gravity.CENTER);
+        monthHeader.addView(monthLabel, new LinearLayout.LayoutParams(0, dp(48), 1));
+        Button next = action("›", Color.WHITE, ink);
+        next.setContentDescription("Next month");
+        next.setOnClickListener(view -> { homeCalendarMonthOffset++; dialog.dismiss(); showMonthScheduleDialog(); });
+        monthHeader.addView(next, new LinearLayout.LayoutParams(dp(42), dp(42)));
+        content.addView(monthHeader);
         GridLayout grid = new GridLayout(this);
         grid.setColumnCount(7);
         String[] shortDays = {"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"};
-        for (String day : shortDays) grid.addView(monthCell(day, false));
+        for (String day : shortDays) grid.addView(monthCalendarHeader(day));
         int first = (month.get(Calendar.DAY_OF_WEEK) - Calendar.MONDAY + 7) % 7;
-        for (int blank = 0; blank < first; blank++) grid.addView(monthCell("", false));
+        for (int blank = 0; blank < first; blank++) grid.addView(monthCalendarCell(null));
         int max = month.getActualMaximum(Calendar.DAY_OF_MONTH);
         for (int date = 1; date <= max; date++) {
             Calendar value = (Calendar) month.clone();
             value.set(Calendar.DAY_OF_MONTH, date);
-            boolean planned = isMonthWorkoutDay(value);
-            grid.addView(monthCell(String.valueOf(date), planned));
+            grid.addView(monthCalendarCell(value));
         }
         LinearLayout.LayoutParams gridParams = new LinearLayout.LayoutParams(-1, -2);
-        gridParams.topMargin = dp(14);
+        gridParams.topMargin = dp(8);
         content.addView(grid, gridParams);
+        TextView legend = text("Mint  workout     Coral  Run / Walk / Cycle     Slate  rest", 11, muted);
+        legend.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams legendParams = new LinearLayout.LayoutParams(-1, -2);
+        legendParams.topMargin = dp(10);
+        content.addView(legend, legendParams);
         Button close = lightAction("Close");
         close.setOnClickListener(v -> dialog.dismiss());
         LinearLayout.LayoutParams closeParams = new LinearLayout.LayoutParams(-1, dp(46));
@@ -1466,15 +1479,65 @@ public final class MainActivity extends Activity {
         dialog.show();
     }
 
-    private TextView monthCell(String label, boolean planned) {
-        TextView cell = text(label, 12, planned ? navy : muted);
-        cell.setGravity(Gravity.CENTER);
-        cell.setBackground(surface(planned ? mint : Color.TRANSPARENT, 8, planned ? 1 : 0, planned ? mint : Color.TRANSPARENT));
-        cell.setPadding(0, dp(8), 0, dp(8));
-        cell.setLayoutParams(new GridLayout.LayoutParams());
-        ((GridLayout.LayoutParams) cell.getLayoutParams()).width = dp(40);
-        ((GridLayout.LayoutParams) cell.getLayoutParams()).height = dp(42);
+    private TextView monthCalendarHeader(String label) {
+        TextView header = text(label, 10, muted);
+        header.setGravity(Gravity.CENTER);
+        GridLayout.LayoutParams params = new GridLayout.LayoutParams();
+        params.width = dp(42); params.height = dp(28);
+        header.setLayoutParams(params);
+        return header;
+    }
+
+    private LinearLayout monthCalendarCell(Calendar date) {
+        LinearLayout cell = new LinearLayout(this);
+        cell.setOrientation(LinearLayout.VERTICAL);
+        cell.setGravity(Gravity.CENTER_HORIZONTAL);
+        GridLayout.LayoutParams params = new GridLayout.LayoutParams();
+        params.width = dp(42); params.height = dp(60);
+        params.setMargins(dp(1), dp(1), dp(1), dp(1));
+        cell.setLayoutParams(params);
+        if (date == null) return cell;
+        boolean planned = isMonthWorkoutDay(date);
+        List<SchedulerStore.Appointment> appointments = SchedulerStore.onDate(this, date);
+        boolean endurance = !appointments.isEmpty();
+        int fill = endurance && !planned ? coral : planned ? mint : Color.rgb(238, 242, 247);
+        boolean today = SchedulerStore.dateKey(date).equals(SchedulerStore.dateKey(Calendar.getInstance()));
+        cell.setPadding(dp(2), dp(3), dp(2), dp(2));
+        cell.setBackground(surface(fill, 8, today ? 2 : 0, today ? coral : Color.TRANSPARENT));
+        TextView number = text(String.valueOf(date.get(Calendar.DAY_OF_MONTH)), 12, planned || endurance ? navy : muted);
+        number.setGravity(Gravity.CENTER);
+        number.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
+        cell.addView(number, new LinearLayout.LayoutParams(-1, dp(22)));
+        if (planned) {
+            TextView plan = text("PLAN", 8, navy);
+            plan.setGravity(Gravity.CENTER);
+            cell.addView(plan, new LinearLayout.LayoutParams(-1, endurance ? dp(16) : dp(28)));
+        }
+        if (endurance) {
+            TextView activity = text(enduranceDayLabel(appointments), 8, navy);
+            activity.setGravity(Gravity.CENTER);
+            activity.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
+            activity.setBackground(surface(coral, 5, 0, Color.TRANSPARENT));
+            cell.addView(activity, new LinearLayout.LayoutParams(-1, planned ? dp(14) : dp(28)));
+        } else if (!planned) {
+            TextView rest = text("REST", 8, muted);
+            rest.setGravity(Gravity.CENTER);
+            cell.addView(rest, new LinearLayout.LayoutParams(-1, dp(28)));
+        }
+        cell.setClickable(true);
+        cell.setContentDescription(new SimpleDateFormat("EEEE, MMMM d", Locale.getDefault()).format(date.getTime()) + ", " + (planned ? "work plan" : "rest day") + (endurance ? ", " + enduranceDayLabel(appointments) : ""));
+        cell.setOnClickListener(view -> showMonthDayDetail(date));
         return cell;
+    }
+
+    private void showMonthDayDetail(Calendar date) {
+        List<SchedulerStore.Appointment> appointments = SchedulerStore.onDate(this, date);
+        StringBuilder detail = new StringBuilder(isMonthWorkoutDay(date) ? "Work plan · " + schedulerStrengthSummary(date) : "Rest day");
+        for (SchedulerStore.Appointment appointment : appointments) {
+            detail.append("\n").append(appointment.mode).append(" · ").append(schedulerTime(appointment.when)).append(" · ").append(appointment.durationMinutes).append(" min");
+        }
+        new AlertDialog.Builder(this).setTitle(new SimpleDateFormat("EEEE, MMMM d", Locale.getDefault()).format(date.getTime()))
+                .setMessage(detail.toString()).setPositiveButton("Done", null).show();
     }
 
     private boolean isMonthWorkoutDay(Calendar date) {
@@ -1495,9 +1558,59 @@ public final class MainActivity extends Activity {
     }
 
     private int homeWeekDate(Calendar weekStart, int index) {
+        return homeDate(weekStart, index).get(Calendar.DAY_OF_MONTH);
+    }
+
+    private Calendar homeDate(Calendar weekStart, int index) {
         Calendar date = (Calendar) weekStart.clone();
         date.add(Calendar.DAY_OF_YEAR, index);
-        return date.get(Calendar.DAY_OF_MONTH);
+        return date;
+    }
+
+    /** Compact split tiles make a same-day strength plan and endurance booking immediately legible. */
+    private LinearLayout homeScheduleDayTile(Calendar date, int dayIndex, boolean workoutDay, boolean confirmed,
+                                               WeeklyScheduleStore.Schedule schedule, boolean today) {
+        List<SchedulerStore.Appointment> appointments = SchedulerStore.onDate(this, date);
+        boolean endurance = !appointments.isEmpty();
+        int base = endurance && !workoutDay ? coral : workoutDay ? mint : Color.rgb(232, 236, 244);
+        LinearLayout tile = new LinearLayout(this);
+        tile.setOrientation(LinearLayout.VERTICAL);
+        tile.setGravity(Gravity.CENTER_HORIZONTAL);
+        tile.setPadding(dp(2), dp(5), dp(2), dp(3));
+        tile.setBackground(surface(base, 10, today ? 2 : 0, today ? Color.WHITE : Color.TRANSPARENT));
+        TextView dateLabel = text(weekDays[dayIndex] + "\n" + homeWeekDate(date, 0), 9, (workoutDay || endurance) ? navy : muted);
+        dateLabel.setGravity(Gravity.CENTER);
+        dateLabel.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
+        tile.addView(dateLabel, new LinearLayout.LayoutParams(-1, dp(34)));
+        if (workoutDay) {
+            TextView plan = text(homeFocusForDay(dayIndex, schedule), 8, navy);
+            plan.setGravity(Gravity.CENTER);
+            plan.setMaxLines(2);
+            tile.addView(plan, new LinearLayout.LayoutParams(-1, endurance ? dp(25) : dp(40)));
+        } else if (!endurance) {
+            TextView rest = text(confirmed ? "REST" : "OPEN", 8, muted);
+            rest.setGravity(Gravity.CENTER);
+            tile.addView(rest, new LinearLayout.LayoutParams(-1, dp(40)));
+        }
+        if (endurance) {
+            TextView activity = text(enduranceDayLabel(appointments), 8, navy);
+            activity.setGravity(Gravity.CENTER);
+            activity.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
+            activity.setBackground(surface(coral, 6, 0, Color.TRANSPARENT));
+            LinearLayout.LayoutParams activityParams = new LinearLayout.LayoutParams(-1, workoutDay ? dp(19) : dp(40));
+            activityParams.leftMargin = dp(1); activityParams.rightMargin = dp(1);
+            tile.addView(activity, activityParams);
+        }
+        String state = workoutDay ? homeFocusForDay(dayIndex, schedule) + " workout" : confirmed ? "Rest Day" : "Open";
+        if (endurance) state += ", " + enduranceDayLabel(appointments);
+        tile.setContentDescription(weekDays[dayIndex] + " " + homeWeekDate(date, 0) + ", " + state);
+        return tile;
+    }
+
+    private String enduranceDayLabel(List<SchedulerStore.Appointment> appointments) {
+        if (appointments.isEmpty()) return "";
+        String label = appointmentAbbreviation(appointments.get(0).mode).toUpperCase(Locale.ROOT);
+        return appointments.size() > 1 ? label + " +" + (appointments.size() - 1) : label;
     }
 
     private boolean isToday(Calendar weekStart, int index) {
