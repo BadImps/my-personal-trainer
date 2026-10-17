@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 40,
-  "versionName": "4.9",
-  "publishedAt": "2026-10-17T08:36:32Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v4.9/app-release.apk",
-  "sha256": "e4123821579a389c0b53e1fe926333edaa4c5082b14ef36c866097ca2a6bd3f9",
-  "sizeBytes": 84161825,
-  "notes": "Adds a persistent whole-workout remaining-time bar, separate skipped cooldown and rest deductions, and adjusted workout totals during cooldown."
+  "versionCode": 41,
+  "versionName": "5.0",
+  "publishedAt": "2026-10-17T10:39:24Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.0/app-release.apk",
+  "sha256": "612ea7de1b58ec28c47286de78618bc09a1c8f53b00753a00a7b0405c29ec8f4",
+  "sizeBytes": 34460857,
+  "notes": "Adds an offline searchable Caribbean Food Library, simplifies the Nutrition flow, and refines the compact workout timer and Total Exercise report."
 }
