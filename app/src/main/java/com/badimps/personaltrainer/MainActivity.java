@@ -4,7 +4,10 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Dialog;
 import android.Manifest;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
@@ -150,6 +153,9 @@ public final class MainActivity extends Activity {
     private int pageGeneration;
     private int otaPageGeneration = -1;
     private boolean showingUpdatePage;
+    private static final int REQUEST_LIVE_LOCATION = 4102;
+    private String pendingLiveTrackingMode;
+    private BroadcastReceiver liveTrackingReceiver;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -186,6 +192,7 @@ public final class MainActivity extends Activity {
     }
 
     @Override protected void onDestroy() {
+        stopLiveTrackingUiObserver();
         if (restTimer != null) restTimer.cancel();
         stopSetClock();
         stopOtaStatusPolling();
@@ -211,6 +218,15 @@ public final class MainActivity extends Activity {
     @Override protected void onPause() {
         stopOtaStatusPolling();
         super.onPause();
+    }
+
+    @Override public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] results) {
+        super.onRequestPermissionsResult(requestCode, permissions, results);
+        if (requestCode != REQUEST_LIVE_LOCATION) return;
+        String mode = pendingLiveTrackingMode;
+        pendingLiveTrackingMode = null;
+        if (mode != null && hasLiveLocationPermission()) startLiveTrackingService(mode);
+        else toast("Location access is needed to measure a live endurance session.");
     }
 
     private int dp(int value) {
@@ -567,6 +583,7 @@ public final class MainActivity extends Activity {
     }
 
     private void beginNewPage() {
+        stopLiveTrackingUiObserver();
         pageGeneration++;
         showingUpdatePage = false;
         stopOtaStatusPolling();
@@ -3228,6 +3245,8 @@ public final class MainActivity extends Activity {
             BodyProfileStore.clear(this);
             MealPlanStore.clear(this);
             EndurancePlanStore.clear(this);
+            LiveTrackingStore.clear(this);
+            stopService(new Intent(this, LiveTrackingService.class));
             JourneyStore.clear(this);
             SetTimeStore.clear(this);
             session.clear();
@@ -4846,6 +4865,28 @@ public final class MainActivity extends Activity {
     private void showEndurance() {
         LinearLayout body = appPage("Endurance");
         title(body, "ENDURANCE", "Map your next move", "Plan a walking, running, or cycling route, then open it in your installed map app. Route details stay on this phone.");
+        LiveTrackingStore.Session live = LiveTrackingStore.current(this);
+        if (live.active) {
+            addLiveTrackingCard(body, live);
+            gap(body, 16);
+        } else {
+            LiveTrackingStore.Session last = LiveTrackingStore.last(this);
+            if (last != null) {
+                LinearLayout summary = card();
+                summary.addView(heading("Last live session", 18, ink));
+                summary.addView(text(last.mode + "  •  " + formatLiveDistance(last.distanceMeters) + "  •  " + formatLiveDuration(last.activeMillis), 15, ink));
+                summary.addView(text("Finished sessions are saved to Progress. The route trace is stored only on this phone.", 13, muted));
+                if (last.points.size() > 1) {
+                    RouteTraceView trace = new RouteTraceView(this);
+                    trace.setPoints(last.points);
+                    LinearLayout.LayoutParams traceParams = new LinearLayout.LayoutParams(-1, dp(128));
+                    traceParams.topMargin = dp(10);
+                    summary.addView(trace, traceParams);
+                }
+                body.addView(summary);
+                gap(body, 16);
+            }
+        }
         body.addView(heading("Choose an activity", 20, Color.WHITE));
         gap(body, 9);
         addEnduranceActivity(body, EndurancePlanStore.WALKING, "Walking", "A steady, low-impact route for everyday movement.");
@@ -4893,8 +4934,110 @@ public final class MainActivity extends Activity {
             edit.setOnClickListener(view -> showEndurancePlanner(mode));
             addButton(tile, edit);
         }
+        LiveTrackingStore.Session active = LiveTrackingStore.current(this);
+        if (!active.active) {
+            gap(tile, 8);
+            Button start = secondary("Start live " + name.toLowerCase(Locale.ROOT));
+            start.setOnClickListener(view -> requestLiveTracking(mode));
+            addButton(tile, start);
+        }
         body.addView(tile);
     }
+
+    private void addLiveTrackingCard(LinearLayout body, LiveTrackingStore.Session live) {
+        LinearLayout tracker = card();
+        TextView state = heading("LIVE " + live.mode.toUpperCase(Locale.ROOT) + (live.paused ? " · PAUSED" : " · TRACKING"), 18, ink);
+        TextView stats = text(liveTrackingStats(live), 20, ink);
+        tracker.addView(state);
+        tracker.addView(stats);
+        tracker.addView(text("GPS route trace is local to this phone. The Android notification confirms that tracking is active.", 13, muted));
+        RouteTraceView trace = new RouteTraceView(this);
+        trace.setPoints(live.points);
+        LinearLayout.LayoutParams traceParams = new LinearLayout.LayoutParams(-1, dp(150));
+        traceParams.topMargin = dp(10);
+        tracker.addView(trace, traceParams);
+        gap(tracker, 10);
+        Button pause = live.paused ? primary("Resume live tracking") : lightAction("Pause live tracking");
+        pause.setOnClickListener(view -> {
+            sendTrackingCommand(live.paused ? LiveTrackingService.ACTION_RESUME : LiveTrackingService.ACTION_PAUSE);
+            workoutHandler.postDelayed(this::showEndurance, 180L);
+        });
+        addButton(tracker, pause);
+        gap(tracker, 7);
+        Button finish = primary("Finish and save to Progress");
+        finish.setOnClickListener(view -> {
+            sendTrackingCommand(LiveTrackingService.ACTION_FINISH);
+            workoutHandler.postDelayed(this::showEndurance, 250L);
+        });
+        addButton(tracker, finish);
+        gap(tracker, 7);
+        Button discard = secondary("Discard live session");
+        discard.setOnClickListener(view -> {
+            sendTrackingCommand(LiveTrackingService.ACTION_DISCARD);
+            workoutHandler.postDelayed(this::showEndurance, 180L);
+        });
+        addButton(tracker, discard);
+        body.addView(tracker);
+        observeLiveTracking(state, stats, trace);
+    }
+
+    private void requestLiveTracking(String mode) {
+        if (hasLiveLocationPermission()) {
+            startLiveTrackingService(mode);
+            return;
+        }
+        pendingLiveTrackingMode = mode;
+        new AlertDialog.Builder(this).setTitle("Track your " + enduranceAction(mode))
+                .setMessage("My Personal Trainer will use your location only while this live session is running to measure distance and draw your private route trace. Android will show an ongoing tracking notification. You can pause, finish, or discard it at any time.")
+                .setNegativeButton("Not now", null)
+                .setPositiveButton("Allow while tracking", (dialog, which) -> requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION}, REQUEST_LIVE_LOCATION)).show();
+    }
+
+    private boolean hasLiveLocationPermission() {
+        return checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                || checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private void startLiveTrackingService(String mode) {
+        Intent intent = new Intent(this, LiveTrackingService.class).setAction(LiveTrackingService.ACTION_START).putExtra(LiveTrackingService.EXTRA_MODE, mode);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(intent); else startService(intent);
+        workoutHandler.postDelayed(this::showEndurance, 180L);
+    }
+
+    private void sendTrackingCommand(String action) {
+        startService(new Intent(this, LiveTrackingService.class).setAction(action));
+    }
+
+    private void observeLiveTracking(TextView state, TextView stats, RouteTraceView trace) {
+        stopLiveTrackingUiObserver();
+        liveTrackingReceiver = new BroadcastReceiver() {
+            @Override public void onReceive(Context context, Intent intent) {
+                LiveTrackingStore.Session latest = LiveTrackingStore.current(MainActivity.this);
+                if (!latest.active) return;
+                state.setText("LIVE " + latest.mode.toUpperCase(Locale.ROOT) + (latest.paused ? " · PAUSED" : " · TRACKING"));
+                stats.setText(liveTrackingStats(latest));
+                trace.setPoints(latest.points);
+            }
+        };
+        IntentFilter filter = new IntentFilter(LiveTrackingService.ACTION_UPDATE);
+        if (Build.VERSION.SDK_INT >= 33) registerReceiver(liveTrackingReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+        else registerReceiver(liveTrackingReceiver, filter);
+    }
+
+    private void stopLiveTrackingUiObserver() {
+        if (liveTrackingReceiver == null) return;
+        try { unregisterReceiver(liveTrackingReceiver); } catch (IllegalArgumentException ignored) { }
+        liveTrackingReceiver = null;
+    }
+
+    private String liveTrackingStats(LiveTrackingStore.Session session) {
+        String pace = "—";
+        if (session.distanceMeters >= 10f) pace = String.format(Locale.US, "%.1f min/km", (session.activeMillis / 60000d) / (session.distanceMeters / 1000d));
+        return formatLiveDistance(session.distanceMeters) + "  •  " + formatLiveDuration(session.activeMillis) + "  •  " + pace;
+    }
+
+    private String formatLiveDistance(float meters) { return meters >= 1000f ? String.format(Locale.US, "%.2f km", meters / 1000f) : Math.round(meters) + " m"; }
+    private String formatLiveDuration(long millis) { long seconds = millis / 1000L; return String.format(Locale.US, "%02d:%02d", seconds / 60L, seconds % 60L); }
 
     private void showEndurancePlanner(String mode) {
         EndurancePlanStore.Plan existing = EndurancePlanStore.load(this, mode);

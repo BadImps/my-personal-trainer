@@ -7,7 +7,9 @@ The Endurance page lets a signed-in person create and retain a Walking, Running,
 ## Fixed rules
 
 - Route details stay in local app storage.
-- No background tracking, live GPS, location permission, map SDK, or route-provider key is used.
+- A person can explicitly start a live Walking, Running, or Cycling session. Android requests location only at that moment, and a visible foreground-service notification remains while tracking is active.
+- GPS points, measured distance, active duration, and a private route trace are stored locally. Pausing stops both the active timer and location sampling; finishing adds the duration to local Progress; discarding removes the session.
+- The in-app route trace intentionally has no third-party street-map tiles, map SDK, or route-provider key.
 - The map handoff is an explicit user action. The selected map app receives only the origin (when entered), destination, and travel mode.
 - Walking and cycling use matching map travel modes. Running is intentionally handed off as a walking route because standard map intents do not offer a separate running mode.
 - Completion is a manual confirmation, not GPS-verified activity.
@@ -22,4 +24,4 @@ The Endurance page lets a signed-in person create and retain a Walking, Running,
 
 ## Non-goals
 
-This release does not supply turn-by-turn navigation, live route recording, automatic distance capture, health-platform syncing, or safety guarantees about a chosen route.
+This release does not supply turn-by-turn navigation, a street-map provider, health-platform syncing, or safety guarantees about a chosen route.
