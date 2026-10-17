@@ -891,8 +891,7 @@ public final class MainActivity extends Activity {
             mediaCard.addView(demonstration, new FrameLayout.LayoutParams(-1, -1));
             return mediaCard;
         }
-        ExerciseAnimationView fallback = new ExerciseAnimationView(this);
-        fallback.setContentDescription("Exercise illustration for " + exercise.name);
+        ExerciseAnimationView fallback = new ExerciseAnimationView(this, coachName(), exercise);
         fallback.setBackground(surface(navyPanel, 18, 1, mint));
         return fallback;
     }

@@ -10,18 +10,18 @@ import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
 import org.robolectric.RuntimeEnvironment;
 
-/** Prevents a plan option from silently falling back to the old GIF path. */
+/** Prevents a plan option from becoming blank or showing a mismatched recorded movement. */
 @RunWith(RobolectricTestRunner.class)
 public final class ExerciseVideosTest {
-    @Test public void everyPrescribedMovementHasLocalVideoForBothTrainers() {
+    @Test public void everyPrescribedMovementHasExactVideoOrNativeMotionGuideForBothTrainers() {
         Context context = RuntimeEnvironment.getApplication();
         for (String target : Coach.TARGETS) {
             for (String equipment : Coach.EQUIPMENT_TYPES) {
                 for (Coach.Exercise exercise : Coach.planOptions(target, equipment)) {
-                    assertTrue("Missing Coach Mia MP4 for " + exercise.name,
-                            ExerciseVideos.forExercise(context, "Female", exercise.name) != 0);
-                    assertTrue("Missing Coach Leo MP4 for " + exercise.name,
-                            ExerciseVideos.forExercise(context, "Male", exercise.name) != 0);
+                    assertTrue("Missing Coach Mia presentation for " + exercise.name,
+                            ExerciseVideos.forExercise(context, "Female", exercise.name) != 0 || ExerciseVideos.hasMotionGuide(exercise.name));
+                    assertTrue("Missing Coach Leo presentation for " + exercise.name,
+                            ExerciseVideos.forExercise(context, "Male", exercise.name) != 0 || ExerciseVideos.hasMotionGuide(exercise.name));
                 }
             }
         }
@@ -34,8 +34,8 @@ public final class ExerciseVideosTest {
         assertEquals(expected.length, exercises.size());
         for (int i = 0; i < expected.length; i++) {
             assertEquals(expected[i], exercises.get(i).name);
-            assertTrue(ExerciseVideos.forExercise(context, "Female", exercises.get(i).name) != 0);
-            assertTrue(ExerciseVideos.forExercise(context, "Male", exercises.get(i).name) != 0);
+            assertTrue(ExerciseVideos.forExercise(context, "Female", exercises.get(i).name) != 0 || ExerciseVideos.hasMotionGuide(exercises.get(i).name));
+            assertTrue(ExerciseVideos.forExercise(context, "Male", exercises.get(i).name) != 0 || ExerciseVideos.hasMotionGuide(exercises.get(i).name));
         }
     }
 
