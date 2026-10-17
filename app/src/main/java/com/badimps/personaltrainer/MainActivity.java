@@ -4014,32 +4014,32 @@ public final class MainActivity extends Activity {
         stopWorkoutRemainingClock();
         LinearLayout header = new LinearLayout(this);
         header.setOrientation(LinearLayout.VERTICAL);
-        header.setPadding(dp(12), dp(9), dp(12), dp(9));
-        header.setBackground(surface(navyPanel, 14, 1, Color.rgb(45, 90, 102)));
+        // The status strip intentionally blends into the page instead of becoming another tile.
+        header.setPadding(0, dp(3), 0, dp(3));
         ProgressBar progress = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
         progress.setMax(1000);
         progress.setProgressTintList(ColorStateList.valueOf(mint));
         progress.setProgressBackgroundTintList(ColorStateList.valueOf(Color.rgb(45, 69, 96)));
         progress.setContentDescription("Workout time remaining");
-        header.addView(progress, new LinearLayout.LayoutParams(-1, dp(5)));
+        header.addView(progress, new LinearLayout.LayoutParams(-1, dp(4)));
         LinearLayout status = new LinearLayout(this);
         status.setGravity(Gravity.CENTER_VERTICAL | Gravity.RIGHT);
-        TextView remaining = heading("", 12, Color.WHITE);
+        TextView remaining = heading("", 10, Color.WHITE);
         remaining.setGravity(Gravity.RIGHT);
         status.addView(remaining, new LinearLayout.LayoutParams(0, -2, 1));
-        TextView cooldownSkip = workoutTimerChip();
-        LinearLayout.LayoutParams cooldownParams = new LinearLayout.LayoutParams(-2, dp(28));
-        cooldownParams.leftMargin = dp(7);
+        TextView cooldownSkip = workoutTimerChip(mint);
+        LinearLayout.LayoutParams cooldownParams = new LinearLayout.LayoutParams(-2, dp(23));
+        cooldownParams.leftMargin = dp(5);
         status.addView(cooldownSkip, cooldownParams);
-        TextView restSkip = workoutTimerChip();
-        LinearLayout.LayoutParams restParams = new LinearLayout.LayoutParams(-2, dp(28));
+        TextView restSkip = workoutTimerChip(coral);
+        LinearLayout.LayoutParams restParams = new LinearLayout.LayoutParams(-2, dp(23));
         restParams.leftMargin = dp(5);
         status.addView(restSkip, restParams);
         LinearLayout.LayoutParams statusParams = new LinearLayout.LayoutParams(-1, -2);
-        statusParams.topMargin = dp(7);
+        statusParams.topMargin = dp(5);
         header.addView(status, statusParams);
         body.addView(header);
-        gap(body, 11);
+        gap(body, 9);
 
         workoutRemainingUpdate = new Runnable() {
             @Override public void run() {
@@ -4047,7 +4047,7 @@ public final class MainActivity extends Activity {
                 int fraction = guidedWorkoutAllowanceMillis <= 0L ? 0
                         : (int) Math.round(1000d * remainingMillis / guidedWorkoutAllowanceMillis);
                 progress.setProgress(Math.max(0, Math.min(1000, fraction)));
-                remaining.setText(WorkoutTiming.formatElapsedMillis(remainingMillis) + " remaining");
+                remaining.setText(WorkoutTiming.formatElapsedMillis(remainingMillis));
                 cooldownSkip.setText(skippedTimerLabel("COOL", skippedCooldownMillis));
                 restSkip.setText(skippedTimerLabel("REST", skippedSetRestMillis));
                 progress.setContentDescription(WorkoutTiming.formatElapsedMillis(remainingMillis) + " remaining; "
@@ -4059,12 +4059,12 @@ public final class MainActivity extends Activity {
         workoutHandler.post(workoutRemainingUpdate);
     }
 
-    private TextView workoutTimerChip() {
-        TextView chip = heading("", 10, navy);
+    private TextView workoutTimerChip(int color) {
+        TextView chip = heading("", 8, navy);
         chip.setGravity(Gravity.CENTER);
-        chip.setPadding(dp(8), 0, dp(8), 0);
+        chip.setPadding(dp(7), 0, dp(7), 0);
         chip.setSingleLine(true);
-        chip.setBackground(surface(mint, 99, 0, Color.TRANSPARENT));
+        chip.setBackground(surface(color, 99, 0, Color.TRANSPARENT));
         return chip;
     }
 
