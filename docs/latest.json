@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 36,
-  "versionName": "4.5",
-  "publishedAt": "2026-10-17T03:49:17Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v4.5/app-release.apk",
-  "sha256": "ce9a62a1e2ca971f1c2e764df53bd09497246579f7f0fa9ac80bf698a426ca99",
+  "versionCode": 37,
+  "versionName": "4.6",
+  "publishedAt": "2026-10-17T04:29:44Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v4.6/app-release.apk",
+  "sha256": "f249b9b8e3fb27aea659f646697ddac6fafdfa23d4501610b4f9fd4254acee61",
   "sizeBytes": 84161825,
-  "notes": "Updates Private Body Context with clear current-weight and target panels plus a labeled weight journey graph and height-based adult screening reference band."
+  "notes": "Implements the approved weight-reference rail with separated labels, height-based range endpoints, current and target markers, and a clear status panel."
 }
