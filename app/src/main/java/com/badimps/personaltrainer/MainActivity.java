@@ -151,6 +151,8 @@ public final class MainActivity extends Activity {
     /** The active scroll surface is retained so in-place option changes do not throw a user to the top. */
     private ScrollView activeScrollView;
     private int pendingScrollRestore = -1;
+    /** True only while a selector redraws its current page; full navigation still receives its entrance motion. */
+    private boolean suppressNextPageEntrance;
     private boolean guidedSessionRecorded;
     private boolean guidedWorkoutAborted;
     private UpdateManager.Info pendingOtaInstall;
@@ -609,8 +611,19 @@ public final class MainActivity extends Activity {
     }
 
     private void refreshPlanKeepingScroll(Runnable refresh) {
+        refreshCurrentPageKeepingScroll(refresh);
+    }
+
+    /** Rebuilds a selector page without replaying the fade/slide entrance or jumping its scroll position. */
+    private void refreshCurrentPageKeepingScroll(Runnable refresh) {
         preserveScrollForRefresh();
-        refresh.run();
+        suppressNextPageEntrance = true;
+        try {
+            refresh.run();
+        } finally {
+            // A normal page rebuild consumes this in animatePage. Keep it scoped even if a caller does not rebuild.
+            suppressNextPageEntrance = false;
+        }
     }
 
     private void beginNewPage() {
@@ -622,7 +635,11 @@ public final class MainActivity extends Activity {
 
     /** A restrained entrance makes navigation legible without becoming decorative noise. */
     private void animatePage(View view) {
-        if (reducedMotion) return;
+        if (reducedMotion || suppressNextPageEntrance) {
+            view.setAlpha(1f);
+            view.setTranslationY(0f);
+            return;
+        }
         view.setAlpha(0f);
         view.setTranslationY(dp(10));
         view.animate().alpha(1f).translationY(0f).setDuration(180L).start();
@@ -1390,7 +1407,7 @@ public final class MainActivity extends Activity {
         header.setGravity(Gravity.CENTER_VERTICAL);
         TextView previous = homeWeekArrow("‹", homeWeekOffset > 0, view -> {
             homeWeekOffset--;
-            showHome();
+            refreshCurrentPageKeepingScroll(this::showHome);
         });
         header.addView(previous, new LinearLayout.LayoutParams(dp(38), dp(38)));
         TextView label = heading(homeWeekRange(weekStart), 18, ink);
@@ -1398,7 +1415,7 @@ public final class MainActivity extends Activity {
         header.addView(label, new LinearLayout.LayoutParams(0, dp(42), 1));
         TextView next = homeWeekArrow("›", homeWeekOffset < HOME_UPCOMING_WEEK_COUNT, view -> {
             homeWeekOffset++;
-            showHome();
+            refreshCurrentPageKeepingScroll(this::showHome);
         });
         header.addView(next, new LinearLayout.LayoutParams(dp(38), dp(38)));
         container.addView(header);
@@ -1447,7 +1464,7 @@ public final class MainActivity extends Activity {
         tile.setFocusable(true);
         tile.setOnClickListener(view -> {
             homeWeekOffset = offset;
-            showHome();
+            refreshCurrentPageKeepingScroll(this::showHome);
         });
         tile.addView(heading(homeWeekRange(weekStart), 15, Color.WHITE));
         int sessions = countTrainingDays(schedule.workoutDays);
@@ -1874,7 +1891,7 @@ public final class MainActivity extends Activity {
         tile.setFocusable(true);
         tile.setContentDescription((selected ? "Selected plan type: " : "Choose plan type: ") + mode + ". " + copy);
         tile.setBackground(surface(paper, 19, selected ? 2 : 1, selected ? mint : cardLine));
-        tile.setOnClickListener(view -> { planMode = mode; showPlanType(); });
+        tile.setOnClickListener(view -> { planMode = mode; refreshCurrentPageKeepingScroll(this::showPlanType); });
 
         ImageView image = new ImageView(this);
         image.setImageResource(icon);
@@ -1914,7 +1931,7 @@ public final class MainActivity extends Activity {
         previous.setTextSize(24);
         previous.setContentDescription("Show the previous week");
         previous.setEnabled(selectedWeekOffset > 0);
-        previous.setOnClickListener(view -> { selectPlanningWeek(selectedWeekOffset - 1); showPlanSchedule(); });
+        previous.setOnClickListener(view -> { selectPlanningWeek(selectedWeekOffset - 1); refreshCurrentPageKeepingScroll(this::showPlanSchedule); });
         pickerHeader.addView(previous, new LinearLayout.LayoutParams(dp(44), dp(44)));
         TextView weekTitle = heading(selectedWeekTitle(), 17, ink);
         weekTitle.setGravity(Gravity.CENTER);
@@ -1923,7 +1940,7 @@ public final class MainActivity extends Activity {
         following.setTextSize(24);
         following.setContentDescription("Show the next week");
         following.setEnabled(selectedWeekOffset < maxSelectableWeekOffset());
-        following.setOnClickListener(view -> { selectPlanningWeek(selectedWeekOffset + 1); showPlanSchedule(); });
+        following.setOnClickListener(view -> { selectPlanningWeek(selectedWeekOffset + 1); refreshCurrentPageKeepingScroll(this::showPlanSchedule); });
         pickerHeader.addView(following, new LinearLayout.LayoutParams(dp(44), dp(44)));
         picker.addView(pickerHeader);
         picker.addView(text(weekly ? "Tap a day to mark Train or Rest. Changes stay with this week only." : "Tap one day for your workout. Switching weeks never changes another week.", 12, muted));
@@ -2098,7 +2115,7 @@ public final class MainActivity extends Activity {
             day.setTextSize(10);
             day.setGravity(Gravity.CENTER);
             day.setContentDescription(scheduleDayLabel(i) + ", " + focusSummary(weeklyDayTargets.get(i)) + (active ? ", currently editing" : ", edit this day"));
-            day.setOnClickListener(view -> { activeScheduleDay = dayIndex; syncPrimaryTarget(); showPlanTarget(); });
+            day.setOnClickListener(view -> { activeScheduleDay = dayIndex; syncPrimaryTarget(); refreshCurrentPageKeepingScroll(this::showPlanTarget); });
             LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(dp(106), dp(52));
             params.rightMargin = dp(7);
             days.addView(day, params);
@@ -3739,7 +3756,7 @@ public final class MainActivity extends Activity {
         LauncherIconManager.apply(this, updated.coachName);
         applyKeepPhoneAwake(updated.keepPhoneAwake);
         configureSpeechVoices();
-        showCoachCustomization();
+        refreshCurrentPageKeepingScroll(this::showCoachCustomization);
     }
 
     private void openVoiceSettings() {
@@ -3941,7 +3958,7 @@ public final class MainActivity extends Activity {
             Button option = choice.equals(target) ? primary("Selected  •  " + choice) : secondary(choice);
             option.setOnClickListener(view -> {
                 target = choice;
-                showPlanFocus();
+                refreshCurrentPageKeepingScroll(this::showPlanFocus);
             });
             addButton(body, option);
             gap(body, 7);
@@ -3964,7 +3981,7 @@ public final class MainActivity extends Activity {
             Button option = place.equals(environment) ? primary("Selected  •  " + place) : secondary(place);
             option.setOnClickListener(view -> {
                 environment = place;
-                showPlanContext();
+                refreshCurrentPageKeepingScroll(this::showPlanContext);
             });
             addButton(body, option);
             gap(body, 7);
@@ -3978,7 +3995,7 @@ public final class MainActivity extends Activity {
             Button length = minutes == sessionMinutes ? primary(minutes + " min") : secondary(minutes + " min");
             length.setOnClickListener(view -> {
                 sessionMinutes = minutes;
-                showPlanContext();
+                refreshCurrentPageKeepingScroll(this::showPlanContext);
             });
             LinearLayout.LayoutParams lengthParams = new LinearLayout.LayoutParams(0, dp(50), 1);
             lengthParams.rightMargin = dp(minutes == 45 ? 0 : 7);
@@ -4868,7 +4885,7 @@ public final class MainActivity extends Activity {
                     float goalWeight = Float.parseFloat(targetWeight.getText().toString());
                     if (now <= 0 || goalWeight <= 0) throw new NumberFormatException();
                     WeightStore.start(this, now, goalWeight, units.getCheckedRadioButtonId() == R.id.unit_lb ? "lb" : "kg");
-                    showWeightTracker();
+                    refreshCurrentPageKeepingScroll(this::showWeightTracker);
                 } catch (Exception ignored) {
                     toast("Enter positive weight values to begin.");
                 }
@@ -4889,7 +4906,7 @@ public final class MainActivity extends Activity {
                     float value = Float.parseFloat(current.getText().toString());
                     if (value <= 0) throw new NumberFormatException();
                     WeightStore.checkIn(this, value);
-                    showWeightTracker();
+                    refreshCurrentPageKeepingScroll(this::showWeightTracker);
                 } catch (Exception ignored) {
                     toast("Enter a positive weight to check in.");
                 }
@@ -4973,7 +4990,7 @@ public final class MainActivity extends Activity {
                 Button remove = lightAction("✓  " + meal + "   Remove");
                 remove.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
                 remove.setContentDescription("Remove " + meal + " from my meal plan");
-                remove.setOnClickListener(view -> { MealPlanStore.remove(this, meal); showMeals(); });
+                remove.setOnClickListener(view -> { MealPlanStore.remove(this, meal); refreshCurrentPageKeepingScroll(this::showMeals); });
                 addButton(savedMeals, remove);
             }
             body.addView(savedMeals);
@@ -5170,7 +5187,7 @@ public final class MainActivity extends Activity {
         previous.setOnClickListener(view -> {
             schedulerMonthOffset--;
             schedulerSelectedDate = schedulerMonth();
-            showScheduler();
+            refreshCurrentPageKeepingScroll(this::showScheduler);
         });
         header.addView(previous, new LinearLayout.LayoutParams(dp(48), dp(46)));
         TextView label = heading(new SimpleDateFormat("MMMM yyyy", Locale.getDefault()).format(month.getTime()), 21, Color.WHITE);
@@ -5181,7 +5198,7 @@ public final class MainActivity extends Activity {
         next.setOnClickListener(view -> {
             schedulerMonthOffset++;
             schedulerSelectedDate = schedulerMonth();
-            showScheduler();
+            refreshCurrentPageKeepingScroll(this::showScheduler);
         });
         header.addView(next, new LinearLayout.LayoutParams(dp(48), dp(46)));
         body.addView(header);
@@ -5242,7 +5259,7 @@ public final class MainActivity extends Activity {
         cell.setBackground(surface(fill, 9, selected ? 2 : 0, selected ? navy : Color.TRANSPARENT));
         cell.setContentDescription(new SimpleDateFormat("EEEE, MMMM d", Locale.getDefault()).format(date.getTime()) + ", " + state);
         cell.setClickable(true);
-        cell.setOnClickListener(view -> { schedulerSelectedDate = (Calendar) date.clone(); showScheduler(); });
+        cell.setOnClickListener(view -> { schedulerSelectedDate = (Calendar) date.clone(); refreshCurrentPageKeepingScroll(this::showScheduler); });
         GridLayout.LayoutParams params = new GridLayout.LayoutParams(); params.width = dp(39); params.height = dp(54); params.setMargins(dp(1), dp(1), dp(1), dp(1));
         cell.setLayoutParams(params);
         return cell;
@@ -5261,7 +5278,7 @@ public final class MainActivity extends Activity {
             row.addView(copy, new LinearLayout.LayoutParams(0, -2, 1f));
             Button remove = action("Remove", paper, coral);
             remove.setTextSize(12);
-            remove.setOnClickListener(view -> { SchedulerStore.remove(this, appointment.id); showScheduler(); });
+            remove.setOnClickListener(view -> { SchedulerStore.remove(this, appointment.id); refreshCurrentPageKeepingScroll(this::showScheduler); });
             row.addView(remove, new LinearLayout.LayoutParams(dp(78), dp(40)));
             agenda.addView(row);
         }
@@ -5303,7 +5320,7 @@ public final class MainActivity extends Activity {
         Button choice = action((selected ? "✓  " : "") + label + "\n" + copy, selected ? mint : paper, ink);
         choice.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
         choice.setTextSize(16);
-        choice.setOnClickListener(view -> { schedulerActivity = mode; showSchedulerActivity(); });
+        choice.setOnClickListener(view -> { schedulerActivity = mode; refreshCurrentPageKeepingScroll(this::showSchedulerActivity); });
         body.addView(choice, new LinearLayout.LayoutParams(-1, dp(78)));
     }
 
@@ -5315,11 +5332,11 @@ public final class MainActivity extends Activity {
         details.addView(heading(appointmentAbbreviation(schedulerActivity), 20, ink));
         Button date = lightAction("Date · " + new SimpleDateFormat("EEE, MMM d", Locale.getDefault()).format(schedulerSelectedDate.getTime()));
         date.setOnClickListener(view -> new android.app.DatePickerDialog(this, (picker, year, month, day) -> {
-            schedulerSelectedDate.set(year, month, day); showSchedulerDetails();
+            schedulerSelectedDate.set(year, month, day); refreshCurrentPageKeepingScroll(this::showSchedulerDetails);
         }, schedulerSelectedDate.get(Calendar.YEAR), schedulerSelectedDate.get(Calendar.MONTH), schedulerSelectedDate.get(Calendar.DAY_OF_MONTH)).show());
         addButton(details, date); gap(details, 8);
         Button time = lightAction("Time · " + String.format(Locale.US, "%02d:%02d", schedulerHour, schedulerMinute));
-        time.setOnClickListener(view -> new android.app.TimePickerDialog(this, (picker, hour, minute) -> { schedulerHour = hour; schedulerMinute = minute; showSchedulerDetails(); }, schedulerHour, schedulerMinute, false).show());
+        time.setOnClickListener(view -> new android.app.TimePickerDialog(this, (picker, hour, minute) -> { schedulerHour = hour; schedulerMinute = minute; refreshCurrentPageKeepingScroll(this::showSchedulerDetails); }, schedulerHour, schedulerMinute, false).show());
         addButton(details, time); gap(details, 8);
         EditText duration = input("Planned minutes", InputType.TYPE_CLASS_NUMBER); duration.setText(String.valueOf(schedulerDurationMinutes)); details.addView(duration);
         body.addView(details); gap(body, 12);
@@ -5714,7 +5731,7 @@ public final class MainActivity extends Activity {
         button.setContentDescription(label + (selected ? ", checked" : ", not checked"));
         button.setOnClickListener(view -> {
             JourneyStore.toggleFuelGoal(this, flag);
-            showMeals();
+            refreshCurrentPageKeepingScroll(this::showMeals);
         });
         return button;
     }
