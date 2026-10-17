@@ -127,9 +127,11 @@ public final class MainActivity extends Activity {
     private int openingPhraseIndex;
     private int completionPhraseIndex;
     private long guidedWorkoutStartedAt;
-    /** Time actually spent in rest or cooldown countdowns during the current guided workout. */
-    private long guidedRecoveryMillis;
+    /** Kept separately so the between-exercise report can show actual cooldown, not just set rest. */
+    private long guidedSetRestMillis;
+    private long guidedCooldownMillis;
     private long recoverySegmentStartedAt = -1L;
+    private boolean recoverySegmentIsCooldown;
     /** The active scroll surface is retained so in-place option changes do not throw a user to the top. */
     private ScrollView activeScrollView;
     private int pendingScrollRestore = -1;
@@ -3812,7 +3814,8 @@ public final class MainActivity extends Activity {
         currentExerciseSetTimes.clear();
         completedExerciseSetTimes.clear();
         guidedWorkoutStartedAt = SystemClock.elapsedRealtime();
-        guidedRecoveryMillis = 0L;
+        guidedSetRestMillis = 0L;
+        guidedCooldownMillis = 0L;
         recoverySegmentStartedAt = -1L;
         guidedSessionRecorded = false;
         guidedWorkoutAborted = false;
@@ -4065,20 +4068,22 @@ public final class MainActivity extends Activity {
     /** A live session roll-up shown while recovering, without changing the exercise leaderboard. */
     private TextView[] addTotalWorkoutCard(LinearLayout container, Coach.Exercise currentExercise, boolean currentExerciseCompleted) {
         long activeMillis = activeWorkoutSetMillis(currentExercise, currentExerciseCompleted);
-        long recoveryMillis = guidedRecoveryMillis + activeRecoverySegmentMillis();
-        long totalMillis = activeMillis + recoveryMillis;
+        long setRestMillis = guidedSetRestMillis;
+        long cooldownMillis = guidedCooldownMillis + (recoverySegmentIsCooldown ? activeRecoverySegmentMillis() : 0L);
+        long totalMillis = activeMillis + setRestMillis + cooldownMillis;
         LinearLayout card = card();
         TextView label = heading("TOTAL WORKOUT", 11, muted);
         label.setLetterSpacing(.08f);
         card.addView(label);
-        card.addView(text("Live time so far", 13, muted));
+        card.addView(text("Completed set rests + this live cooldown", 13, muted));
         gap(card, 8);
         TextView active = addWorkoutTotalRow(card, "Active set time", WorkoutTiming.formatElapsedMillis(activeMillis), false);
-        TextView recovery = addWorkoutTotalRow(card, "Rest + cooldown", WorkoutTiming.formatElapsedMillis(recoveryMillis), false);
+        TextView rest = addWorkoutTotalRow(card, "Set rest total", WorkoutTiming.formatElapsedMillis(setRestMillis), false);
+        TextView cooldown = addWorkoutTotalRow(card, "Cooldown (live)", WorkoutTiming.formatElapsedMillis(cooldownMillis), false);
         gap(card, 5);
         TextView grand = addWorkoutTotalRow(card, "GRAND TOTAL", WorkoutTiming.formatElapsedMillis(totalMillis), true);
         container.addView(card);
-        return new TextView[]{active, recovery, grand};
+        return new TextView[]{active, rest, cooldown, grand};
     }
 
     private long activeWorkoutSetMillis(Coach.Exercise currentExercise, boolean currentExerciseCompleted) {
@@ -4109,25 +4114,32 @@ public final class MainActivity extends Activity {
     }
 
     private void updateTotalWorkoutViews(TextView[] views, long activeMillis) {
-        if (views == null || views.length < 3) return;
-        long recoveryMillis = guidedRecoveryMillis + activeRecoverySegmentMillis();
+        if (views == null || views.length < 4) return;
+        long setRestMillis = guidedSetRestMillis;
+        long cooldownMillis = guidedCooldownMillis + (recoverySegmentIsCooldown ? activeRecoverySegmentMillis() : 0L);
         views[0].setText(WorkoutTiming.formatElapsedMillis(activeMillis));
-        views[1].setText(WorkoutTiming.formatElapsedMillis(recoveryMillis));
-        views[2].setText(WorkoutTiming.formatElapsedMillis(activeMillis + recoveryMillis));
+        views[1].setText(WorkoutTiming.formatElapsedMillis(setRestMillis));
+        views[2].setText(WorkoutTiming.formatElapsedMillis(cooldownMillis));
+        views[3].setText(WorkoutTiming.formatElapsedMillis(activeMillis + setRestMillis + cooldownMillis));
     }
 
     private long activeRecoverySegmentMillis() {
         return recoverySegmentStartedAt < 0L ? 0L : Math.max(0L, SystemClock.elapsedRealtime() - recoverySegmentStartedAt);
     }
 
-    private void beginRecoverySegment() {
-        if (recoverySegmentStartedAt < 0L) recoverySegmentStartedAt = SystemClock.elapsedRealtime();
+    private void beginRecoverySegment(boolean cooldown) {
+        if (recoverySegmentStartedAt < 0L) {
+            recoverySegmentStartedAt = SystemClock.elapsedRealtime();
+            recoverySegmentIsCooldown = cooldown;
+        }
     }
 
     private void endRecoverySegment() {
         if (recoverySegmentStartedAt < 0L) return;
-        guidedRecoveryMillis += activeRecoverySegmentMillis();
+        if (recoverySegmentIsCooldown) guidedCooldownMillis += activeRecoverySegmentMillis();
+        else guidedSetRestMillis += activeRecoverySegmentMillis();
         recoverySegmentStartedAt = -1L;
+        recoverySegmentIsCooldown = false;
     }
 
     private void showExerciseSetSummary(int index, Coach.Exercise exercise) {
@@ -4232,14 +4244,19 @@ public final class MainActivity extends Activity {
         gap(body, 12);
         final boolean currentExerciseCompleted = betweenExercises;
         final long activeSetMillis = activeWorkoutSetMillis(exercise, currentExerciseCompleted);
-        TextView[] totalWorkout = addTotalWorkoutCard(body, exercise, currentExerciseCompleted);
-        gap(body, 12);
+        final TextView[] totalWorkout;
+        if (betweenExercises) {
+            totalWorkout = addTotalWorkoutCard(body, exercise, true);
+            gap(body, 12);
+        } else {
+            totalWorkout = null;
+        }
         Button emergency = emergencyStopButton();
         emergency.setOnClickListener(view -> showEmergencyStopConfirmation(index, set,
                 () -> showRest(index, set, exercise, remaining[0], true, betweenExercises)));
         addButton(body, emergency);
         if (!running) return;
-        beginRecoverySegment();
+        beginRecoverySegment(betweenExercises);
         restTimer = new CountDownTimer(secondsRemaining * 1000L, 1000) {
             @Override public void onTick(long left) {
                 int seconds = (int) Math.ceil(left / 1000d);
@@ -4285,8 +4302,10 @@ public final class MainActivity extends Activity {
             setTracker = null;
             currentExerciseSetTimes.clear();
             completedExerciseSetTimes.clear();
-            guidedRecoveryMillis = 0L;
+            guidedSetRestMillis = 0L;
+            guidedCooldownMillis = 0L;
             recoverySegmentStartedAt = -1L;
+            recoverySegmentIsCooldown = false;
             showHome();
         });
         addButton(body, end);
