@@ -10,10 +10,11 @@ import java.security.SecureRandom;
 public final class AccountStore {
     private static final String FILE="trainer_profile";
     public static final class Profile {
-        public final String email, username, trainer, coachName, dialogueMode;
-        public final boolean keepPhoneAwake;
-        Profile(String e, String u, String t, String coach, String dialogue, boolean awake) {
+        public final String email, username, trainer, coachName, dialogueMode, photoUri;
+        public final boolean keepPhoneAwake, rememberSignIn, biometricUnlock;
+        Profile(String e, String u, String t, String coach, String dialogue, boolean awake, String photo, boolean remember, boolean biometric) {
             email=e; username=u; trainer=t; coachName=coach; dialogueMode=dialogue; keepPhoneAwake=awake;
+            photoUri=photo; rememberSignIn=remember; biometricUnlock=biometric;
         }
     }
     public static boolean exists(Context c) { return c.getSharedPreferences(FILE,Context.MODE_PRIVATE).getBoolean("created",false); }
@@ -24,11 +25,12 @@ public final class AccountStore {
         CoachPreferences.CoachOption option=CoachPreferences.coach(coach);
         return new Profile(p.getString("email",""),p.getString("username","Athlete"),option.gender,option.name,
                 CoachPreferences.normalizeDialogueMode(p.getString("dialogue_mode",CoachPreferences.FULL_DIALOGUE)),
-                p.getBoolean("keep_phone_awake",false));
+                p.getBoolean("keep_phone_awake",false), p.getString("photo_uri", ""),
+                p.getBoolean("remember_sign_in", false), p.getBoolean("biometric_unlock", false));
     }
     public static void create(Context c,String email,String username,String password,String trainer) {
         byte[] salt=new byte[16]; new SecureRandom().nextBytes(salt);
-        c.getSharedPreferences(FILE,Context.MODE_PRIVATE).edit().putBoolean("created",true).putString("email",email.trim()).putString("username",username.trim()).putString("trainer",trainer).putString("coach_name",CoachPreferences.defaultCoach(trainer)).putString("dialogue_mode",CoachPreferences.FULL_DIALOGUE).putBoolean("keep_phone_awake",false).putString("salt",hex(salt)).putString("passwordHash",hash(salt,password)).apply();
+        c.getSharedPreferences(FILE,Context.MODE_PRIVATE).edit().putBoolean("created",true).putString("email",email.trim()).putString("username",username.trim()).putString("trainer",trainer).putString("coach_name",CoachPreferences.defaultCoach(trainer)).putString("dialogue_mode",CoachPreferences.FULL_DIALOGUE).putBoolean("keep_phone_awake",false).putBoolean("remember_sign_in",false).putBoolean("biometric_unlock",false).putString("photo_uri", "").putString("salt",hex(salt)).putString("passwordHash",hash(salt,password)).apply();
     }
     public static void updateCoachPreferences(Context c,String coachName,String dialogueMode,boolean keepPhoneAwake) {
         CoachPreferences.CoachOption coach=CoachPreferences.coach(coachName);
@@ -44,6 +46,23 @@ public final class AccountStore {
         if (!p.getBoolean("created",false) || !p.getString("email","").equalsIgnoreCase(email.trim())) return false;
         try { return hash(unhex(p.getString("salt","")),password).equals(p.getString("passwordHash","")); }
         catch(Exception ignored) { return false; }
+    }
+    public static void updatePersonalProfile(Context c, String username, String photoUri, boolean remember, boolean biometric, String newPassword) {
+        if (username == null || username.trim().length() < 3) throw new IllegalArgumentException("Choose a name with at least 3 characters.");
+        SharedPreferences p=c.getSharedPreferences(FILE,Context.MODE_PRIVATE);
+        SharedPreferences.Editor edit=p.edit().putString("username", username.trim()).putString("photo_uri", photoUri == null ? "" : photoUri).putBoolean("remember_sign_in",remember).putBoolean("biometric_unlock",biometric);
+        if (newPassword != null && !newPassword.isEmpty()) {
+            if (newPassword.length() < 8) throw new IllegalArgumentException("Use a password with at least 8 characters.");
+            byte[] salt=new byte[16]; new SecureRandom().nextBytes(salt);
+            edit.putString("salt",hex(salt)).putString("passwordHash",hash(salt,newPassword));
+        }
+        edit.apply();
+    }
+    public static boolean resetPassword(Context c, String email, String password) {
+        if (!exists(c) || !get(c).email.equalsIgnoreCase(email == null ? "" : email.trim()) || password == null || password.length() < 8) return false;
+        byte[] salt=new byte[16]; new SecureRandom().nextBytes(salt);
+        c.getSharedPreferences(FILE,Context.MODE_PRIVATE).edit().putString("salt",hex(salt)).putString("passwordHash",hash(salt,password)).putBoolean("remember_sign_in",false).apply();
+        return true;
     }
     public static void clear(Context c) { c.getSharedPreferences(FILE,Context.MODE_PRIVATE).edit().clear().apply(); }
     private static String hash(byte[] salt,String value) { try { MessageDigest d=MessageDigest.getInstance("SHA-256"); d.update(salt); return hex(d.digest(value.getBytes(StandardCharsets.UTF_8))); } catch(Exception e) { throw new IllegalStateException(e); } }

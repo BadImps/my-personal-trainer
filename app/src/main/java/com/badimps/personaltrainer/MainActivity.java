@@ -13,9 +13,11 @@ import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
+import android.hardware.biometrics.BiometricPrompt;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.CancellationSignal;
 import android.os.CountDownTimer;
 import android.os.Handler;
 import android.os.Looper;
@@ -159,7 +161,9 @@ public final class MainActivity extends Activity {
     private int otaPageGeneration = -1;
     private boolean showingUpdatePage;
     private static final int REQUEST_LIVE_LOCATION = 4102;
+    private static final int REQUEST_PROFILE_PHOTO = 4103;
     private String pendingLiveTrackingMode;
+    private String selectedProfilePhotoUri;
     private BroadcastReceiver liveTrackingReceiver;
     private int schedulerMonthOffset;
     private int homeCalendarMonthOffset;
@@ -200,7 +204,9 @@ public final class MainActivity extends Activity {
         initialisePlanSelections();
         restoreSavedPlan();
         if (hasLocalAccount) {
-            if (getIntent().getBooleanExtra(EXTRA_START_GUIDED_WORKOUT, false) && !session.isEmpty()) showWorkoutCountdown();
+            AccountStore.Profile profile = AccountStore.get(this);
+            if (profile.biometricUnlock || !profile.rememberSignIn) showLogin();
+            else if (getIntent().getBooleanExtra(EXTRA_START_GUIDED_WORKOUT, false) && !session.isEmpty()) showWorkoutCountdown();
             else showHome();
         } else {
             showWelcome();
@@ -243,6 +249,15 @@ public final class MainActivity extends Activity {
         pendingLiveTrackingMode = null;
         if (mode != null && hasLiveLocationPermission()) startLiveTrackingService(mode);
         else toast("Location access is needed to measure a live endurance session.");
+    }
+
+    @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode != REQUEST_PROFILE_PHOTO || resultCode != RESULT_OK || data == null || data.getData() == null) return;
+        Uri photo = data.getData();
+        try { getContentResolver().takePersistableUriPermission(photo, Intent.FLAG_GRANT_READ_URI_PERMISSION); } catch (SecurityException ignored) { }
+        selectedProfilePhotoUri = photo.toString();
+        showProfileEditor();
     }
 
     private int dp(int value) {
@@ -1060,31 +1075,82 @@ public final class MainActivity extends Activity {
     private void showLogin() {
         LinearLayout body = signedOutPage();
         gap(body, 42);
-        title(body, "SIGN IN", "Welcome back", "Your coach, plan, and progress are ready when you are.");
+        title(body, "SIGN IN", "Welcome back", "Sign in to open your coach, plan, and progress.");
         EditText email = input("Email address", InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
+        if (AccountStore.exists(this)) email.setText(profile().email);
         body.addView(email);
         gap(body, 10);
         EditText password = input("Password", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
         body.addView(password);
-        gap(body, 18);
+        CheckBox remember = new CheckBox(this);
+        remember.setText("Remember this account on this device");
+        remember.setTextColor(Color.WHITE);
+        remember.setButtonTintList(ColorStateList.valueOf(mint));
+        remember.setChecked(AccountStore.exists(this) && profile().rememberSignIn);
+        body.addView(remember);
+        gap(body, 12);
         Button signIn = primary("Sign in");
         signIn.setOnClickListener(view -> {
             if (AccountStore.authenticate(this, email.getText().toString(), password.getText().toString())) {
-                AccountStore.Profile signedInProfile = AccountStore.get(this);
-                selectedTrainer = signedInProfile.trainer;
-                configureSpeechVoices();
-                LauncherIconManager.apply(this, signedInProfile.coachName);
-                applyKeepPhoneAwake(signedInProfile.keepPhoneAwake);
-                showHome();
+                AccountStore.Profile current = profile();
+                AccountStore.updatePersonalProfile(this, current.username, current.photoUri, remember.isChecked(), current.biometricUnlock, "");
+                openSignedInHome();
             } else {
                 toast("That email or password does not match this profile.");
             }
         });
         addButton(body, signIn);
+        gap(body, 8);
+        if (AccountStore.exists(this) && profile().biometricUnlock) {
+            Button biometric = lightAction("Use biometrics");
+            biometric.setOnClickListener(view -> authenticateWithBiometrics());
+            addButton(body, biometric);
+            gap(body, 8);
+        }
+        Button forgot = secondary("Forgot password?");
+        forgot.setOnClickListener(view -> showForgotPassword());
+        addButton(body, forgot);
+        gap(body, 8);
+        Button register = lightAction("New user? Register here");
+        register.setOnClickListener(view -> showRegistration());
+        addButton(body, register);
         gap(body, 10);
         Button back = secondary("Back");
         back.setOnClickListener(view -> showWelcome());
         addButton(body, back);
+    }
+
+    private void openSignedInHome() {
+        AccountStore.Profile signedInProfile = profile();
+        selectedTrainer = signedInProfile.trainer;
+        configureSpeechVoices();
+        LauncherIconManager.apply(this, signedInProfile.coachName);
+        applyKeepPhoneAwake(signedInProfile.keepPhoneAwake);
+        showHome();
+    }
+
+    private void showForgotPassword() {
+        LinearLayout form = new LinearLayout(this); form.setOrientation(LinearLayout.VERTICAL); form.setPadding(dp(20), 0, dp(20), 0);
+        EditText email = input("Email address", InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
+        if (AccountStore.exists(this)) email.setText(profile().email);
+        EditText password = input("New password — at least 8 characters", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        form.addView(email); gap(form, 8); form.addView(password);
+        new AlertDialog.Builder(this).setTitle("Reset password").setMessage("This profile is stored only on this device. Confirm its email and choose a new password.")
+                .setView(form).setNegativeButton("Cancel", null).setPositiveButton("Reset", (dialog, which) -> {
+                    if (AccountStore.resetPassword(this, email.getText().toString(), password.getText().toString())) { toast("Password updated."); showLogin(); }
+                    else toast("Check the email and use at least 8 characters.");
+                }).show();
+    }
+
+    private void authenticateWithBiometrics() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) { toast("Biometric unlock requires Android 9 or later. Use your password instead."); return; }
+        try {
+            BiometricPrompt prompt = new BiometricPrompt.Builder(this).setTitle("Unlock My Personal Trainer").setNegativeButton("Use password", getMainExecutor(), (dialog, which) -> { }).build();
+            prompt.authenticate(new CancellationSignal(), getMainExecutor(), new BiometricPrompt.AuthenticationCallback() {
+                @Override public void onAuthenticationSucceeded(BiometricPrompt.AuthenticationResult result) { runOnUiThread(MainActivity.this::openSignedInHome); }
+                @Override public void onAuthenticationError(int code, CharSequence message) { if (code != BiometricPrompt.BIOMETRIC_ERROR_USER_CANCELED) toast(message.toString()); }
+            });
+        } catch (RuntimeException unavailable) { toast("Biometrics are unavailable on this device. Use your password instead."); }
     }
 
     private void showRegistration() {
@@ -3294,25 +3360,23 @@ public final class MainActivity extends Activity {
         AccountStore.Profile profile = AccountStore.get(this);
         String coach = "Coach " + profile.coachName;
         LinearLayout body = appPage("Settings");
-        title(body, "ACCOUNT", profile.username, "Your trainer, preferences, and update controls live here.");
+        title(body, "SETTINGS", profile.username, "Your account, coach, appearance, privacy, and updates.");
 
         LinearLayout identity = card();
-        identity.addView(chip(coach));
-        gap(identity, 10);
-        identity.addView(heading(profile.email, 18, ink));
-        identity.addView(text("Your local profile is stored on this device.", 14, muted));
+        identity.setOrientation(LinearLayout.HORIZONTAL);
+        ImageView profilePhoto = new ImageView(this);
+        bindProfilePhoto(profilePhoto, profile);
+        LinearLayout.LayoutParams profilePhotoParams = new LinearLayout.LayoutParams(dp(70), dp(70));
+        profilePhotoParams.rightMargin = dp(14);
+        identity.addView(profilePhoto, profilePhotoParams);
+        LinearLayout identityCopy = new LinearLayout(this); identityCopy.setOrientation(LinearLayout.VERTICAL);
+        identityCopy.addView(heading("Account settings", 19, ink));
+        identityCopy.addView(text(profile.username + " · " + profile.email, 14, muted));
+        identityCopy.addView(text(profile.biometricUnlock ? "Biometric unlock on" : "Password unlock", 13, muted));
+        identity.addView(identityCopy, new LinearLayout.LayoutParams(0, -2, 1));
+        identity.setClickable(true); identity.setFocusable(true);
+        identity.setOnClickListener(view -> showProfileEditor());
         body.addView(identity);
-        gap(body, 12);
-
-        LinearLayout bodyProfile = card();
-        bodyProfile.addView(heading("Private body context", 19, ink));
-        bodyProfile.addView(text(BodyProfileStore.summary(this), 14, muted));
-        bodyProfile.addView(text("Weight: " + WeightStore.latestLabel(this) + "  •  Used locally for trend context across Workouts, Progress, and Nutrition.", 13, muted));
-        bodyProfile.setClickable(true);
-        bodyProfile.setFocusable(true);
-        bodyProfile.setContentDescription("Private body context. " + BodyProfileStore.summary(this));
-        bodyProfile.setOnClickListener(view -> { if (BodyProfileStore.configured(this)) showBodyContext(); else showBodyProfileSetup(false); });
-        body.addView(bodyProfile);
         gap(body, 12);
 
         LinearLayout coachSettings = card();
@@ -3387,6 +3451,55 @@ public final class MainActivity extends Activity {
             showWelcome();
         });
         addButton(body, signOut);
+    }
+
+    /** Personal account details are separate from body context and from coach preferences. */
+    private void showProfileEditor() {
+        AccountStore.Profile profile = profile();
+        if (selectedProfilePhotoUri == null) selectedProfilePhotoUri = profile.photoUri;
+        LinearLayout body = appPage("Settings");
+        title(body, "ACCOUNT SETTINGS", "Your personal profile", "Your profile stays on this device.");
+        LinearLayout photoCard = card();
+        photoCard.setGravity(Gravity.CENTER_VERTICAL);
+        photoCard.setOrientation(LinearLayout.HORIZONTAL);
+        ImageView image = new ImageView(this);
+        bindProfilePhoto(image, profile);
+        photoCard.addView(image, new LinearLayout.LayoutParams(dp(86), dp(86)));
+        Button choosePhoto = lightAction(selectedProfilePhotoUri == null || selectedProfilePhotoUri.isEmpty() ? "Add profile photo" : "Change profile photo");
+        choosePhoto.setOnClickListener(view -> {
+            Intent picker = new Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("image/*").addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+            startActivityForResult(picker, REQUEST_PROFILE_PHOTO);
+        });
+        LinearLayout.LayoutParams chooseParams = new LinearLayout.LayoutParams(0, dp(48), 1); chooseParams.leftMargin = dp(14);
+        photoCard.addView(choosePhoto, chooseParams);
+        body.addView(photoCard); gap(body, 12);
+        EditText name = input("Name", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_WORDS); name.setText(profile.username); body.addView(name);
+        gap(body, 9);
+        EditText password = input("New password — leave blank to keep current", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD); body.addView(password);
+        CheckBox remember = new CheckBox(this); remember.setText("Remember this account on this device"); remember.setTextColor(Color.WHITE); remember.setButtonTintList(ColorStateList.valueOf(mint)); remember.setChecked(profile.rememberSignIn); body.addView(remember);
+        CheckBox biometric = new CheckBox(this); biometric.setText("Use biometrics to open my account"); biometric.setTextColor(Color.WHITE); biometric.setButtonTintList(ColorStateList.valueOf(mint)); biometric.setChecked(profile.biometricUnlock); body.addView(biometric);
+        body.addView(text("Biometric unlock uses your phone’s enrolled fingerprint or face system. If it is unavailable, you can still use your password.", 13, Color.rgb(202, 216, 234)));
+        gap(body, 12);
+        Button save = primary("Save account settings");
+        save.setOnClickListener(view -> {
+            try {
+                AccountStore.updatePersonalProfile(this, name.getText().toString(), selectedProfilePhotoUri, remember.isChecked(), biometric.isChecked(), password.getText().toString());
+                toast("Account settings saved."); selectedProfilePhotoUri = null; showProfile();
+            } catch (IllegalArgumentException error) { toast(error.getMessage()); }
+        });
+        addButton(body, save); gap(body, 8);
+        Button back = secondary("Back to settings"); back.setOnClickListener(view -> { selectedProfilePhotoUri = null; showProfile(); }); addButton(body, back);
+    }
+
+    private void bindProfilePhoto(ImageView view, AccountStore.Profile profile) {
+        view.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        view.setBackground(surface(navyPanel, 99, 2, mint));
+        view.setClipToOutline(true);
+        String uri = selectedProfilePhotoUri != null ? selectedProfilePhotoUri : profile.photoUri;
+        try {
+            if (uri != null && !uri.isEmpty()) { view.setImageURI(Uri.parse(uri)); return; }
+        } catch (RuntimeException ignored) { }
+        view.setImageResource(coachPortrait(profile.coachName));
     }
 
     private void showAppearanceOptions() {
@@ -5616,12 +5729,12 @@ public final class MainActivity extends Activity {
         final int updatePage = pageGeneration;
         otaPageGeneration = updatePage;
         showingUpdatePage = true;
-        title(body, "APP UPDATES", "Keep your coach current", "Android now owns the download so it can persist through mobile-data interruptions and app backgrounding. Every package is SHA-256 checked before Android installs it.");
+        title(body, "UPDATES", "Keep your coach current", "Version " + BuildConfig.VERSION_NAME);
         LinearLayout statusCard = card();
-        TextView status = heading("Checking the update channel…", 18, ink);
+        TextView status = heading("Ready to check for an update", 18, ink);
         statusCard.addView(status);
-        TextView network = text("Connection: " + UpdateManager.networkSummary(this), 13, muted);
-        statusCard.addView(network);
+        // Kept for the update-state renderer but intentionally not displayed: this page is customer-facing.
+        TextView network = text("", 1, Color.TRANSPARENT);
         ProgressBar downloadProgress = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
         downloadProgress.setMax(100);
         downloadProgress.setProgressTintList(ColorStateList.valueOf(mint));
@@ -5638,17 +5751,20 @@ public final class MainActivity extends Activity {
         LinearLayout actions = new LinearLayout(this);
         actions.setOrientation(LinearLayout.VERTICAL);
         body.addView(actions);
-        gap(body, 6);
-        body.addView(text("For a metered mobile connection, you choose whether to use mobile data. Roaming is never used automatically. A downloaded update is kept until Android is ready to install it.", 13, Color.rgb(211, 225, 233)));
-        gap(body, 14);
-        Button back = secondary("Back to account");
-        back.setOnClickListener(view -> showProfile());
-        addButton(body, back);
 
         UpdateManager.Info restored = knownInfo != null ? knownInfo : UpdateManager.savedInfo(this);
         if (hasSavedUpdateState(restored)) {
             renderUpdateState(restored, status, network, downloadProgress, progressLabel, actions);
+        } else {
+            Button check = primary("Check for update");
+            check.setOnClickListener(view -> checkForUpdate(updatePage, status, network, downloadProgress, progressLabel, actions));
+            addButton(actions, check);
         }
+    }
+
+    private void checkForUpdate(int updatePage, TextView status, TextView network, ProgressBar downloadProgress, TextView progressLabel, LinearLayout actions) {
+        status.setText("Checking for an update…");
+        actions.removeAllViews();
         new Thread(() -> {
             try {
                 UpdateManager.Info info = UpdateManager.check();
@@ -5660,8 +5776,10 @@ public final class MainActivity extends Activity {
                             renderUpdateState(saved, status, network, downloadProgress, progressLabel, actions);
                             return;
                         }
-                        status.setText("You already have the latest published version.");
-                        network.setText("Connection: " + UpdateManager.networkSummary(this));
+                        status.setText("You have the latest version.");
+                        Button check = primary("Check again");
+                        check.setOnClickListener(view -> checkForUpdate(updatePage, status, network, downloadProgress, progressLabel, actions));
+                        addButton(actions, check);
                         return;
                     }
                     renderUpdateState(info, status, network, downloadProgress, progressLabel, actions);
@@ -5674,25 +5792,11 @@ public final class MainActivity extends Activity {
                         renderUpdateState(saved, status, network, downloadProgress, progressLabel, actions);
                         return;
                     }
-                    status.setText("We could not reach the update service on this connection. "
-                            + "Your plans and app stay unchanged. Try again, use Wi-Fi, or use the manual download.");
+                    status.setText("Unable to check for an update.");
                     actions.removeAllViews();
-                    Button retry = primary("Retry update check");
-                    retry.setOnClickListener(view -> showUpdate());
+                    Button retry = primary("Check for update");
+                    retry.setOnClickListener(view -> checkForUpdate(updatePage, status, network, downloadProgress, progressLabel, actions));
                     addButton(actions, retry);
-                    gap(actions, 10);
-                    Button manual = secondary("Open manual download");
-                    manual.setOnClickListener(view -> {
-                        try {
-                            startActivity(new Intent(Intent.ACTION_VIEW,
-                                    Uri.parse(UpdateManager.MANUAL_RELEASES_URL)));
-                        } catch (Exception ignored) {
-                            toast("Unable to open the download page.");
-                        }
-                    });
-                    addButton(actions, manual);
-                    network.setText("Connection: " + UpdateManager.networkSummary(this)
-                            + " • primary and backup channels unavailable");
                 });
             }
         }).start();
@@ -5718,7 +5822,7 @@ public final class MainActivity extends Activity {
         } catch (RuntimeException error) {
             state = new UpdateManager.DownloadStatus(UpdateManager.STATE_FAILED, 0L, info.sizeBytes, conciseNetworkError(error));
         }
-        network.setText("Connection: " + UpdateManager.networkSummary(this));
+        network.setText("");
         actions.removeAllViews();
         progress.setVisibility(state.state == UpdateManager.STATE_NONE ? View.GONE : View.VISIBLE);
         progressLabel.setVisibility(state.state == UpdateManager.STATE_NONE ? View.GONE : View.VISIBLE);
@@ -5734,16 +5838,15 @@ public final class MainActivity extends Activity {
         }
 
         if (state.state == UpdateManager.STATE_NONE) {
-            String size = info.sizeBytes > 0L ? " • " + formatDownloadSize(info.sizeBytes) : "";
-            status.setText("Version " + info.name + " is ready" + size + ".");
-            Button download = primary(UpdateManager.isMetered(this) ? "Choose mobile-data download" : "Download and install " + info.name);
+            status.setText("Update available");
+            Button download = primary("Download update");
             download.setOnClickListener(view -> confirmAndStartUpdateDownload(info));
             addButton(actions, download);
         } else if (state.state == UpdateManager.STATE_QUEUED || state.state == UpdateManager.STATE_DOWNLOADING || state.state == UpdateManager.STATE_PAUSED) {
-            status.setText(state.detail + " • " + info.name);
+            status.setText("Downloading update");
             if (state.state == UpdateManager.STATE_PAUSED) {
                 boolean metered = UpdateManager.isMetered(this);
-                Button resume = primary(metered ? "Use mobile data & restart" : "Check download status");
+                Button resume = primary(metered ? "Resume download" : "Check download status");
                 resume.setOnClickListener(view -> {
                     if (metered) confirmAndStartUpdateDownload(info);
                     else renderUpdateState(info, status, network, progress, progressLabel, actions);
@@ -5760,31 +5863,31 @@ public final class MainActivity extends Activity {
             addButton(actions, cancel);
             startOtaStatusPolling(info, status, network, progress, progressLabel, actions);
         } else if (state.state == UpdateManager.STATE_VERIFYING) {
-            status.setText("Download complete. Verifying its SHA-256 before Android installs it…");
+            status.setText("Preparing update…");
             progress.setIndeterminate(true);
-            progressLabel.setText("Downloaded • verifying integrity");
+            progressLabel.setText("Download complete");
             verifyAndInstallUpdate(info);
         } else if (state.state == UpdateManager.STATE_READY_TO_INSTALL) {
-            status.setText("Version " + info.name + " is verified and ready for Android to install.");
+            status.setText("Update ready to install");
             progress.setIndeterminate(false);
             progress.setProgress(100, true);
-            progressLabel.setText("100%  •  SHA-256 verified");
-            Button install = primary("Install verified " + info.name);
+            progressLabel.setText("100%");
+            Button install = primary("Install update");
             install.setOnClickListener(view -> requestVerifiedUpdateInstall(info));
             addButton(actions, install);
             gap(actions, 7);
-            Button remove = lightAction("Remove verified download");
+            Button remove = lightAction("Remove download");
             remove.setOnClickListener(view -> {
                 UpdateManager.cancel(this, info);
                 renderUpdateState(info, status, network, progress, progressLabel, actions);
             });
             addButton(actions, remove);
         } else {
-            status.setText("Update download stopped. " + state.detail);
+            status.setText("Update download stopped");
             progress.setIndeterminate(false);
             progress.setProgress(0);
-            progressLabel.setText("No verified update is waiting");
-            Button retry = primary("Retry update download");
+            progressLabel.setText("");
+            Button retry = primary("Download update");
             retry.setOnClickListener(view -> confirmAndStartUpdateDownload(info));
             addButton(actions, retry);
         }
