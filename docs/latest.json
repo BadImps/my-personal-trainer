@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 39,
-  "versionName": "4.8",
-  "publishedAt": "2026-10-17T07:15:49Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v4.8/app-release.apk",
-  "sha256": "333ed6c60ed387a345a6a51f7a2eaccb1f404cbe2ddcbd1aa44f90dfc0f578b2",
+  "versionCode": 40,
+  "versionName": "4.9",
+  "publishedAt": "2026-10-17T08:36:32Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v4.9/app-release.apk",
+  "sha256": "e4123821579a389c0b53e1fe926333edaa4c5082b14ef36c866097ca2a6bd3f9",
   "sizeBytes": 84161825,
-  "notes": "Adds native 30 fps illustrated motion guides for every exercise without an exact filmed loop. Matching filmed loops remain in use, while related clips are no longer substituted silently."
+  "notes": "Adds a persistent whole-workout remaining-time bar, separate skipped cooldown and rest deductions, and adjusted workout totals during cooldown."
 }
