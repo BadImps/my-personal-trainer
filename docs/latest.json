@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 42,
-  "versionName": "5.1",
-  "publishedAt": "2026-10-17T13:27:32Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.1/app-release.apk",
-  "sha256": "f6a53a78040240bc74f3a2cf0b93a7f7a1997f5ff44cddcaa5ef393a6450c245",
-  "sizeBytes": 34473601,
-  "notes": "Adds private live Endurance tracking for walking, running, and cycling, with GPS distance, pace, pause/resume, route trace, and Progress logging."
+  "versionCode": 43,
+  "versionName": "5.2",
+  "publishedAt": "2026-10-17T17:26:52Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.2/app-release.apk",
+  "sha256": "39cbded2a5705f7e0503de71d74dfcc2f952f919d3ea1a8b60105634003802df",
+  "sizeBytes": 34489885,
+  "notes": "Adds Scheduler, timer-only Endurance starts, redesigned training calendars, and streamlined account, sign-in, and update settings."
 }
