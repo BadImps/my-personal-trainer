@@ -47,6 +47,11 @@ import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.core.content.FileProvider;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
@@ -4882,6 +4887,10 @@ public final class MainActivity extends Activity {
                     LinearLayout.LayoutParams traceParams = new LinearLayout.LayoutParams(-1, dp(128));
                     traceParams.topMargin = dp(10);
                     summary.addView(trace, traceParams);
+                    gap(summary, 9);
+                    Button offlineMap = lightAction("Open route in an offline map app");
+                    offlineMap.setOnClickListener(view -> openTrackInOfflineMap(last));
+                    addButton(summary, offlineMap);
                 }
                 body.addView(summary);
                 gap(body, 16);
@@ -4899,7 +4908,37 @@ public final class MainActivity extends Activity {
         LinearLayout guidance = card();
         guidance.addView(heading("Build gradually", 18, ink));
         guidance.addView(text("Choose a distance, duration, and effort that fit your current ability. General activity guidance can be useful, but pace, route safety, weather, and health needs are personal.", 14, muted));
+        gap(guidance, 9);
+        Button offlineGuide = lightAction("How offline maps work");
+        offlineGuide.setOnClickListener(view -> showOfflineMapGuide());
+        addButton(guidance, offlineGuide);
         body.addView(guidance);
+    }
+
+    /** Sends a standard GPX file to a user-chosen map app; no mapping account or map data is bundled. */
+    private void openTrackInOfflineMap(LiveTrackingStore.Session session) {
+        try {
+            File folder = new File(getCacheDir(), "tracks");
+            if (!folder.exists() && !folder.mkdirs()) throw new IOException("Could not prepare route file");
+            File track = new File(folder, "endurance-" + System.currentTimeMillis() + ".gpx");
+            StringBuilder gpx = new StringBuilder("<?xml version=\"1.0\" encoding=\"UTF-8\"?><gpx version=\"1.1\" creator=\"My Personal Trainer\" xmlns=\"http://www.topografix.com/GPX/1/1\"><trk><name>")
+                    .append(session.mode).append(" endurance</name><trkseg>");
+            for (LiveTrackingStore.Point point : session.points) gpx.append("<trkpt lat=\"").append(point.latitude).append("\" lon=\"").append(point.longitude).append("\"/>");
+            gpx.append("</trkseg></trk></gpx>");
+            try (FileOutputStream output = new FileOutputStream(track)) { output.write(gpx.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8)); }
+            Uri uri = FileProvider.getUriForFile(this, getPackageName() + ".files", track);
+            Intent share = new Intent(Intent.ACTION_VIEW).setDataAndType(uri, "application/gpx+xml")
+                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            startActivity(Intent.createChooser(share, "Open route with"));
+        } catch (IOException | RuntimeException error) {
+            toast("Could not prepare this route for an offline map app.");
+        }
+    }
+
+    private void showOfflineMapGuide() {
+        new AlertDialog.Builder(this).setTitle("Use maps offline")
+                .setMessage("For dependable walking, running, and cycling maps without mobile data, install an offline-map app such as OsmAnd and download your local region inside that app while on Wi‑Fi. My Personal Trainer records distance with GPS and can send each finished route to a compatible map app as a GPX file. Google Maps offline downloads cannot provide walking or cycling directions.")
+                .setPositiveButton("Got it", null).show();
     }
 
     private void addEnduranceActivity(LinearLayout body, String mode, String name, String description) {
