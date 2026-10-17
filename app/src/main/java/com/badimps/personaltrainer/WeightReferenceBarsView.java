@@ -10,7 +10,7 @@ import android.view.View;
 import java.util.Locale;
 
 /**
- * A compact, factual comparison of the user's locally logged starting/current/target weights.
+ * A compact journey graph for the user's locally logged starting/current/target weights.
  * The mint band is an adult screening reference only; it is not a diagnosis or a prescribed goal.
  */
 public final class WeightReferenceBarsView extends View {
@@ -38,7 +38,7 @@ public final class WeightReferenceBarsView extends View {
 
     @Override protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
-        float left = dp(16), right = getWidth() - dp(16), top = dp(19), bottom = dp(73);
+        float left = dp(22), right = getWidth() - dp(22), top = dp(23), bottom = dp(70);
         float minimum = Math.min(Math.min(Math.min(start, current), target), low);
         float maximum = Math.max(Math.max(Math.max(start, current), target), high);
         float extra = Math.max(3f, (maximum - minimum) * .18f);
@@ -55,25 +55,45 @@ public final class WeightReferenceBarsView extends View {
         paint.setColor(Color.rgb(86, 100, 126));
         canvas.drawText("Adult screening reference band", left, dp(12), paint);
 
-        float step = (right - left) / 3f;
-        bar(canvas, left + step * .5f, start, minimum, maximum, top, bottom, Color.rgb(75, 91, 121), "Start");
-        bar(canvas, left + step * 1.5f, current, minimum, maximum, top, bottom, Color.rgb(255, 107, 95), "Now");
-        bar(canvas, left + step * 2.5f, target, minimum, maximum, top, bottom, Color.rgb(119, 224, 196), "Target");
+        float startX = left + dp(18);
+        float currentX = left + (right - left) / 2f;
+        float targetX = right - dp(18);
+        float startY = y(start, minimum, maximum, top, bottom);
+        float currentY = y(current, minimum, maximum, top, bottom);
+        float targetY = y(target, minimum, maximum, top, bottom);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(dp(3));
+        paint.setStrokeCap(Paint.Cap.ROUND);
+        paint.setColor(Color.rgb(75, 91, 121));
+        android.graphics.Path path = new android.graphics.Path();
+        path.moveTo(startX, startY);
+        path.lineTo(currentX, currentY);
+        path.lineTo(targetX, targetY);
+        canvas.drawPath(path, paint);
+        paint.setStyle(Paint.Style.FILL);
+        point(canvas, startX, startY, start, Color.rgb(75, 91, 121), "Start");
+        point(canvas, currentX, currentY, current, Color.rgb(255, 107, 95), "Today");
+        point(canvas, targetX, targetY, target, Color.rgb(16, 23, 42), "Target");
     }
 
-    private void bar(Canvas canvas, float centerX, float value, float minimum, float maximum,
-                     float top, float bottom, int color, String label) {
-        float valueY = y(value, minimum, maximum, top, bottom);
+    private void point(Canvas canvas, float x, float y, float value, int color, String label) {
         paint.setColor(color);
-        canvas.drawRoundRect(new RectF(centerX - dp(12), valueY, centerX + dp(12), bottom), dp(6), dp(6), paint);
+        canvas.drawCircle(x, y, dp(8), paint);
+        if ("Target".equals(label)) {
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setColor(Color.rgb(119, 224, 196));
+            paint.setStrokeWidth(dp(3));
+            canvas.drawCircle(x, y, dp(12), paint);
+            paint.setStyle(Paint.Style.FILL);
+        }
         paint.setTextSize(dp(10));
         paint.setTypeface(android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.BOLD));
         paint.setColor(Color.rgb(16, 23, 42));
         String number = String.format(Locale.US, "%.1f", value);
-        canvas.drawText(number, centerX - paint.measureText(number) / 2f, Math.max(dp(18), valueY - dp(5)), paint);
+        canvas.drawText(number, x - paint.measureText(number) / 2f, Math.max(dp(18), y - dp(12)), paint);
         paint.setTypeface(android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.NORMAL));
         paint.setColor(Color.rgb(86, 100, 126));
-        canvas.drawText(label, centerX - paint.measureText(label) / 2f, dp(94), paint);
+        canvas.drawText(label, x - paint.measureText(label) / 2f, dp(94), paint);
     }
 
     private float y(float value, float minimum, float maximum, float top, float bottom) {

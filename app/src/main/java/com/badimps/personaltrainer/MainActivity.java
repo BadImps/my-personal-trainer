@@ -2950,39 +2950,40 @@ public final class MainActivity extends Activity {
                 : "Not set";
         // Keep the reference scale meaningful until the optional target is supplied.
         float scaleTarget = targetWeight > 0f ? targetWeight : current;
+        String distanceToTarget = targetWeight > 0f
+                ? String.format(Locale.US, "%.1f %s to your selected target", Math.abs(current - targetWeight), unit)
+                : "Set a personal target whenever you are ready";
 
         LinearLayout identity = bodyReferenceCard();
-        LinearLayout metricLabels = new LinearLayout(this);
-        metricLabels.setGravity(Gravity.CENTER_VERTICAL);
-        metricLabels.addView(heading("CURRENT WEIGHT", 10, muted), new LinearLayout.LayoutParams(0, -2, 1));
-        metricLabels.addView(heading("PERSONAL TARGET", 10, muted), new LinearLayout.LayoutParams(0, -2, 1));
-        identity.addView(metricLabels);
         LinearLayout metrics = new LinearLayout(this);
         metrics.setGravity(Gravity.CENTER_VERTICAL);
         LinearLayout currentMetric = new LinearLayout(this);
         currentMetric.setOrientation(LinearLayout.VERTICAL);
-        currentMetric.addView(heading(WeightStore.latestLabel(this), 31, navy));
-        currentMetric.addView(text("●  NOW", 12, coral));
+        currentMetric.setPadding(dp(12), dp(11), dp(12), dp(11));
+        currentMetric.setBackground(surface(Color.rgb(255, 239, 237), 14, 0, Color.TRANSPARENT));
+        currentMetric.addView(heading("CURRENT WEIGHT", 10, muted));
+        currentMetric.addView(heading(WeightStore.latestLabel(this), 26, navy));
+        currentMetric.addView(text("●  TODAY", 11, coral));
         metrics.addView(currentMetric, new LinearLayout.LayoutParams(0, -2, 1));
-        View verticalDivider = bodyReferenceDivider();
-        metrics.addView(verticalDivider, new LinearLayout.LayoutParams(dp(1), dp(72)));
+        View metricGap = new View(this);
+        metrics.addView(metricGap, new LinearLayout.LayoutParams(dp(9), 1));
         LinearLayout targetMetric = new LinearLayout(this);
         targetMetric.setOrientation(LinearLayout.VERTICAL);
-        targetMetric.addView(heading("◎", 30, navy));
-        targetMetric.addView(heading(targetLabel, 21, navy));
-        LinearLayout.LayoutParams targetMetricParams = new LinearLayout.LayoutParams(0, -2, 1);
-        targetMetricParams.leftMargin = dp(12);
-        metrics.addView(targetMetric, targetMetricParams);
+        targetMetric.setPadding(dp(12), dp(11), dp(12), dp(11));
+        targetMetric.setBackground(surface(Color.rgb(230, 249, 243), 14, 0, Color.TRANSPARENT));
+        targetMetric.addView(heading("PERSONAL TARGET", 10, muted));
+        targetMetric.addView(heading(targetLabel, 23, navy));
+        targetMetric.addView(text("◎  YOUR MARK", 11, navy));
+        metrics.addView(targetMetric, new LinearLayout.LayoutParams(0, -2, 1));
         LinearLayout.LayoutParams metricsParams = new LinearLayout.LayoutParams(-1, -2);
-        metricsParams.topMargin = dp(7);
         identity.addView(metrics, metricsParams);
         View identityDivider = bodyReferenceDivider();
         LinearLayout.LayoutParams identityDividerParams = new LinearLayout.LayoutParams(-1, dp(1));
-        identityDividerParams.topMargin = dp(10);
-        identityDividerParams.bottomMargin = dp(10);
+        identityDividerParams.topMargin = dp(12);
+        identityDividerParams.bottomMargin = dp(8);
         identity.addView(identityDivider, identityDividerParams);
-        identity.addView(text("Adult screening reference: " + BodyInsights.referenceRange(heightCm, unit), 17, navy));
-        identity.addView(text("Screening only — not a diagnosis or ideal weight.", 13, muted));
+        identity.addView(text(distanceToTarget, 14, navy));
+        identity.addView(text("Adult screening reference: " + BodyInsights.referenceRange(heightCm, unit) + " • screening only, not a diagnosis or ideal weight.", 12, muted));
         body.addView(identity);
         gap(body, 12);
 
