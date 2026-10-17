@@ -4105,7 +4105,7 @@ public final class MainActivity extends Activity {
     }
 
     /** A per-exercise roll-up shown during the following cooldown, without changing its leaderboard. */
-    private TextView[] addTotalWorkoutCard(LinearLayout container, Coach.Exercise currentExercise) {
+    private TextView[] addTotalExerciseCard(LinearLayout container, Coach.Exercise currentExercise) {
         long activeMillis = currentExercise == null ? 0L : currentExerciseSummary(currentExercise).totalActiveMillis;
         long setRestMillis = currentExerciseSetRestMillis;
         long totalMillis = activeMillis + setRestMillis;
@@ -4141,7 +4141,7 @@ public final class MainActivity extends Activity {
         return duration;
     }
 
-    private void updateTotalWorkoutViews(TextView[] views, long activeMillis) {
+    private void updateTotalExerciseViews(TextView[] views, long activeMillis) {
         if (views == null || views.length < 3) return;
         long setRestMillis = currentExerciseSetRestMillis;
         views[0].setText(WorkoutTiming.formatElapsedMillis(activeMillis));
@@ -4277,12 +4277,12 @@ public final class MainActivity extends Activity {
         addSetTimesCard(body, currentExerciseSummary(exercise), false);
         gap(body, 12);
         final long activeSetMillis = currentExerciseSummary(exercise).totalActiveMillis;
-        final TextView[] totalWorkout;
+        final TextView[] totalExercise;
         if (betweenExercises) {
-            totalWorkout = addTotalWorkoutCard(body, exercise);
+            totalExercise = addTotalExerciseCard(body, exercise);
             gap(body, 12);
         } else {
-            totalWorkout = null;
+            totalExercise = null;
         }
         Button emergency = emergencyStopButton();
         emergency.setOnClickListener(view -> showEmergencyStopConfirmation(index, set,
@@ -4296,13 +4296,13 @@ public final class MainActivity extends Activity {
                 remaining[0] = seconds;
                 timer.setText(format(seconds));
                 timer.setContentDescription((betweenExercises ? "Cooldown" : "Rest") + " time remaining " + seconds + " seconds");
-                updateTotalWorkoutViews(totalWorkout, activeSetMillis);
+                updateTotalExerciseViews(totalExercise, activeSetMillis);
             }
 
             @Override public void onFinish() {
                 endRecoverySegment();
                 timer.setText("00:00");
-                updateTotalWorkoutViews(totalWorkout, activeSetMillis);
+                updateTotalExerciseViews(totalExercise, activeSetMillis);
                 advance(index, set, exercise);
             }
         }.start();
@@ -4661,15 +4661,15 @@ public final class MainActivity extends Activity {
         title(body, "TODAY'S FUEL", "Simple food ideas, connected", "Save flexible meal ideas and check in on everyday habits. Progress shows the pattern beside your training consistency.");
         JourneyStore.Snapshot snapshot = JourneyStore.snapshot(this);
 
-        LinearLayout connection = card();
-        connection.addView(heading(session.isEmpty() ? "Plan your movement first" : "Today’s movement: " + target + "  •  " + sessionMinutes + " min", 19, ink));
-        connection.addView(text(session.isEmpty()
-                ? "Choose a workout whenever you are ready. Food ideas remain available without a plan."
-                : "Goal: " + goal + "  •  Equipment: " + equipmentSummary(), 14, muted));
-        gap(connection, 7);
-        connection.addView(text("Keep food choices familiar, practical, and suited to your appetite, culture, budget, allergies, and any clinical guidance.", 13, muted));
-        body.addView(connection);
-        gap(body, 12);
+        if (!session.isEmpty()) {
+            LinearLayout connection = card();
+            connection.addView(heading("Today’s movement: " + target + "  •  " + sessionMinutes + " min", 19, ink));
+            connection.addView(text("Goal: " + goal + "  •  Equipment: " + equipmentSummary(), 14, muted));
+            gap(connection, 7);
+            connection.addView(text("Keep food choices familiar, practical, and suited to your appetite, culture, budget, allergies, and any clinical guidance.", 13, muted));
+            body.addView(connection);
+            gap(body, 12);
+        }
 
         NutritionRecommendation.Day todayFood = NutritionRecommendation.forToday();
         LinearLayout todayIdeas = card();
@@ -4688,7 +4688,7 @@ public final class MainActivity extends Activity {
 
         LinearLayout caribbean = card();
         caribbean.addView(heading("Caribbean Food Library", 19, ink));
-        caribbean.addView(text(CaribbeanFoodLibrary.count() + " familiar foods • Searchable reference facts per 100 g for staples, fruit, vegetables, beans, seafood, proteins, and pantry foods.", 14, muted));
+        caribbean.addView(text(CaribbeanFoodLibrary.count() + " familiar foods • Searchable reference facts per 100 g for staples, fruit, vegetables, beans, seafood, proteins, and cooking basics.", 14, muted));
         caribbean.addView(text("Values are a reference snapshot. Recipe, brand, seasoning, oil, and serving size can change the result.", 12, muted));
         gap(caribbean, 9);
         Button browseCaribbean = primary("Browse Caribbean foods");
@@ -4700,7 +4700,7 @@ public final class MainActivity extends Activity {
         List<String> plannedMeals = MealPlanStore.meals(this);
         if (!plannedMeals.isEmpty()) {
             LinearLayout savedMeals = card();
-            savedMeals.addView(heading("Meals added to my plan", 19, ink));
+            savedMeals.addView(heading("Saved food ideas", 19, ink));
             savedMeals.addView(text("Your locally saved meal ideas. Edit this list whenever your week changes.", 13, muted));
             for (String meal : plannedMeals) {
                 gap(savedMeals, 7);
@@ -4726,30 +4726,32 @@ public final class MainActivity extends Activity {
         body.addView(checkIn);
         gap(body, 12);
 
-        LinearLayout timing = card();
-        timing.addView(heading("Fuel around your workout", 18, ink));
-        String before = session.isEmpty() ? "Plan first: workout timing will appear here."
-                : "Before: choose familiar food and fluids that feel comfortable before your " + sessionMinutes + "-minute session.";
-        timing.addView(text(before, 14, muted));
-        gap(timing, 5);
-        timing.addView(text("After: return to a balanced meal or snack with a protein food, produce, and a grain or other carbohydrate you enjoy.", 14, muted));
-        if (sessionMinutes >= 90) {
+        if (!session.isEmpty()) {
+            LinearLayout timing = card();
+            timing.addView(heading("Fuel around your workout", 18, ink));
+            timing.addView(text("Before: choose familiar food and fluids that feel comfortable before your " + sessionMinutes + "-minute session.", 14, muted));
             gap(timing, 5);
-            timing.addView(text("Longer session: plan access to fluids and avoid experimenting with unfamiliar foods during training.", 14, muted));
-        }
-        body.addView(timing);
-        gap(body, 14);
+            timing.addView(text("After: return to a balanced meal or snack with a protein food, produce, and a grain or other carbohydrate you enjoy.", 14, muted));
+            if (sessionMinutes >= 90) {
+                gap(timing, 5);
+                timing.addView(text("Longer session: plan access to fluids and avoid experimenting with unfamiliar foods during training.", 14, muted));
+            }
+            body.addView(timing);
+            gap(body, 14);
 
-        body.addView(heading("Flexible ideas for " + goal, 20, Color.WHITE));
-        gap(body, 8);
-        for (String meal : Coach.meals(goal)) {
-            LinearLayout mealCard = card();
-            mealCard.addView(heading(meal, 18, ink));
-            mealCard.addView(text("Adapt ingredients and portions to appetite, culture, budget, allergies, and medical guidance.", 14, muted));
-            gap(mealCard, 8);
-            addButton(mealCard, saveMealIdeaButton("Save this idea", meal));
-            body.addView(mealCard);
-            gap(body, 9);
+            body.addView(heading("Two ideas for " + goal, 20, Color.WHITE));
+            gap(body, 8);
+            int ideaCount = 0;
+            for (String meal : Coach.meals(goal)) {
+                if (ideaCount++ == 2) break;
+                LinearLayout mealCard = card();
+                mealCard.addView(heading(meal, 18, ink));
+                mealCard.addView(text("Adapt ingredients and portions to appetite, culture, budget, allergies, and medical guidance.", 14, muted));
+                gap(mealCard, 8);
+                addButton(mealCard, saveMealIdeaButton("Save this idea", meal));
+                body.addView(mealCard);
+                gap(body, 9);
+            }
         }
         gap(body, 5);
         Button workout = primary(session.isEmpty() ? "Build a connected workout" : "Open connected workout");

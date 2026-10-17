@@ -11,7 +11,7 @@ import java.util.Locale;
 public final class CaribbeanFoodLibrary {
     public static final String[] CATEGORIES = {
             "All", "Staples & grains", "Fruit", "Vegetables", "Beans & plant proteins",
-            "Fish & seafood", "Meat, eggs & dairy", "Pantry & drinks"
+            "Fish & seafood", "Meat, eggs & dairy", "Cooking basics"
     };
 
     public static final class Food {
@@ -121,17 +121,17 @@ public final class CaribbeanFoodLibrary {
             f("Plain yogurt", "Meat, eggs & dairy", "low-fat, plain", 63, 5.3, 7.0, 0, 1.6, 70),
             f("Cheddar cheese", "Meat, eggs & dairy", "plain", 403, 24.9, 1.3, 0, 33.1, 621),
 
-            f("Coconut milk", "Pantry & drinks", "canned or fresh, unsweetened reference", 230, 2.3, 5.5, 2.2, 23.8, 15),
-            f("Coconut cream", "Pantry & drinks", "unsweetened reference", 330, 3.6, 6.7, 2.0, 34.7, 18),
-            f("Olive oil", "Pantry & drinks", "plain", 884, 0, 0, 0, 100.0, 2),
-            f("Canola oil", "Pantry & drinks", "plain", 884, 0, 0, 0, 100.0, 0),
-            f("Peanut oil", "Pantry & drinks", "plain", 884, 0, 0, 0, 100.0, 0),
-            f("Honey", "Pantry & drinks", "plain", 304, .3, 82.4, .2, 0, 4),
-            f("Brown sugar", "Pantry & drinks", "plain", 380, 0, 98.1, 0, 0, 28),
-            f("Hot pepper sauce", "Pantry & drinks", "commercial reference", 44, 1.5, 9.3, 1.5, .9, 2200),
-            f("Cocoa powder", "Pantry & drinks", "unsweetened", 228, 19.6, 57.9, 33.2, 13.7, 21),
-            f("Ginger", "Pantry & drinks", "fresh", 80, 1.8, 17.8, 2.0, .8, 13),
-            f("Garlic", "Pantry & drinks", "fresh", 149, 6.4, 33.1, 2.1, .5, 17)
+            f("Coconut milk", "Cooking basics", "canned or fresh, unsweetened reference", 230, 2.3, 5.5, 2.2, 23.8, 15),
+            f("Coconut cream", "Cooking basics", "unsweetened reference", 330, 3.6, 6.7, 2.0, 34.7, 18),
+            f("Olive oil", "Cooking basics", "plain", 884, 0, 0, 0, 100.0, 2),
+            f("Canola oil", "Cooking basics", "plain", 884, 0, 0, 0, 100.0, 0),
+            f("Peanut oil", "Cooking basics", "plain", 884, 0, 0, 0, 100.0, 0),
+            f("Honey", "Cooking basics", "plain", 304, .3, 82.4, .2, 0, 4),
+            f("Brown sugar", "Cooking basics", "plain", 380, 0, 98.1, 0, 0, 28),
+            f("Hot pepper sauce", "Cooking basics", "commercial reference", 44, 1.5, 9.3, 1.5, .9, 2200),
+            f("Cocoa powder", "Cooking basics", "unsweetened", 228, 19.6, 57.9, 33.2, 13.7, 21),
+            f("Ginger", "Cooking basics", "fresh", 80, 1.8, 17.8, 2.0, .8, 13),
+            f("Garlic", "Cooking basics", "fresh", 149, 6.4, 33.1, 2.1, .5, 17)
     };
 
     public static int count() { return FOODS.length; }
