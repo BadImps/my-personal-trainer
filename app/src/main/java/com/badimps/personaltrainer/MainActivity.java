@@ -2989,6 +2989,8 @@ public final class MainActivity extends Activity {
 
         LinearLayout reference = bodyReferenceCard();
         if (BodyInsights.usesAdultReference(age)) {
+            float referenceLow = BodyInsights.fromKg(BodyInsights.referenceWeightLowKg(heightCm), unit);
+            float referenceHigh = BodyInsights.fromKg(BodyInsights.referenceWeightHighKg(heightCm), unit);
             reference.addView(heading("WEIGHT REFERENCE", 11, muted));
             TextView legend = text("●  Now · " + WeightStore.latestLabel(this) + "     ◎  Target · " + targetLabel, 11, ink);
             legend.setSingleLine(true);
@@ -2997,12 +2999,29 @@ public final class MainActivity extends Activity {
             reference.addView(legend, legendParams);
             WeightReferenceBarsView chart = new WeightReferenceBarsView(this);
             chart.setValues(WeightStore.starting(this), current, scaleTarget,
-                    BodyInsights.fromKg(BodyInsights.referenceWeightLowKg(heightCm), unit),
-                    BodyInsights.fromKg(BodyInsights.referenceWeightHighKg(heightCm), unit), unit);
+                    referenceLow, referenceHigh, unit);
             LinearLayout.LayoutParams chartParams = new LinearLayout.LayoutParams(-1, dp(104));
             chartParams.topMargin = dp(3);
             reference.addView(chart, chartParams);
-            reference.addView(text(String.format(Locale.US, "BMI screening value: %.1f. One screening measure, not a verdict.", BodyInsights.bmi(heightCm, current, unit)), 11, muted));
+            String rangeStatus;
+            int statusFill;
+            if (current > referenceHigh) {
+                rangeStatus = String.format(Locale.US, "Current: %.1f %s above upper reference", current - referenceHigh, unit);
+                statusFill = Color.rgb(255, 235, 232);
+            } else if (current < referenceLow) {
+                rangeStatus = String.format(Locale.US, "Current: %.1f %s below lower reference", referenceLow - current, unit);
+                statusFill = Color.rgb(232, 241, 255);
+            } else {
+                rangeStatus = "Current: within this height-based reference";
+                statusFill = Color.rgb(230, 249, 243);
+            }
+            TextView status = heading(rangeStatus, 12, navy);
+            status.setPadding(dp(11), dp(8), dp(11), dp(8));
+            status.setBackground(surface(statusFill, 10, 0, Color.TRANSPARENT));
+            LinearLayout.LayoutParams statusParams = new LinearLayout.LayoutParams(-1, -2);
+            statusParams.topMargin = dp(4);
+            reference.addView(status, statusParams);
+            reference.addView(text("Reference only — not a diagnosis or ideal weight.", 11, muted));
         } else {
             reference.addView(heading("Age-specific growth context", 19, Color.WHITE));
             reference.addView(text("For ages 18–19, this app does not apply an adult BMI range. Growth and weight context require a sex- and age-specific clinical chart, so talk with a qualified healthcare professional if you want an assessment.", 14, Color.rgb(202, 216, 234)));
