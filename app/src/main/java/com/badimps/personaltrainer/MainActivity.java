@@ -24,6 +24,7 @@ import android.speech.tts.UtteranceProgressListener;
 import android.speech.tts.Voice;
 import android.text.InputType;
 import android.view.Gravity;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowInsets;
 import android.view.WindowManager;
@@ -57,14 +58,15 @@ import java.text.SimpleDateFormat;
 public final class MainActivity extends Activity {
     public static final String EXTRA_START_GUIDED_WORKOUT = "start_guided_workout";
     private static final int REQUEST_LOCAL_GEMMA_MODEL = 715;
-    private final int navy = Color.rgb(16, 23, 42);
-    private final int navyPanel = Color.rgb(26, 58, 72);
-    private final int coral = Color.rgb(255, 107, 95);
-    private final int mint = Color.rgb(119, 224, 196);
-    private final int paper = Color.rgb(247, 248, 252);
-    private final int ink = Color.rgb(43, 52, 77);
-    private final int muted = Color.rgb(107, 122, 147);
-    private final int cardLine = Color.rgb(218, 226, 233);
+    private int navy = Color.rgb(16, 23, 42);
+    private int navyPanel = Color.rgb(26, 58, 72);
+    private int coral = Color.rgb(255, 107, 95);
+    private int mint = Color.rgb(119, 224, 196);
+    private int paper = Color.rgb(247, 248, 252);
+    private int ink = Color.rgb(43, 52, 77);
+    private int muted = Color.rgb(107, 122, 147);
+    private int cardLine = Color.rgb(218, 226, 233);
+    private boolean reducedMotion;
     /** Image-led focuses for the approved plan-flow. Core includes trunk work; there is no Abs category. */
     private static final String[] WIZARD_TARGETS = {"Upper", "Lower", "Arms", "Chest", "Legs", "Full Body", "Back", "Shoulders", "Core", "Endurance"};
 
@@ -137,6 +139,7 @@ public final class MainActivity extends Activity {
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
+        applyAppearance();
         voice = new TextToSpeech(this, result -> {
             if (result == TextToSpeech.SUCCESS) {
                 voice.setLanguage(Locale.US);
@@ -217,6 +220,28 @@ public final class MainActivity extends Activity {
 
     private int dp(int value) {
         return (int) (value * getResources().getDisplayMetrics().density + .5f);
+    }
+
+    /** Applies one coherent palette before any screen creates its components. */
+    private void applyAppearance() {
+        String theme = AppearanceStore.theme(this);
+        if (AppearanceStore.OCEAN.equals(theme)) {
+            navy = Color.rgb(8, 31, 46); navyPanel = Color.rgb(17, 67, 81);
+            coral = Color.rgb(255, 119, 103); mint = Color.rgb(102, 229, 210);
+            paper = Color.rgb(246, 250, 252); ink = Color.rgb(27, 49, 65);
+            muted = Color.rgb(84, 108, 124); cardLine = Color.rgb(201, 221, 226);
+        } else if (AppearanceStore.HIGH_CONTRAST.equals(theme)) {
+            navy = Color.rgb(10, 16, 30); navyPanel = Color.rgb(25, 43, 67);
+            coral = Color.rgb(255, 125, 108); mint = Color.rgb(117, 244, 209);
+            paper = Color.WHITE; ink = Color.rgb(13, 25, 47);
+            muted = Color.rgb(62, 78, 106); cardLine = Color.rgb(181, 194, 213);
+        } else {
+            navy = Color.rgb(16, 23, 42); navyPanel = Color.rgb(26, 58, 72);
+            coral = Color.rgb(255, 107, 95); mint = Color.rgb(119, 224, 196);
+            paper = Color.rgb(247, 248, 252); ink = Color.rgb(43, 52, 77);
+            muted = Color.rgb(107, 122, 147); cardLine = Color.rgb(218, 226, 233);
+        }
+        reducedMotion = AppearanceStore.reducedMotion(this);
     }
 
     private AccountStore.Profile profile() { return AccountStore.get(this); }
@@ -464,6 +489,7 @@ public final class MainActivity extends Activity {
         LinearLayout body = column();
         scroll.addView(body, new ScrollView.LayoutParams(-1, -2));
         setContentView(scroll);
+        animatePage(scroll);
         return body;
     }
 
@@ -484,6 +510,7 @@ public final class MainActivity extends Activity {
         shell.addView(coachRail(activeScreen), new LinearLayout.LayoutParams(dp(82), -1));
         shell.addView(scroll, new LinearLayout.LayoutParams(0, -1, 1));
         setContentView(shell);
+        animatePage(scroll);
         return body;
     }
 
@@ -519,6 +546,7 @@ public final class MainActivity extends Activity {
         shell.addView(planCoachRail(), new LinearLayout.LayoutParams(dp(76), -1));
         shell.addView(scroll, new LinearLayout.LayoutParams(0, -1, 1));
         setContentView(shell);
+        animatePage(scroll);
         return body;
     }
 
@@ -526,6 +554,27 @@ public final class MainActivity extends Activity {
         pageGeneration++;
         showingUpdatePage = false;
         stopOtaStatusPolling();
+    }
+
+    /** A restrained entrance makes navigation legible without becoming decorative noise. */
+    private void animatePage(View view) {
+        if (reducedMotion) return;
+        view.setAlpha(0f);
+        view.setTranslationY(dp(10));
+        view.animate().alpha(1f).translationY(0f).setDuration(180L).start();
+    }
+
+    /** Supplies tangible press feedback for every shared action control. */
+    private void applyPressMotion(View view) {
+        if (reducedMotion) return;
+        view.setOnTouchListener((touched, event) -> {
+            if (event.getAction() == MotionEvent.ACTION_DOWN) {
+                touched.animate().scaleX(.975f).scaleY(.975f).setDuration(80L).start();
+            } else if (event.getAction() == MotionEvent.ACTION_UP || event.getAction() == MotionEvent.ACTION_CANCEL) {
+                touched.animate().scaleX(1f).scaleY(1f).setDuration(130L).start();
+            }
+            return false;
+        });
     }
 
     private LinearLayout planCoachRail() {
@@ -591,6 +640,7 @@ public final class MainActivity extends Activity {
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(dp(60), dp(hasTallPlanViewport() ? 54 : 48));
         params.topMargin = dp(hasTallPlanViewport() ? 10 : 7);
         rail.addView(item, params);
+        applyPressMotion(item);
     }
 
     private LinearLayout coachRail(String activeScreen) {
@@ -662,6 +712,7 @@ public final class MainActivity extends Activity {
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(dp(64), dp(61));
         params.topMargin = dp(7);
         rail.addView(item, params);
+        applyPressMotion(item);
     }
 
     private void gap(LinearLayout box, int size) {
@@ -808,6 +859,7 @@ public final class MainActivity extends Activity {
         button.setBackground(surface(fill, 15, 0, Color.TRANSPARENT));
         button.setElevation(dp(2));
         button.setMinHeight(dp(48));
+        applyPressMotion(button);
         return button;
     }
 
@@ -3112,6 +3164,18 @@ public final class MainActivity extends Activity {
         body.addView(coachSettings);
         gap(body, 12);
 
+        LinearLayout appearance = card();
+        appearance.addView(heading("Appearance", 19, ink));
+        appearance.addView(text(AppearanceStore.theme(this) + " theme  •  " + (reducedMotion ? "Reduced motion" : "Expressive motion"), 14, muted));
+        appearance.addView(text("Choose a clear visual mode and motion level for every screen.", 13, muted));
+        appearance.setClickable(true);
+        appearance.setFocusable(true);
+        appearance.setContentDescription("Appearance. " + AppearanceStore.theme(this) + " theme. " + (reducedMotion ? "Reduced motion enabled" : "Motion enabled"));
+        appearance.setOnClickListener(view -> showAppearanceOptions());
+        applyPressMotion(appearance);
+        body.addView(appearance);
+        gap(body, 12);
+
         LinearLayout privacy = card();
         privacy.addView(heading("Privacy", 19, ink));
         privacy.addView(text("This version stores your registration details locally and does not send them to an account server.", 14, muted));
@@ -3145,6 +3209,51 @@ public final class MainActivity extends Activity {
             showWelcome();
         });
         addButton(body, signOut);
+    }
+
+    private void showAppearanceOptions() {
+        final String[] themes = {AppearanceStore.MIDNIGHT, AppearanceStore.OCEAN, AppearanceStore.HIGH_CONTRAST};
+        int checked = 0;
+        for (int i = 0; i < themes.length; i++) if (themes[i].equals(AppearanceStore.theme(this))) checked = i;
+        LinearLayout options = new LinearLayout(this);
+        options.setOrientation(LinearLayout.VERTICAL);
+        int padding = dp(20);
+        options.setPadding(padding, dp(4), padding, 0);
+        RadioGroup group = new RadioGroup(this);
+        group.setOrientation(RadioGroup.VERTICAL);
+        for (int i = 0; i < themes.length; i++) {
+            RadioButton option = new RadioButton(this);
+            option.setId(7000 + i);
+            option.setText(themes[i]);
+            option.setTextSize(16);
+            option.setMinHeight(dp(48));
+            option.setContentDescription(themes[i] + " theme");
+            group.addView(option);
+        }
+        group.check(7000 + checked);
+        options.addView(group);
+        CheckBox motion = new CheckBox(this);
+        motion.setText("Reduce motion");
+        motion.setTextSize(16);
+        motion.setMinHeight(dp(48));
+        motion.setChecked(AppearanceStore.reducedMotion(this));
+        motion.setContentDescription("Reduce motion");
+        options.addView(motion);
+        options.addView(text("Reduced motion keeps all controls fully available while removing entrance and press animations.", 13, muted));
+        new AlertDialog.Builder(this)
+                .setTitle("Appearance")
+                .setView(options)
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Apply", (dialog, which) -> {
+                    int selection = group.getCheckedRadioButtonId() - 7000;
+                    if (selection < 0 || selection >= themes.length) selection = 0;
+                    AppearanceStore.theme(this, themes[selection]);
+                    AppearanceStore.reducedMotion(this, motion.isChecked());
+                    applyAppearance();
+                    toast("Appearance updated.");
+                    showProfile();
+                })
+                .show();
     }
 
     private void showBodyProfileSetup(boolean onboarding) {
