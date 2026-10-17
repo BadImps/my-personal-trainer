@@ -130,8 +130,13 @@ public final class MainActivity extends Activity {
     /** Kept separately so the between-exercise report can show actual cooldown, not just set rest. */
     private long guidedSetRestMillis;
     private long guidedCooldownMillis;
+    /** Recovery deliberately skipped by the user; it is removed from the workout allowance. */
+    private long skippedCooldownMillis;
+    private long skippedSetRestMillis;
+    private long guidedWorkoutAllowanceMillis;
     private long recoverySegmentStartedAt = -1L;
     private boolean recoverySegmentIsCooldown;
+    private Runnable workoutRemainingUpdate;
     /** The active scroll surface is retained so in-place option changes do not throw a user to the top. */
     private ScrollView activeScrollView;
     private int pendingScrollRestore = -1;
@@ -3814,9 +3819,14 @@ public final class MainActivity extends Activity {
         currentExerciseSetTimes.clear();
         completedExerciseSetTimes.clear();
         guidedWorkoutStartedAt = SystemClock.elapsedRealtime();
+        guidedWorkoutAllowanceMillis = Math.max(1L, sessionMinutes) * 60_000L;
         guidedSetRestMillis = 0L;
         guidedCooldownMillis = 0L;
+        skippedSetRestMillis = 0L;
+        skippedCooldownMillis = 0L;
         recoverySegmentStartedAt = -1L;
+        recoverySegmentIsCooldown = false;
+        stopWorkoutRemainingClock();
         guidedSessionRecorded = false;
         guidedWorkoutAborted = false;
         showSetCountIn(0, 1, true);
@@ -3841,6 +3851,7 @@ public final class MainActivity extends Activity {
         String dialogueMode = profile().dialogueMode;
         boolean audioCountdown = CoachPreferences.usesVoice(dialogueMode);
         LinearLayout body = appPage("Workouts");
+        addWorkoutRemainingHeader(body);
         String countdownTitle = CoachPreferences.NO_DIALOGUE.equals(dialogueMode) ? "Audio countdown is ready"
                 : CoachPreferences.NO_SOUND.equals(dialogueMode) ? "Silent countdown is ready"
                 : "Coach " + trainerName + " is counting you in";
@@ -3879,6 +3890,7 @@ public final class MainActivity extends Activity {
             currentExerciseSetTimes.clear();
         }
         LinearLayout body = appPage("Workouts");
+        addWorkoutRemainingHeader(body);
         title(body, "GUIDED WORKOUT", exercise.target, "Exercise " + (index + 1) + " of " + session.size() + "  •  Set " + set + " of " + exercise.sets);
 
         LinearLayout demoCard = card();
@@ -3985,6 +3997,82 @@ public final class MainActivity extends Activity {
         setClockUpdate = null;
     }
 
+    /** Remaining planned workout allowance; pauses do not stop it and skipped recovery reduces it. */
+    private long workoutRemainingMillis() {
+        if (guidedWorkoutStartedAt <= 0L) return 0L;
+        long elapsed = Math.max(0L, SystemClock.elapsedRealtime() - guidedWorkoutStartedAt);
+        long skipped = skippedCooldownMillis + skippedSetRestMillis;
+        return Math.max(0L, guidedWorkoutAllowanceMillis - elapsed - skipped);
+    }
+
+    private String skippedTimerLabel(String prefix, long millis) {
+        return prefix + " −" + WorkoutTiming.formatElapsedMillis(millis);
+    }
+
+    /** Fixed workout-time strip repeated on every live guided-workout screen. */
+    private void addWorkoutRemainingHeader(LinearLayout body) {
+        stopWorkoutRemainingClock();
+        LinearLayout header = new LinearLayout(this);
+        header.setOrientation(LinearLayout.VERTICAL);
+        header.setPadding(dp(12), dp(9), dp(12), dp(9));
+        header.setBackground(surface(navyPanel, 14, 1, Color.rgb(45, 90, 102)));
+        ProgressBar progress = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+        progress.setMax(1000);
+        progress.setProgressTintList(ColorStateList.valueOf(mint));
+        progress.setProgressBackgroundTintList(ColorStateList.valueOf(Color.rgb(45, 69, 96)));
+        progress.setContentDescription("Workout time remaining");
+        header.addView(progress, new LinearLayout.LayoutParams(-1, dp(5)));
+        LinearLayout status = new LinearLayout(this);
+        status.setGravity(Gravity.CENTER_VERTICAL | Gravity.RIGHT);
+        TextView remaining = heading("", 12, Color.WHITE);
+        remaining.setGravity(Gravity.RIGHT);
+        status.addView(remaining, new LinearLayout.LayoutParams(0, -2, 1));
+        TextView cooldownSkip = workoutTimerChip();
+        LinearLayout.LayoutParams cooldownParams = new LinearLayout.LayoutParams(-2, dp(28));
+        cooldownParams.leftMargin = dp(7);
+        status.addView(cooldownSkip, cooldownParams);
+        TextView restSkip = workoutTimerChip();
+        LinearLayout.LayoutParams restParams = new LinearLayout.LayoutParams(-2, dp(28));
+        restParams.leftMargin = dp(5);
+        status.addView(restSkip, restParams);
+        LinearLayout.LayoutParams statusParams = new LinearLayout.LayoutParams(-1, -2);
+        statusParams.topMargin = dp(7);
+        header.addView(status, statusParams);
+        body.addView(header);
+        gap(body, 11);
+
+        workoutRemainingUpdate = new Runnable() {
+            @Override public void run() {
+                long remainingMillis = workoutRemainingMillis();
+                int fraction = guidedWorkoutAllowanceMillis <= 0L ? 0
+                        : (int) Math.round(1000d * remainingMillis / guidedWorkoutAllowanceMillis);
+                progress.setProgress(Math.max(0, Math.min(1000, fraction)));
+                remaining.setText(WorkoutTiming.formatElapsedMillis(remainingMillis) + " remaining");
+                cooldownSkip.setText(skippedTimerLabel("COOL", skippedCooldownMillis));
+                restSkip.setText(skippedTimerLabel("REST", skippedSetRestMillis));
+                progress.setContentDescription(WorkoutTiming.formatElapsedMillis(remainingMillis) + " remaining; "
+                        + skippedTimerLabel("cooldown skipped", skippedCooldownMillis) + "; "
+                        + skippedTimerLabel("rest skipped", skippedSetRestMillis));
+                if (!guidedWorkoutAborted && !guidedSessionRecorded) workoutHandler.postDelayed(this, 250L);
+            }
+        };
+        workoutHandler.post(workoutRemainingUpdate);
+    }
+
+    private TextView workoutTimerChip() {
+        TextView chip = heading("", 10, navy);
+        chip.setGravity(Gravity.CENTER);
+        chip.setPadding(dp(8), 0, dp(8), 0);
+        chip.setSingleLine(true);
+        chip.setBackground(surface(mint, 99, 0, Color.TRANSPARENT));
+        return chip;
+    }
+
+    private void stopWorkoutRemainingClock() {
+        if (workoutRemainingUpdate != null) workoutHandler.removeCallbacks(workoutRemainingUpdate);
+        workoutRemainingUpdate = null;
+    }
+
     private String setHistoryText(Coach.Exercise exercise) {
         SetTimeStore.ExerciseSummary summary = currentExerciseSummary(exercise);
         if (!summary.hasSetEntries()) return "Completed set times will appear here.";
@@ -4070,7 +4158,8 @@ public final class MainActivity extends Activity {
         long activeMillis = activeWorkoutSetMillis(currentExercise, currentExerciseCompleted);
         long setRestMillis = guidedSetRestMillis;
         long cooldownMillis = guidedCooldownMillis + (recoverySegmentIsCooldown ? activeRecoverySegmentMillis() : 0L);
-        long totalMillis = activeMillis + setRestMillis + cooldownMillis;
+        long skippedMillis = skippedSetRestMillis + skippedCooldownMillis;
+        long totalMillis = Math.max(0L, activeMillis + setRestMillis + cooldownMillis - skippedMillis);
         LinearLayout card = card();
         TextView label = heading("TOTAL WORKOUT", 11, muted);
         label.setLetterSpacing(.08f);
@@ -4080,10 +4169,11 @@ public final class MainActivity extends Activity {
         TextView active = addWorkoutTotalRow(card, "Active set time", WorkoutTiming.formatElapsedMillis(activeMillis), false);
         TextView rest = addWorkoutTotalRow(card, "Set rest total", WorkoutTiming.formatElapsedMillis(setRestMillis), false);
         TextView cooldown = addWorkoutTotalRow(card, "Cooldown (live)", WorkoutTiming.formatElapsedMillis(cooldownMillis), false);
+        TextView skipped = addWorkoutTotalRow(card, "Skipped", "−" + WorkoutTiming.formatElapsedMillis(skippedMillis), false);
         gap(card, 5);
         TextView grand = addWorkoutTotalRow(card, "GRAND TOTAL", WorkoutTiming.formatElapsedMillis(totalMillis), true);
         container.addView(card);
-        return new TextView[]{active, rest, cooldown, grand};
+        return new TextView[]{active, rest, cooldown, skipped, grand};
     }
 
     private long activeWorkoutSetMillis(Coach.Exercise currentExercise, boolean currentExerciseCompleted) {
@@ -4114,13 +4204,15 @@ public final class MainActivity extends Activity {
     }
 
     private void updateTotalWorkoutViews(TextView[] views, long activeMillis) {
-        if (views == null || views.length < 4) return;
+        if (views == null || views.length < 5) return;
         long setRestMillis = guidedSetRestMillis;
         long cooldownMillis = guidedCooldownMillis + (recoverySegmentIsCooldown ? activeRecoverySegmentMillis() : 0L);
+        long skippedMillis = skippedSetRestMillis + skippedCooldownMillis;
         views[0].setText(WorkoutTiming.formatElapsedMillis(activeMillis));
         views[1].setText(WorkoutTiming.formatElapsedMillis(setRestMillis));
         views[2].setText(WorkoutTiming.formatElapsedMillis(cooldownMillis));
-        views[3].setText(WorkoutTiming.formatElapsedMillis(activeMillis + setRestMillis + cooldownMillis));
+        views[3].setText("−" + WorkoutTiming.formatElapsedMillis(skippedMillis));
+        views[4].setText(WorkoutTiming.formatElapsedMillis(Math.max(0L, activeMillis + setRestMillis + cooldownMillis - skippedMillis)));
     }
 
     private long activeRecoverySegmentMillis() {
@@ -4148,6 +4240,7 @@ public final class MainActivity extends Activity {
         SetTimeStore.ExerciseSummary summary = completeExerciseTiming(index, exercise);
         boolean hasNextExercise = index + 1 < session.size();
         LinearLayout body = appPage("Workouts");
+        addWorkoutRemainingHeader(body);
         title(body, "EXERCISE COMPLETE", exercise.name, "Your set leaderboard is ordered from fastest to slowest. The total below includes work-set time only, not rest or cooldown.");
         addSetTimesCard(body, summary, true);
         gap(body, 14);
@@ -4205,6 +4298,7 @@ public final class MainActivity extends Activity {
         if (guidedWorkoutAborted) return;
         stopSetClock();
         LinearLayout body = appPage("Workouts");
+        addWorkoutRemainingHeader(body);
         title(body, betweenExercises ? "COOLDOWN TIMER" : "REST TIMER", betweenExercises ? "Cooldown before next exercise" : "Set complete · recover", betweenExercises ? "Your " + restChoiceLabel(planCooldownSeconds) + " exercise cooldown is separate from set rest. The next exercise begins after Coach " + coachName() + " gives your count-in." : "Your custom set rest is " + restChoiceLabel(secondsRemaining) + ". Your next set begins after the count-in.");
         LinearLayout timerCard = card();
         TextView timer = heading(format(secondsRemaining), 52, ink);
@@ -4233,6 +4327,9 @@ public final class MainActivity extends Activity {
         Button skip = lightAction(betweenExercises ? "Skip cooldown" : "Skip rest");
         skip.setOnClickListener(view -> {
             if (restTimer != null) restTimer.cancel();
+            long skippedMillis = Math.max(0L, remaining[0]) * 1_000L;
+            if (betweenExercises) skippedCooldownMillis += skippedMillis;
+            else skippedSetRestMillis += skippedMillis;
             endRecoverySegment();
             stopSpeech();
             advance(index, set, exercise);
@@ -4304,8 +4401,11 @@ public final class MainActivity extends Activity {
             completedExerciseSetTimes.clear();
             guidedSetRestMillis = 0L;
             guidedCooldownMillis = 0L;
+            skippedSetRestMillis = 0L;
+            skippedCooldownMillis = 0L;
             recoverySegmentStartedAt = -1L;
             recoverySegmentIsCooldown = false;
+            stopWorkoutRemainingClock();
             showHome();
         });
         addButton(body, end);
@@ -4467,6 +4567,7 @@ public final class MainActivity extends Activity {
         if (guidedWorkoutStartedAt > 0L && !guidedSessionRecorded) guidedWorkoutAborted = true;
         if (restTimer != null) restTimer.cancel();
         endRecoverySegment();
+        stopWorkoutRemainingClock();
         restTimer = null;
         stopSetClock();
         stopSpeech();
@@ -5328,6 +5429,7 @@ public final class MainActivity extends Activity {
         }
         if (restTimer != null) restTimer.cancel();
         stopSetClock();
+        stopWorkoutRemainingClock();
         if (!guidedSessionRecorded) {
             long elapsed = guidedWorkoutStartedAt == 0 ? 60_000L : Math.max(60_000L, SystemClock.elapsedRealtime() - guidedWorkoutStartedAt);
             int activeMinutes = (int) Math.max(1, Math.round(elapsed / 60_000d));
