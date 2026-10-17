@@ -53,7 +53,21 @@ public final class WeightReferenceBarsView extends View {
         paint.setTextSize(dp(10));
         paint.setTypeface(android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.NORMAL));
         paint.setColor(Color.rgb(86, 100, 126));
-        canvas.drawText("Adult screening reference band", left, dp(12), paint);
+        String rangeLabel = String.format(Locale.US, "Height-based reference: %.1f–%.1f %s", low, high, unit);
+        canvas.drawText(rangeLabel, left, dp(12), paint);
+
+        // Pin both bounds to the mint band itself so the visual range is never ambiguous.
+        paint.setStrokeWidth(dp(1));
+        paint.setColor(Color.rgb(60, 156, 132));
+        canvas.drawLine(left, y(high, minimum, maximum, top, bottom), right, y(high, minimum, maximum, top, bottom), paint);
+        canvas.drawLine(left, y(low, minimum, maximum, top, bottom), right, y(low, minimum, maximum, top, bottom), paint);
+        paint.setTextSize(dp(9));
+        paint.setTypeface(android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.BOLD));
+        paint.setColor(Color.rgb(46, 120, 103));
+        String upperBound = String.format(Locale.US, "%.1f %s", high, unit);
+        String lowerBound = String.format(Locale.US, "%.1f %s", low, unit);
+        canvas.drawText(upperBound, left + dp(5), y(high, minimum, maximum, top, bottom) - dp(4), paint);
+        canvas.drawText(lowerBound, left + dp(5), y(low, minimum, maximum, top, bottom) + dp(12), paint);
 
         float startX = left + dp(18);
         float currentX = left + (right - left) / 2f;
