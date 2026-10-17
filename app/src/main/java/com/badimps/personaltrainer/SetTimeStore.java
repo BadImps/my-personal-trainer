@@ -252,6 +252,19 @@ public final class SetTimeStore {
         return loadCompletedWorkouts(context);
     }
 
+    /** Removes set-time detail for one deleted Progress history item. */
+    public static void removeWorkout(Context context, long completedAtMillis) {
+        SharedPreferences preferences = preferences(context);
+        ArrayList<WorkoutIndex> retained = new ArrayList<>();
+        for (WorkoutIndex index : readIndex(safeString(preferences, INDEX_KEY))) {
+            if (index.completedAtMillis != completedAtMillis) retained.add(index);
+        }
+        preferences.edit()
+                .putString(INDEX_KEY, encodeIndex(retained))
+                .remove(detailsKey(completedAtMillis))
+                .apply();
+    }
+
     /** Removes only set-time history; it does not affect JourneyStore or any other app data. */
     public static void clear(Context context) {
         preferences(context).edit().clear().apply();

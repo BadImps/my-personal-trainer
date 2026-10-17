@@ -17,8 +17,8 @@ android {
         applicationId 'com.badimps.personaltrainer'
         minSdk 26
         targetSdk 36
-        versionCode 43
-        versionName '5.2'
+        versionCode 44
+        versionName '5.3'
     }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
     testOptions { unitTests.includeAndroidResources = true }
@@ -29,6 +29,7 @@ android {
 dependencies {
     implementation 'androidx.core:core:1.17.0'
     implementation 'androidx.activity:activity:1.11.0'
+    implementation 'androidx.biometric:biometric:1.1.0'
     testImplementation 'junit:junit:4.13.2'
     testImplementation 'org.robolectric:robolectric:4.16'
 }

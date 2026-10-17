@@ -1,6 +1,5 @@
 package com.badimps.personaltrainer;
 
-import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Dialog;
 import android.Manifest;
@@ -13,7 +12,6 @@ import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
-import android.hardware.biometrics.BiometricPrompt;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -50,6 +48,10 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.core.content.FileProvider;
+import androidx.core.content.ContextCompat;
+import androidx.biometric.BiometricManager;
+import androidx.biometric.BiometricPrompt;
+import androidx.fragment.app.FragmentActivity;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -65,7 +67,7 @@ import java.util.Set;
 import java.text.SimpleDateFormat;
 
 /** The complete on-device My Personal Trainer experience. */
-public final class MainActivity extends Activity {
+public final class MainActivity extends FragmentActivity {
     public static final String EXTRA_START_GUIDED_WORKOUT = "start_guided_workout";
     private int navy = Color.rgb(16, 23, 42);
     private int navyPanel = Color.rgb(26, 58, 72);
@@ -174,6 +176,13 @@ public final class MainActivity extends Activity {
     private int schedulerHour = 18;
     private int schedulerMinute;
     private int schedulerDurationMinutes = 45;
+    private String enduranceWizardMode = EndurancePlanStore.WALKING;
+    private String enduranceWizardName = "";
+    private String enduranceWizardOrigin = "";
+    private String enduranceWizardDestination = "";
+    private float enduranceWizardDistanceKm = 3f;
+    private int enduranceWizardMinutes = 35;
+    private String enduranceWizardEffort = "Steady";
     /** Timer-only endurance session: no location request, map trace, or background GPS service. */
     private String manualEnduranceMode;
     private long manualEnduranceStartedAt;
@@ -1017,82 +1026,50 @@ public final class MainActivity extends Activity {
     // Signed-out flow
 
     private void showWelcome() {
-        LinearLayout body = signedOutPage();
-        gap(body, 18);
-        TextView welcome = heading("Welcome", 42, Color.WHITE);
-        welcome.setGravity(Gravity.CENTER);
-        body.addView(welcome, new LinearLayout.LayoutParams(-1, -2));
-        gap(body, 5);
-        TextView motto = text("Your Health is Your Wealth", 17, mint);
-        motto.setGravity(Gravity.CENTER);
-        body.addView(motto, new LinearLayout.LayoutParams(-1, -2));
-        gap(body, 24);
-
-        LinearLayout coaches = new LinearLayout(this);
-        coaches.setOrientation(LinearLayout.HORIZONTAL);
-        addWelcomeCoach(coaches, "Female", "Mia", R.drawable.mia_launcher);
-        addWelcomeCoach(coaches, "Male", "Leo", R.drawable.leo_launcher);
-        body.addView(coaches);
-        gap(body, 12);
-
-        TextView selection = text("Selected trainer: Coach " + ("Male".equals(selectedTrainer) ? "Leo" : "Mia"), 13, mint);
-        selection.setGravity(Gravity.CENTER);
-        body.addView(selection, new LinearLayout.LayoutParams(-1, -2));
-        gap(body, 22);
-
-        Button signIn = primary("Sign in");
-        signIn.setOnClickListener(view -> showLogin());
-        addButton(body, signIn);
-        gap(body, 10);
-        Button create = secondary("Create account");
-        create.setOnClickListener(view -> showRegistration());
-        addButton(body, create);
-    }
-
-    private void addWelcomeCoach(LinearLayout row, String value, String name, int portraitRes) {
-        boolean selected = value.equals(selectedTrainer);
-        LinearLayout person = new LinearLayout(this);
-        person.setOrientation(LinearLayout.VERTICAL);
-        person.setGravity(Gravity.CENTER);
-        person.setPadding(dp(5), dp(8), dp(5), dp(8));
-        person.setBackground(surface(selected ? navyPanel : navy, 22, selected ? 2 : 1, selected ? mint : Color.rgb(35, 53, 78)));
-        person.setContentDescription("Choose Coach " + name + (selected ? ", selected" : ""));
-        person.setClickable(true);
-        person.setFocusable(true);
-        person.setOnClickListener(view -> {
-            selectedTrainer = value;
-            configureSpeechVoices();
-            showWelcome();
-        });
-
-        ImageView photo = new ImageView(this);
-        photo.setImageResource(portraitRes);
-        photo.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        photo.setBackground(surface(navyPanel, 99, 2, selected ? mint : Color.WHITE));
-        photo.setClipToOutline(true);
-        photo.setContentDescription("Coach " + name);
-        person.addView(photo, new LinearLayout.LayoutParams(dp(122), dp(122)));
-        gap(person, 7);
-        TextView label = heading("Coach " + name, 15, Color.WHITE);
-        label.setGravity(Gravity.CENTER);
-        person.addView(label, new LinearLayout.LayoutParams(-1, -2));
-        if (selected) {
-            TextView selectedLabel = heading("SELECTED", 10, mint);
-            selectedLabel.setGravity(Gravity.CENTER);
-            LinearLayout.LayoutParams selectedParams = new LinearLayout.LayoutParams(-1, -2);
-            selectedParams.topMargin = dp(2);
-            person.addView(selectedLabel, selectedParams);
-        }
-        LinearLayout.LayoutParams personParams = new LinearLayout.LayoutParams(0, -2, 1);
-        personParams.leftMargin = dp(4);
-        personParams.rightMargin = dp(4);
-        row.addView(person, personParams);
+        // There is deliberately no unsigned coach picker. A saved coach choice is respected
+        // everywhere, including the signed-out hero. New members receive the default coach
+        // until they make their own choice during registration or in Settings.
+        showLogin();
     }
 
     private void showLogin() {
         LinearLayout body = signedOutPage();
-        gap(body, 42);
-        title(body, "SIGN IN", "Welcome back", "Sign in to open your coach, plan, and progress.");
+        String heroCoach = AccountStore.exists(this) ? profile().coachName : CoachPreferences.defaultCoach(selectedTrainer);
+        gap(body, 8);
+
+        FrameLayout hero = new FrameLayout(this);
+        hero.setPadding(dp(20), dp(20), dp(20), dp(18));
+        hero.setBackground(surface(navyPanel, 28, 1, Color.rgb(42, 83, 98)));
+        hero.setClipToOutline(true);
+        hero.setContentDescription("Welcome with Coach " + heroCoach);
+        ImageView coach = new ImageView(this);
+        coach.setImageResource(coachPortrait(heroCoach));
+        coach.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        coach.setAlpha(.92f);
+        FrameLayout.LayoutParams coachParams = new FrameLayout.LayoutParams(dp(190), dp(244), Gravity.RIGHT | Gravity.BOTTOM);
+        coachParams.rightMargin = dp(-18);
+        coachParams.bottomMargin = dp(-18);
+        hero.addView(coach, coachParams);
+        LinearLayout heroCopy = new LinearLayout(this);
+        heroCopy.setOrientation(LinearLayout.VERTICAL);
+        TextView brand = heading("MY PERSONAL TRAINER", 11, mint);
+        brand.setLetterSpacing(.08f);
+        heroCopy.addView(brand);
+        gap(heroCopy, 14);
+        TextView welcome = heading("Welcome", 37, Color.WHITE);
+        heroCopy.addView(welcome);
+        TextView motto = text("Your Health is\nYour Wealth", 19, Color.rgb(222, 231, 242));
+        motto.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL));
+        heroCopy.addView(motto);
+        gap(heroCopy, 17);
+        TextView coachLabel = heading("COACH " + heroCoach.toUpperCase(Locale.ROOT), 11, mint);
+        heroCopy.addView(coachLabel);
+        TextView coachLine = text("Your coach is ready when you are.", 12, Color.rgb(222, 231, 242));
+        heroCopy.addView(coachLine);
+        FrameLayout.LayoutParams copyParams = new FrameLayout.LayoutParams(dp(225), -2, Gravity.LEFT | Gravity.TOP);
+        hero.addView(heroCopy, copyParams);
+        body.addView(hero, new LinearLayout.LayoutParams(-1, dp(252)));
+        gap(body, 20);
         EditText email = input("Email address", InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
         if (AccountStore.exists(this)) email.setText(profile().email);
         body.addView(email);
@@ -1131,10 +1108,6 @@ public final class MainActivity extends Activity {
         Button register = lightAction("New user? Register here");
         register.setOnClickListener(view -> showRegistration());
         addButton(body, register);
-        gap(body, 10);
-        Button back = secondary("Back");
-        back.setOnClickListener(view -> showWelcome());
-        addButton(body, back);
     }
 
     private void openSignedInHome() {
@@ -1160,14 +1133,28 @@ public final class MainActivity extends Activity {
     }
 
     private void authenticateWithBiometrics() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) { toast("Biometric unlock requires Android 9 or later. Use your password instead."); return; }
-        try {
-            BiometricPrompt prompt = new BiometricPrompt.Builder(this).setTitle("Unlock My Personal Trainer").setNegativeButton("Use password", getMainExecutor(), (dialog, which) -> { }).build();
-            prompt.authenticate(new CancellationSignal(), getMainExecutor(), new BiometricPrompt.AuthenticationCallback() {
-                @Override public void onAuthenticationSucceeded(BiometricPrompt.AuthenticationResult result) { runOnUiThread(MainActivity.this::openSignedInHome); }
-                @Override public void onAuthenticationError(int code, CharSequence message) { if (code != BiometricPrompt.BIOMETRIC_ERROR_USER_CANCELED) toast(message.toString()); }
-            });
-        } catch (RuntimeException unavailable) { toast("Biometrics are unavailable on this device. Use your password instead."); }
+        final int authenticators = BiometricManager.Authenticators.BIOMETRIC_STRONG | BiometricManager.Authenticators.DEVICE_CREDENTIAL;
+        int availability = BiometricManager.from(this).canAuthenticate(authenticators);
+        if (availability != BiometricManager.BIOMETRIC_SUCCESS) {
+            toast("Set up a fingerprint, face unlock, or phone screen lock before using biometric sign-in.");
+            return;
+        }
+        BiometricPrompt prompt = new BiometricPrompt(this, ContextCompat.getMainExecutor(this), new BiometricPrompt.AuthenticationCallback() {
+            @Override public void onAuthenticationSucceeded(BiometricPrompt.AuthenticationResult result) {
+                super.onAuthenticationSucceeded(result);
+                openSignedInHome();
+            }
+            @Override public void onAuthenticationError(int code, CharSequence message) {
+                super.onAuthenticationError(code, message);
+                if (code != BiometricPrompt.ERROR_USER_CANCELED && code != BiometricPrompt.ERROR_NEGATIVE_BUTTON) toast(message == null ? "Biometric sign-in was not completed." : message.toString());
+            }
+        });
+        BiometricPrompt.PromptInfo promptInfo = new BiometricPrompt.PromptInfo.Builder()
+                .setTitle("Unlock My Personal Trainer")
+                .setSubtitle("Use your enrolled biometric or device screen lock")
+                .setAllowedAuthenticators(authenticators)
+                .build();
+        prompt.authenticate(promptInfo);
     }
 
     private void showRegistration() {
@@ -3118,6 +3105,11 @@ public final class MainActivity extends Activity {
         body.addView(history);
         gap(body, 12);
 
+        Button allHistory = lightAction("View all workout history");
+        allHistory.setOnClickListener(view -> showWorkoutHistory());
+        addButton(body, allHistory);
+        gap(body, 12);
+
         LinearLayout week = card();
         week.addView(heading("This week's rhythm", 19, ink));
         String completion = planned == 0 ? snapshot.workoutsThisWeek + " workouts completed"
@@ -3193,6 +3185,46 @@ public final class MainActivity extends Activity {
         weight.setOnClickListener(view -> showWeightTracker());
         addButton(trend, weight);
         body.addView(trend);
+    }
+
+    /** User-managed, local-only archive of completed workouts with a confirmation before deletion. */
+    private void showWorkoutHistory() {
+        LinearLayout body = appPage("Progress");
+        title(body, "WORKOUT HISTORY", "Your completed sessions", "This archive lives only on this device. Removing an entry also removes its saved set-time details, but never changes your plan or schedule.");
+        List<JourneyStore.WorkoutRecord> records = JourneyStore.workouts(this);
+        if (records.isEmpty()) {
+            LinearLayout empty = card();
+            empty.addView(heading("No completed workouts yet", 19, ink));
+            empty.addView(text("Finish a guided workout or log an endurance session to see it here.", 14, muted));
+            body.addView(empty);
+        } else {
+            SimpleDateFormat timestamp = new SimpleDateFormat("EEE, MMM d · h:mm a", Locale.getDefault());
+            for (JourneyStore.WorkoutRecord record : records) {
+                LinearLayout item = card();
+                item.setOrientation(LinearLayout.HORIZONTAL);
+                LinearLayout copy = new LinearLayout(this); copy.setOrientation(LinearLayout.VERTICAL);
+                copy.addView(heading(record.target, 17, ink));
+                copy.addView(text(timestamp.format(record.timestamp) + "  •  " + record.minutes + " min", 13, muted));
+                SetTimeStore.WorkoutSummary details = SetTimeStore.loadWorkout(this, record.timestamp);
+                if (details != null && details.totalActiveMillis > 0L) copy.addView(text("Set time " + WorkoutTiming.formatElapsedMillis(details.totalActiveMillis), 12, mint));
+                item.addView(copy, new LinearLayout.LayoutParams(0, -2, 1));
+                Button delete = action("Delete", paper, coral);
+                delete.setTextSize(12);
+                delete.setContentDescription("Delete " + record.target + " completed " + timestamp.format(record.timestamp));
+                delete.setOnClickListener(view -> new AlertDialog.Builder(this)
+                        .setTitle("Delete workout history?")
+                        .setMessage("Remove " + record.target + " from your local progress history? This cannot be undone.")
+                        .setNegativeButton("Cancel", null)
+                        .setPositiveButton("Delete", (dialog, which) -> {
+                            JourneyStore.removeWorkout(this, record.timestamp);
+                            SetTimeStore.removeWorkout(this, record.timestamp);
+                            refreshCurrentPageKeepingScroll(this::showWorkoutHistory);
+                        }).show());
+                item.addView(delete, new LinearLayout.LayoutParams(dp(78), dp(42)));
+                body.addView(item); gap(body, 9);
+            }
+        }
+        Button back = secondary("Back to Progress"); back.setOnClickListener(view -> showProgress()); addButton(body, back);
     }
 
     /** Detailed progress record for a normally completed guided workout only. */
@@ -3375,9 +3407,8 @@ public final class MainActivity extends Activity {
 
     private void showProfile() {
         AccountStore.Profile profile = AccountStore.get(this);
-        String coach = "Coach " + profile.coachName;
         LinearLayout body = appPage("Settings");
-        title(body, "SETTINGS", profile.username, "Your account, coach, appearance, privacy, and updates.");
+        title(body, "SETTINGS", "Account & preferences", "Your profile, security, coach, appearance, privacy, and updates.");
 
         LinearLayout identity = card();
         identity.setOrientation(LinearLayout.HORIZONTAL);
@@ -3387,65 +3418,38 @@ public final class MainActivity extends Activity {
         profilePhotoParams.rightMargin = dp(14);
         identity.addView(profilePhoto, profilePhotoParams);
         LinearLayout identityCopy = new LinearLayout(this); identityCopy.setOrientation(LinearLayout.VERTICAL);
-        identityCopy.addView(heading("Account settings", 19, ink));
+        identityCopy.addView(heading(profile.username, 19, ink));
         identityCopy.addView(text(profile.username + " · " + profile.email, 14, muted));
-        identityCopy.addView(text(profile.biometricUnlock ? "Biometric unlock on" : "Password unlock", 13, muted));
+        identityCopy.addView(text("Tap to edit profile", 13, mint));
         identity.addView(identityCopy, new LinearLayout.LayoutParams(0, -2, 1));
         identity.setClickable(true); identity.setFocusable(true);
         identity.setOnClickListener(view -> showProfileEditor());
         body.addView(identity);
         gap(body, 12);
 
-        LinearLayout coachSettings = card();
-        coachSettings.setOrientation(LinearLayout.HORIZONTAL);
-        ImageView coachImage = new ImageView(this);
-        coachImage.setImageResource(coachPortrait(profile.coachName));
-        coachImage.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        coachImage.setBackground(surface(navyPanel, 99, 2, mint));
-        coachImage.setClipToOutline(true);
-        coachImage.setContentDescription("Coach " + profile.coachName);
-        LinearLayout.LayoutParams coachImageParams = new LinearLayout.LayoutParams(dp(76), dp(76));
-        coachImageParams.rightMargin = dp(14);
-        coachSettings.addView(coachImage, coachImageParams);
-        LinearLayout coachCopy = new LinearLayout(this);
-        coachCopy.setOrientation(LinearLayout.VERTICAL);
-        coachCopy.addView(heading("Customize your Coach", 19, ink));
-        coachCopy.addView(text(profile.coachName + " · " + CoachPreferences.coach(profile.coachName).accent, 14, muted));
-        coachCopy.addView(text(profile.dialogueMode + (profile.keepPhoneAwake ? " · Phone stays awake" : ""), 13, muted));
-        coachSettings.addView(coachCopy, new LinearLayout.LayoutParams(0, -2, 1));
-        coachSettings.setClickable(true);
-        coachSettings.setFocusable(true);
-        coachSettings.setContentDescription("Customize your Coach. Current coach " + profile.coachName + ", " + profile.dialogueMode);
-        coachSettings.setOnClickListener(view -> showCoachCustomization());
-        body.addView(coachSettings);
+        body.addView(settingsGroup("ACCOUNT"));
+        LinearLayout accountGroup = settingsPanel();
+        accountGroup.addView(settingsRow("●", "Personal details", "Name, photo, remember me & biometrics", view -> showProfileEditor()));
+        accountGroup.addView(settingsDivider());
+        accountGroup.addView(settingsRow("⌁", "Security", "Password and biometric unlock", view -> showSecuritySettings()));
+        accountGroup.addView(settingsDivider());
+        accountGroup.addView(settingsRow("◌", "Privacy", "Profile details stay on this device", null));
+        body.addView(accountGroup);
         gap(body, 12);
 
-        LinearLayout appearance = card();
-        appearance.addView(heading("Appearance", 19, ink));
-        appearance.addView(text(AppearanceStore.theme(this) + " theme  •  " + (reducedMotion ? "Reduced motion" : "Expressive motion"), 14, muted));
-        appearance.addView(text("Choose a clear visual mode and motion level for every screen.", 13, muted));
-        appearance.setClickable(true);
-        appearance.setFocusable(true);
-        appearance.setContentDescription("Appearance. " + AppearanceStore.theme(this) + " theme. " + (reducedMotion ? "Reduced motion enabled" : "Motion enabled"));
-        appearance.setOnClickListener(view -> showAppearanceOptions());
-        applyPressMotion(appearance);
-        body.addView(appearance);
+        body.addView(settingsGroup("PREFERENCES"));
+        LinearLayout preferencesGroup = settingsPanel();
+        preferencesGroup.addView(settingsRow("★", "Customize your Coach", profile.coachName + " · " + profile.dialogueMode, view -> showCoachCustomization()));
+        preferencesGroup.addView(settingsDivider());
+        preferencesGroup.addView(settingsRow("◐", "Appearance", AppearanceStore.theme(this) + " theme · " + (reducedMotion ? "Reduced motion" : "Expressive motion"), view -> showAppearanceOptions()));
+        body.addView(preferencesGroup);
         gap(body, 12);
 
-        LinearLayout privacy = card();
-        privacy.addView(heading("Privacy", 19, ink));
-        privacy.addView(text("This version stores your registration details locally and does not send them to an account server.", 14, muted));
-        body.addView(privacy);
-        gap(body, 12);
-
-        Button updates = lightAction("Check for OTA update");
-        updates.setOnClickListener(view -> showUpdate());
-        addButton(body, updates);
-        gap(body, 10);
-        Button preferences = primary("Adjust workout preferences");
-        preferences.setOnClickListener(view -> showWizard());
-        addButton(body, preferences);
-        gap(body, 10);
+        body.addView(settingsGroup("APP"));
+        LinearLayout appGroup = settingsPanel();
+        appGroup.addView(settingsRow("↻", "Updates", "Check for a newer version", view -> showUpdate()));
+        body.addView(appGroup);
+        gap(body, 18);
         Button signOut = secondary("Sign out and clear this device");
         signOut.setOnClickListener(view -> {
             AccountStore.clear(this);
@@ -3470,6 +3474,46 @@ public final class MainActivity extends Activity {
         addButton(body, signOut);
     }
 
+    /** WhatsApp-inspired settings groups: one clear profile row, concise rows, and muted dividers. */
+    private TextView settingsGroup(String label) {
+        TextView header = heading(label, 11, mint);
+        header.setLetterSpacing(.08f);
+        header.setPadding(dp(6), dp(4), 0, dp(6));
+        return header;
+    }
+
+    private LinearLayout settingsPanel() {
+        LinearLayout panel = card();
+        panel.setPadding(0, 0, 0, 0);
+        return panel;
+    }
+
+    private LinearLayout settingsRow(String symbol, String title, String summary, View.OnClickListener onClick) {
+        LinearLayout row = new LinearLayout(this);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(dp(14), dp(13), dp(14), dp(13));
+        row.setBackgroundColor(Color.TRANSPARENT);
+        TextView icon = heading(symbol, 20, navy);
+        icon.setGravity(Gravity.CENTER);
+        icon.setBackground(surface(mint, 99, 0, Color.TRANSPARENT));
+        row.addView(icon, new LinearLayout.LayoutParams(dp(38), dp(38)));
+        LinearLayout words = new LinearLayout(this); words.setOrientation(LinearLayout.VERTICAL);
+        TextView name = heading(title, 16, ink); words.addView(name);
+        words.addView(text(summary, 13, muted));
+        LinearLayout.LayoutParams wordParams = new LinearLayout.LayoutParams(0, -2, 1); wordParams.leftMargin = dp(13);
+        row.addView(words, wordParams);
+        TextView chevron = heading(onClick == null ? "" : "›", 28, muted); chevron.setGravity(Gravity.CENTER);
+        row.addView(chevron, new LinearLayout.LayoutParams(dp(24), dp(42)));
+        if (onClick != null) { row.setClickable(true); row.setFocusable(true); row.setOnClickListener(onClick); applyPressMotion(row); }
+        return row;
+    }
+
+    private View settingsDivider() {
+        View divider = new View(this); divider.setBackgroundColor(cardLine);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(1)); params.leftMargin = dp(65); divider.setLayoutParams(params);
+        return divider;
+    }
+
     /** Personal account details are separate from body context and from coach preferences. */
     private void showProfileEditor() {
         AccountStore.Profile profile = profile();
@@ -3492,7 +3536,6 @@ public final class MainActivity extends Activity {
         body.addView(photoCard); gap(body, 12);
         EditText name = input("Name", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_WORDS); name.setText(profile.username); body.addView(name);
         gap(body, 9);
-        EditText password = input("New password — leave blank to keep current", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD); body.addView(password);
         CheckBox remember = new CheckBox(this); remember.setText("Remember this account on this device"); remember.setTextColor(Color.WHITE); remember.setButtonTintList(ColorStateList.valueOf(mint)); remember.setChecked(profile.rememberSignIn); body.addView(remember);
         CheckBox biometric = new CheckBox(this); biometric.setText("Use biometrics to open my account"); biometric.setTextColor(Color.WHITE); biometric.setButtonTintList(ColorStateList.valueOf(mint)); biometric.setChecked(profile.biometricUnlock); body.addView(biometric);
         body.addView(text("Biometric unlock uses your phone’s enrolled fingerprint or face system. If it is unavailable, you can still use your password.", 13, Color.rgb(202, 216, 234)));
@@ -3500,12 +3543,33 @@ public final class MainActivity extends Activity {
         Button save = primary("Save account settings");
         save.setOnClickListener(view -> {
             try {
-                AccountStore.updatePersonalProfile(this, name.getText().toString(), selectedProfilePhotoUri, remember.isChecked(), biometric.isChecked(), password.getText().toString());
+                AccountStore.updatePersonalProfile(this, name.getText().toString(), selectedProfilePhotoUri, remember.isChecked(), biometric.isChecked(), "");
                 toast("Account settings saved."); selectedProfilePhotoUri = null; showProfile();
             } catch (IllegalArgumentException error) { toast(error.getMessage()); }
         });
         addButton(body, save); gap(body, 8);
         Button back = secondary("Back to settings"); back.setOnClickListener(view -> { selectedProfilePhotoUri = null; showProfile(); }); addButton(body, back);
+    }
+
+    private void showSecuritySettings() {
+        LinearLayout body = appPage("Settings");
+        title(body, "SECURITY", "Protect your account", "Confirm your current password before choosing a new one. Your password stays on this device.");
+        LinearLayout notice = card();
+        notice.addView(heading("Change password", 18, ink));
+        notice.addView(text("Use at least 8 characters. Your current password is required to continue.", 14, muted));
+        body.addView(notice); gap(body, 12);
+        EditText current = input("Current password", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD); body.addView(current); gap(body, 9);
+        EditText updated = input("New password — at least 8 characters", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD); body.addView(updated); gap(body, 9);
+        EditText confirm = input("Confirm new password", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD); body.addView(confirm); gap(body, 14);
+        Button save = primary("Change password");
+        save.setOnClickListener(view -> {
+            String next = updated.getText().toString();
+            if (!next.equals(confirm.getText().toString())) { toast("The new passwords do not match."); return; }
+            if (AccountStore.changePassword(this, current.getText().toString(), next)) { toast("Password changed."); showProfile(); }
+            else toast("Check your current password and use at least 8 characters.");
+        });
+        addButton(body, save); gap(body, 9);
+        Button back = secondary("Back to settings"); back.setOnClickListener(view -> showProfile()); addButton(body, back);
     }
 
     private void bindProfilePhoto(ImageView view, AccountStore.Profile profile) {
@@ -5158,6 +5222,10 @@ public final class MainActivity extends Activity {
         }
         body.addView(heading("Choose an activity", 20, Color.WHITE));
         gap(body, 9);
+        Button build = primary("Build an endurance plan");
+        build.setOnClickListener(view -> startEnduranceWizard(EndurancePlanStore.WALKING));
+        addButton(body, build);
+        gap(body, 12);
         addEnduranceActivity(body, EndurancePlanStore.WALKING, "Walking", "A steady, low-impact route for everyday movement.");
         gap(body, 10);
         addEnduranceActivity(body, EndurancePlanStore.RUNNING, "Running", "Set a pace-focused route; maps will use a walking route as the closest running option.");
@@ -5173,6 +5241,105 @@ public final class MainActivity extends Activity {
         offlineGuide.setOnClickListener(view -> showOfflineMapGuide());
         addButton(guidance, offlineGuide);
         body.addView(guidance);
+    }
+
+    /** Three-step counterpart to the workout wizard, tailored for route-based movement. */
+    private void startEnduranceWizard(String mode) {
+        EndurancePlanStore.Plan existing = EndurancePlanStore.load(this, mode);
+        enduranceWizardMode = mode;
+        enduranceWizardName = existing == null ? mode + " route" : existing.name;
+        enduranceWizardOrigin = existing == null ? "" : existing.origin;
+        enduranceWizardDestination = existing == null ? "" : existing.destination;
+        enduranceWizardDistanceKm = existing == null ? defaultDistance(mode) : existing.distanceKm;
+        enduranceWizardMinutes = existing == null ? defaultMinutes(mode) : existing.minutes;
+        enduranceWizardEffort = existing == null ? "Steady" : existing.effort;
+        showEnduranceWizardActivity();
+    }
+
+    private void addEnduranceWizardProgress(LinearLayout body, int active) {
+        String[] labels = {"Activity", "Route", "Review"};
+        LinearLayout progress = new LinearLayout(this); progress.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout dots = new LinearLayout(this); dots.setGravity(Gravity.CENTER_VERTICAL);
+        for (int index = 0; index < labels.length; index++) {
+            int step = index + 1;
+            TextView dot = heading(step < active ? "✓" : String.valueOf(step), 13, step <= active ? navy : Color.rgb(205, 215, 231));
+            dot.setGravity(Gravity.CENTER);
+            dot.setBackground(surface(step <= active ? mint : navyPanel, 99, step <= active ? 0 : 1, Color.rgb(95, 113, 139)));
+            dots.addView(dot, new LinearLayout.LayoutParams(dp(25), dp(25)));
+            if (index < labels.length - 1) {
+                View line = new View(this); line.setBackgroundColor(step < active ? mint : Color.rgb(75, 91, 117));
+                LinearLayout.LayoutParams lineParams = new LinearLayout.LayoutParams(0, dp(2), 1); lineParams.leftMargin = dp(7); lineParams.rightMargin = dp(7);
+                dots.addView(line, lineParams);
+            }
+        }
+        progress.addView(dots, new LinearLayout.LayoutParams(-1, dp(27)));
+        LinearLayout names = new LinearLayout(this);
+        for (int index = 0; index < labels.length; index++) { TextView name = text(labels[index], 9, index + 1 == active ? mint : Color.rgb(205, 215, 231)); name.setGravity(Gravity.CENTER); names.addView(name, new LinearLayout.LayoutParams(0, dp(18), 1)); }
+        progress.addView(names); body.addView(progress); gap(body, 13);
+    }
+
+    private void showEnduranceWizardActivity() {
+        LinearLayout body = planPage();
+        planTitle(body, "PLAN YOUR ENDURANCE", "Choose your\nactivity", "Build a simple outdoor or indoor endurance session. You can use live tracking, an external map, or a timer-only session.");
+        addEnduranceWizardProgress(body, 1);
+        body.addView(enduranceModeTile(EndurancePlanStore.WALKING, "Walking", "Low-impact distance and pace", "🚶")); gap(body, 8);
+        body.addView(enduranceModeTile(EndurancePlanStore.RUNNING, "Running", "Pace-focused route or treadmill", "🏃")); gap(body, 8);
+        body.addView(enduranceModeTile(EndurancePlanStore.CYCLING, "Cycling", "Road, bike path, or indoor bike", "🚴")); gap(body, 14);
+        Button next = planPrimary("Next: set up route"); next.setOnClickListener(view -> showEnduranceWizardRoute()); addPlanButton(body, next);
+        gap(body, 8); Button back = planBack(); back.setOnClickListener(view -> showEndurance()); addPlanBack(body, back);
+    }
+
+    private LinearLayout enduranceModeTile(String mode, String label, String copy, String symbol) {
+        boolean selected = mode.equals(enduranceWizardMode);
+        LinearLayout tile = new LinearLayout(this); tile.setGravity(Gravity.CENTER_VERTICAL); tile.setPadding(dp(14), dp(13), dp(14), dp(13));
+        tile.setBackground(surface(paper, 18, selected ? 2 : 1, selected ? mint : cardLine)); tile.setClickable(true); tile.setFocusable(true);
+        TextView icon = heading(symbol, 24, navy); icon.setGravity(Gravity.CENTER); icon.setBackground(surface(mint, 99, 0, Color.TRANSPARENT)); tile.addView(icon, new LinearLayout.LayoutParams(dp(48), dp(48)));
+        LinearLayout copyColumn = new LinearLayout(this); copyColumn.setOrientation(LinearLayout.VERTICAL); copyColumn.addView(heading(label, 18, ink)); copyColumn.addView(text(copy, 13, muted));
+        LinearLayout.LayoutParams copyParams = new LinearLayout.LayoutParams(0, -2, 1); copyParams.leftMargin = dp(12); tile.addView(copyColumn, copyParams);
+        if (selected) { TextView check = heading("✓", 18, navy); check.setGravity(Gravity.CENTER); check.setBackground(surface(mint, 99, 0, Color.TRANSPARENT)); tile.addView(check, new LinearLayout.LayoutParams(dp(32), dp(32))); }
+        tile.setOnClickListener(view -> { enduranceWizardMode = mode; refreshCurrentPageKeepingScroll(this::showEnduranceWizardActivity); });
+        return tile;
+    }
+
+    private void showEnduranceWizardRoute() {
+        LinearLayout body = planPage();
+        planTitle(body, "PLAN YOUR " + enduranceAction(enduranceWizardMode).toUpperCase(Locale.ROOT), "Set your route\nand time", "A destination is optional for an indoor session. Use a landmark or route name when you want map directions.");
+        addEnduranceWizardProgress(body, 2);
+        EditText name = input("Session name", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES); name.setText(enduranceWizardName); body.addView(name); gap(body, 8);
+        EditText origin = input("Starting point (optional)", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES); origin.setText(enduranceWizardOrigin); body.addView(origin); gap(body, 8);
+        EditText destination = input("Destination or loop landmark (optional)", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES); destination.setText(enduranceWizardDestination); body.addView(destination); gap(body, 8);
+        EditText distance = input("Target distance in km", InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL); distance.setText(String.valueOf(enduranceWizardDistanceKm)); body.addView(distance); gap(body, 8);
+        EditText minutes = input("Target minutes", InputType.TYPE_CLASS_NUMBER); minutes.setText(String.valueOf(enduranceWizardMinutes)); body.addView(minutes); gap(body, 10);
+        body.addView(heading("Effort", 17, Color.WHITE));
+        RadioGroup effort = new RadioGroup(this); effort.setOrientation(RadioGroup.HORIZONTAL); addEnduranceEffort(effort, "Relaxed", enduranceWizardEffort); addEnduranceEffort(effort, "Steady", enduranceWizardEffort); addEnduranceEffort(effort, "Challenging", enduranceWizardEffort); body.addView(effort); gap(body, 13);
+        Button next = planPrimary("Next: review plan");
+        next.setOnClickListener(view -> {
+            try {
+                enduranceWizardName = name.getText().toString().trim(); enduranceWizardOrigin = origin.getText().toString().trim(); enduranceWizardDestination = destination.getText().toString().trim();
+                enduranceWizardDistanceKm = Float.parseFloat(distance.getText().toString().trim()); enduranceWizardMinutes = Integer.parseInt(minutes.getText().toString().trim());
+                int checked = effort.getCheckedRadioButtonId(); enduranceWizardEffort = checked == View.NO_ID ? "Steady" : ((RadioButton) effort.findViewById(checked)).getText().toString();
+                if (enduranceWizardName.isEmpty()) { name.setError("Add a session name"); return; }
+                if (enduranceWizardDistanceKm <= 0f || enduranceWizardMinutes < 5) throw new NumberFormatException();
+                showEnduranceWizardReview();
+            } catch (NumberFormatException error) { toast("Enter a positive distance and at least 5 minutes."); }
+        }); addPlanButton(body, next); gap(body, 8);
+        Button back = planBack(); back.setOnClickListener(view -> showEnduranceWizardActivity()); addPlanBack(body, back);
+    }
+
+    private void showEnduranceWizardReview() {
+        LinearLayout body = planPage();
+        planTitle(body, "PLAN YOUR ENDURANCE", "Review your\n" + enduranceAction(enduranceWizardMode), "This plan can start with live tracking, an external map, or a timer-only session.");
+        addEnduranceWizardProgress(body, 3);
+        LinearLayout review = card();
+        review.addView(heading(appointmentAbbreviation(enduranceWizardMode) + " · " + enduranceWizardName, 20, ink));
+        review.addView(text(formatDistance(enduranceWizardDistanceKm) + "  •  " + enduranceWizardMinutes + " min  •  " + enduranceWizardEffort, 14, muted));
+        review.addView(text(enduranceWizardDestination.isEmpty() ? "Indoor or open route" : "Destination: " + enduranceWizardDestination, 13, muted)); body.addView(review); gap(body, 13);
+        Button save = planPrimary("Save endurance plan");
+        save.setOnClickListener(view -> {
+            try { EndurancePlanStore.save(this, enduranceWizardMode, enduranceWizardName, enduranceWizardOrigin, enduranceWizardDestination, enduranceWizardDistanceKm, enduranceWizardMinutes, enduranceWizardEffort); toast("Endurance plan saved."); showEndurance(); }
+            catch (IllegalArgumentException error) { toast(error.getMessage()); }
+        }); addPlanButton(body, save); gap(body, 8);
+        Button back = planBack(); back.setOnClickListener(view -> showEnduranceWizardRoute()); addPlanBack(body, back);
     }
 
     /** One calendar joins strength templates, rest days, and separately booked endurance appointments. */
@@ -5206,23 +5373,33 @@ public final class MainActivity extends Activity {
 
         LinearLayout calendarCard = card();
         calendarCard.addView(text("Mint = work plan  •  Coral = endurance appointment  •  Slate = rest day", 12, muted));
-        GridLayout grid = new GridLayout(this);
-        grid.setColumnCount(7);
+        // Use weighted rows rather than fixed-width grid cells. The sidebar changes available
+        // width on phones and tablets, so fixed 39dp cells could crop the last calendar days.
+        LinearLayout grid = new LinearLayout(this);
+        grid.setOrientation(LinearLayout.VERTICAL);
         String[] labels = {"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"};
-        for (String day : labels) {
-            TextView title = text(day, 10, muted);
-            title.setGravity(Gravity.CENTER);
-            GridLayout.LayoutParams params = new GridLayout.LayoutParams();
-            params.width = dp(39); params.height = dp(30);
-            grid.addView(title, params);
-        }
         int first = (month.get(Calendar.DAY_OF_WEEK) - Calendar.MONDAY + 7) % 7;
-        for (int i = 0; i < first; i++) grid.addView(schedulerCalendarCell(null));
         int max = month.getActualMaximum(Calendar.DAY_OF_MONTH);
-        for (int day = 1; day <= max; day++) {
-            Calendar date = (Calendar) month.clone();
-            date.set(Calendar.DAY_OF_MONTH, day);
-            grid.addView(schedulerCalendarCell(date));
+        int rows = (int) Math.ceil((first + max) / 7d);
+        for (int rowIndex = -1; rowIndex < rows; rowIndex++) {
+            LinearLayout row = new LinearLayout(this); row.setOrientation(LinearLayout.HORIZONTAL);
+            for (int column = 0; column < 7; column++) {
+                TextView cell;
+                int cellHeight;
+                if (rowIndex == -1) {
+                    cell = text(labels[column], 10, muted); cell.setGravity(Gravity.CENTER); cellHeight = 28;
+                } else {
+                    int index = rowIndex * 7 + column;
+                    int day = index - first + 1;
+                    Calendar date = null;
+                    if (day >= 1 && day <= max) { date = (Calendar) month.clone(); date.set(Calendar.DAY_OF_MONTH, day); }
+                    cell = schedulerCalendarCell(date); cellHeight = 56;
+                }
+                LinearLayout.LayoutParams cellParams = new LinearLayout.LayoutParams(0, dp(cellHeight), 1f);
+                cellParams.setMargins(dp(1), dp(1), dp(1), dp(1));
+                row.addView(cell, cellParams);
+            }
+            grid.addView(row, new LinearLayout.LayoutParams(-1, -2));
         }
         calendarCard.addView(grid);
         body.addView(calendarCard);
@@ -5245,7 +5422,6 @@ public final class MainActivity extends Activity {
     private TextView schedulerCalendarCell(Calendar date) {
         if (date == null) {
             TextView empty = text("", 10, muted);
-            GridLayout.LayoutParams params = new GridLayout.LayoutParams(); params.width = dp(39); params.height = dp(54); empty.setLayoutParams(params);
             return empty;
         }
         List<SchedulerStore.Appointment> appointments = SchedulerStore.onDate(this, date);
@@ -5260,8 +5436,6 @@ public final class MainActivity extends Activity {
         cell.setContentDescription(new SimpleDateFormat("EEEE, MMMM d", Locale.getDefault()).format(date.getTime()) + ", " + state);
         cell.setClickable(true);
         cell.setOnClickListener(view -> { schedulerSelectedDate = (Calendar) date.clone(); refreshCurrentPageKeepingScroll(this::showScheduler); });
-        GridLayout.LayoutParams params = new GridLayout.LayoutParams(); params.width = dp(39); params.height = dp(54); params.setMargins(dp(1), dp(1), dp(1), dp(1));
-        cell.setLayoutParams(params);
         return cell;
     }
 
@@ -5403,7 +5577,7 @@ public final class MainActivity extends Activity {
             tile.addView(text("No route saved yet.", 13, muted));
             gap(tile, 10);
             Button create = primary("Plan a " + name.toLowerCase(Locale.ROOT));
-            create.setOnClickListener(view -> showEndurancePlanner(mode));
+            create.setOnClickListener(view -> startEnduranceWizard(mode));
             addButton(tile, create);
         } else {
             tile.addView(text(plan.name + "  •  " + formatDistance(plan.distanceKm) + "  •  " + plan.minutes + " min  •  " + plan.effort, 14, ink));
@@ -5422,7 +5596,7 @@ public final class MainActivity extends Activity {
             addButton(tile, complete);
             gap(tile, 7);
             Button edit = secondary("Edit or remove route");
-            edit.setOnClickListener(view -> showEndurancePlanner(mode));
+            edit.setOnClickListener(view -> startEnduranceWizard(mode));
             addButton(tile, edit);
         }
         LiveTrackingStore.Session active = LiveTrackingStore.current(this);

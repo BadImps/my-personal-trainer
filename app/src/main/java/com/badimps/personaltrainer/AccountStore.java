@@ -64,6 +64,17 @@ public final class AccountStore {
         c.getSharedPreferences(FILE,Context.MODE_PRIVATE).edit().putString("salt",hex(salt)).putString("passwordHash",hash(salt,password)).putBoolean("remember_sign_in",false).apply();
         return true;
     }
+    /** Changes a local password only after the existing password has been verified. */
+    public static boolean changePassword(Context c, String currentPassword, String newPassword) {
+        Profile profile = get(c);
+        if (!authenticate(c, profile.email, currentPassword) || newPassword == null || newPassword.length() < 8) return false;
+        byte[] salt = new byte[16]; new SecureRandom().nextBytes(salt);
+        c.getSharedPreferences(FILE,Context.MODE_PRIVATE).edit()
+                .putString("salt", hex(salt))
+                .putString("passwordHash", hash(salt, newPassword))
+                .apply();
+        return true;
+    }
     public static void clear(Context c) { c.getSharedPreferences(FILE,Context.MODE_PRIVATE).edit().clear().apply(); }
     private static String hash(byte[] salt,String value) { try { MessageDigest d=MessageDigest.getInstance("SHA-256"); d.update(salt); return hex(d.digest(value.getBytes(StandardCharsets.UTF_8))); } catch(Exception e) { throw new IllegalStateException(e); } }
     private static String hex(byte[] bytes) { StringBuilder b=new StringBuilder(); for(byte x:bytes)b.append(String.format("%02x",x)); return b.toString(); }

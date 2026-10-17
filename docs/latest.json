@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 43,
-  "versionName": "5.2",
-  "publishedAt": "2026-10-17T17:26:52Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.2/app-release.apk",
-  "sha256": "39cbded2a5705f7e0503de71d74dfcc2f952f919d3ea1a8b60105634003802df",
-  "sizeBytes": 34489885,
-  "notes": "Adds Scheduler, timer-only Endurance starts, redesigned training calendars, and streamlined account, sign-in, and update settings."
+  "versionCode": 44,
+  "versionName": "5.3",
+  "publishedAt": "2026-10-17T18:23:29Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.3/app-release.apk",
+  "sha256": "1a8bd56acc44d4cddc67a7e702919884a8a3643fbe8b1e720bcec7b56bf876bd",
+  "sizeBytes": 35438350,
+  "notes": "Adds a selected-coach hero login, a unified launcher icon, account Security with verified password changes, deletable workout history, reliable biometric sign-in, a three-step Endurance wizard, and a responsive Scheduler calendar."
 }

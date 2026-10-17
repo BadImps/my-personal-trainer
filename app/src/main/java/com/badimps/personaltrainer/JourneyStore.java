@@ -109,6 +109,23 @@ public final class JourneyStore {
         return output;
     }
 
+    /** Complete local workout history, newest first, for the user-managed Progress archive. */
+    public static List<WorkoutRecord> workouts(Context context) {
+        ArrayList<WorkoutRecord> output = new ArrayList<>(workoutRecords(context));
+        output.sort((left, right) -> Long.compare(right.timestamp, left.timestamp));
+        return output;
+    }
+
+    /** Removes exactly one completed-workout record; no schedules, profile, or fuel data are touched. */
+    public static void removeWorkout(Context context, long timestamp) {
+        List<String> events = lines(preferences(context).getString("workouts", ""));
+        String prefix = timestamp + "|";
+        for (int index = events.size() - 1; index >= 0; index--) {
+            if (events.get(index).startsWith(prefix)) { events.remove(index); break; }
+        }
+        preferences(context).edit().putString("workouts", join(events)).apply();
+    }
+
     public static MonthReport monthReport(Context context) {
         Calendar now = Calendar.getInstance();
         int maxWeek = Math.max(1, now.getActualMaximum(Calendar.WEEK_OF_MONTH));
