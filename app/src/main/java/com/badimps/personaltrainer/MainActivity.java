@@ -4686,6 +4686,17 @@ public final class MainActivity extends Activity {
         body.addView(todayIdeas);
         gap(body, 12);
 
+        LinearLayout caribbean = card();
+        caribbean.addView(heading("Caribbean Food Library", 19, ink));
+        caribbean.addView(text(CaribbeanFoodLibrary.count() + " familiar foods • Searchable reference facts per 100 g for staples, fruit, vegetables, beans, seafood, proteins, and pantry foods.", 14, muted));
+        caribbean.addView(text("Values are a reference snapshot. Recipe, brand, seasoning, oil, and serving size can change the result.", 12, muted));
+        gap(caribbean, 9);
+        Button browseCaribbean = primary("Browse Caribbean foods");
+        browseCaribbean.setOnClickListener(view -> showCaribbeanFoodLibrary("", "All"));
+        addButton(caribbean, browseCaribbean);
+        body.addView(caribbean);
+        gap(body, 12);
+
         List<String> plannedMeals = MealPlanStore.meals(this);
         if (!plannedMeals.isEmpty()) {
             LinearLayout savedMeals = card();
@@ -4762,6 +4773,65 @@ public final class MainActivity extends Activity {
             showMeals();
         });
         return button;
+    }
+
+    private void showCaribbeanFoodLibrary(String query, String selectedCategory) {
+        LinearLayout body = appPage("Nutrition");
+        title(body, "CARIBBEAN FOOD LIBRARY", "Familiar foods, clear reference facts", "Search values per 100 g. Use them as a starting point; a home recipe, brand, cooking method, and added oil or salt can change the result.");
+
+        EditText search = input("Search: breadfruit, callaloo, snapper…", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+        search.setText(query);
+        body.addView(search);
+        gap(body, 8);
+        Button runSearch = primary("Search foods");
+        runSearch.setOnClickListener(view -> showCaribbeanFoodLibrary(search.getText().toString().trim(), "All"));
+        addButton(body, runSearch);
+        gap(body, 12);
+
+        body.addView(heading("Browse by group", 18, Color.WHITE));
+        HorizontalScrollView categoriesScroll = new HorizontalScrollView(this);
+        categoriesScroll.setHorizontalScrollBarEnabled(false);
+        LinearLayout categories = new LinearLayout(this);
+        categories.setOrientation(LinearLayout.HORIZONTAL);
+        categoriesScroll.addView(categories);
+        for (String category : CaribbeanFoodLibrary.CATEGORIES) {
+            Button categoryButton = action((category.equals(selectedCategory) ? "✓  " : "") + category,
+                    category.equals(selectedCategory) ? mint : Color.rgb(28, 64, 79),
+                    category.equals(selectedCategory) ? navy : Color.WHITE);
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-2, dp(40));
+            params.rightMargin = dp(7);
+            categoryButton.setOnClickListener(view -> showCaribbeanFoodLibrary("", category));
+            categories.addView(categoryButton, params);
+        }
+        body.addView(categoriesScroll, new LinearLayout.LayoutParams(-1, dp(46)));
+        gap(body, 12);
+
+        List<CaribbeanFoodLibrary.Food> foods = CaribbeanFoodLibrary.search(query, selectedCategory);
+        body.addView(text(foods.size() + " foods shown  •  kcal, protein, carbohydrate, fibre, fat, and sodium per 100 g", 13, Color.rgb(211, 225, 233)));
+        gap(body, 8);
+        for (CaribbeanFoodLibrary.Food food : foods) {
+            LinearLayout foodCard = card();
+            foodCard.addView(heading(food.name, 18, ink));
+            foodCard.addView(text(food.category + "  •  " + food.preparation, 13, muted));
+            gap(foodCard, 7);
+            foodCard.addView(text(food.kcal + " kcal  •  Protein " + food.protein + " g  •  Carbs " + food.carbs + " g", 14, ink));
+            foodCard.addView(text("Fibre " + food.fibre + " g  •  Fat " + food.fat + " g  •  Sodium " + food.sodium + " mg", 13, muted));
+            if (!food.note.isEmpty()) foodCard.addView(text(food.note, 12, muted));
+            body.addView(foodCard);
+            gap(body, 8);
+        }
+        if (foods.isEmpty()) {
+            LinearLayout empty = card();
+            empty.addView(heading("No matching food yet", 18, ink));
+            empty.addView(text("Try a familiar name, another spelling, or a food group. The library focuses on common single foods so its facts stay useful across islands.", 14, muted));
+            body.addView(empty);
+        }
+        gap(body, 10);
+        body.addView(text("Sources: Caribbean Food and Nutrition Institute composition tables, indexed by FAO/INFOODS, and USDA FoodData Central reference datasets. These are general food-composition values, not a substitute for a product label or clinical nutrition advice.", 12, Color.rgb(211, 225, 233)));
+        gap(body, 10);
+        Button back = secondary("Back to Today’s Fuel");
+        back.setOnClickListener(view -> showMeals());
+        addButton(body, back);
     }
 
     private String conciseNetworkError(Exception error) {

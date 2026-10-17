@@ -83,6 +83,8 @@ Set rest and exercise cooldown are now deliberately separate controls. Set rest 
 
 Nutrition is a private, offline fuel companion: daily breakfast and lunch ideas rotate automatically, any idea can be saved locally, and three simple food-and-hydration check-ins connect to Progress beside completed workouts. It does not estimate calories, use a model, send food or body information anywhere, or prescribe portions.
 
+The Nutrition page also includes an offline **Caribbean Food Library** with searchable, rounded per-100 g reference values for common staples, fruit, vegetables, beans, fish, proteins, and pantry foods. See [the data-scope note](docs/CARIBBEAN_FOOD_LIBRARY.md) for sources and limits.
+
 Guided workouts now preserve a local **Set Times** leaderboard for every normally completed exercise. The recovery screen places it directly above Emergency stop, orders completed sets from fastest to slowest, marks the personal best, and shows active-set totals. Those details appear under the corresponding completed workout in Progress; emergency-stopped workouts are never written there.
 
 Direct APK updates now use Android’s persistent download service rather than a one-shot in-app stream. The update screen makes mobile-data use explicit, blocks roaming, restores progress after app backgrounding or a short signal loss, verifies SHA-256 before installation, and resumes the Android installer after the normal install-permission screen.
