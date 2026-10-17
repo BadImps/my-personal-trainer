@@ -547,7 +547,13 @@ public final class MainActivity extends FragmentActivity {
         return body;
     }
 
-    /** A full-height app page with exactly one navigation system: the coach rail. */
+    /**
+     * Signed-in Coach Hero Dashboard shell.
+     *
+     * The approved dashboard references use one selected coach, a hero area, and one bottom
+     * navigation system.  Keep this shell shared by every top-level page: page content may
+     * change, but coach identity, spacing, navigation and palette must not silently fork.
+     */
     private LinearLayout appPage(String activeScreen) {
         beginNewPage();
         setSystemBars();
@@ -556,17 +562,113 @@ public final class MainActivity extends FragmentActivity {
         scroll.setClipToPadding(false);
         scroll.setBackgroundColor(navy);
         LinearLayout body = column();
+        body.addView(coachHeroHeader(activeScreen));
+        gap(body, 18);
         scroll.addView(body, new ScrollView.LayoutParams(-1, -2));
 
         LinearLayout shell = new LinearLayout(this);
-        shell.setOrientation(LinearLayout.HORIZONTAL);
+        shell.setOrientation(LinearLayout.VERTICAL);
         shell.setBackgroundColor(navy);
-        shell.addView(coachRail(activeScreen), new LinearLayout.LayoutParams(dp(82), -1));
-        shell.addView(scroll, new LinearLayout.LayoutParams(0, -1, 1));
+        shell.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+        shell.addView(coachHeroBottomNavigation(activeScreen), new LinearLayout.LayoutParams(-1, dp(76)));
         setContentView(shell);
         activateScroll(scroll);
-        animatePage(scroll);
+        animatePage(shell);
         return body;
+    }
+
+    /** A dynamic hero uses the saved coach selection rather than a hard-coded portrait. */
+    private FrameLayout coachHeroHeader(String activeScreen) {
+        FrameLayout hero = new FrameLayout(this);
+        hero.setClipChildren(true);
+        hero.setBackground(surface(navyPanel, 24, 1, Color.rgb(39, 78, 97)));
+        hero.setContentDescription("Coach " + coachName() + " dashboard header");
+
+        View ring = new View(this);
+        GradientDrawable ringShape = new GradientDrawable();
+        ringShape.setShape(GradientDrawable.OVAL);
+        ringShape.setColor(Color.TRANSPARENT);
+        ringShape.setStroke(dp(3), mint);
+        ring.setBackground(ringShape);
+        ring.setAlpha(.70f);
+        FrameLayout.LayoutParams ringParams = new FrameLayout.LayoutParams(dp(176), dp(176), Gravity.RIGHT | Gravity.CENTER_VERTICAL);
+        ringParams.rightMargin = dp(-23);
+        hero.addView(ring, ringParams);
+
+        ImageView portrait = new ImageView(this);
+        portrait.setImageResource(coachPortrait(coachName()));
+        portrait.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        portrait.setContentDescription("Coach " + coachName());
+        FrameLayout.LayoutParams portraitParams = new FrameLayout.LayoutParams(dp(164), dp(164), Gravity.RIGHT | Gravity.BOTTOM);
+        portraitParams.rightMargin = dp(-14);
+        portraitParams.bottomMargin = dp(-13);
+        hero.addView(portrait, portraitParams);
+
+        LinearLayout copy = new LinearLayout(this);
+        copy.setOrientation(LinearLayout.VERTICAL);
+        copy.setGravity(Gravity.CENTER_VERTICAL);
+        TextView eyebrow = heading("COACH " + coachName().toUpperCase(Locale.ROOT), 11, mint);
+        eyebrow.setLetterSpacing(.09f);
+        copy.addView(eyebrow);
+        TextView title = heading(activeScreen, 27, Color.WHITE);
+        title.setSingleLine(true);
+        copy.addView(title);
+        copy.addView(text("Your personal training dashboard", 13, Color.rgb(211, 225, 233)));
+        FrameLayout.LayoutParams copyParams = new FrameLayout.LayoutParams(dp(208), -2, Gravity.LEFT | Gravity.CENTER_VERTICAL);
+        copyParams.leftMargin = dp(17);
+        hero.addView(copy, copyParams);
+        return hero;
+    }
+
+    /**
+     * The lower dashboard bar deliberately remains one horizontally-scrollable, labelled row.
+     * This protects labels at accessibility sizes without reintroducing the old competing rail.
+     */
+    private HorizontalScrollView coachHeroBottomNavigation(String activeScreen) {
+        HorizontalScrollView scroll = new HorizontalScrollView(this);
+        scroll.setHorizontalScrollBarEnabled(false);
+        scroll.setFillViewport(true);
+        scroll.setBackgroundColor(Color.rgb(12, 22, 41));
+        LinearLayout row = new LinearLayout(this);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(dp(8), dp(7), dp(8), dp(8));
+        addCoachHeroNavItem(row, "Home", R.drawable.ic_nav_home, activeScreen, view -> { stopGuidedRuntime(); showHome(); });
+        addCoachHeroNavItem(row, "Workouts", R.drawable.ic_nav_workouts, activeScreen, view -> { stopGuidedRuntime(); showPlans(); });
+        addCoachHeroNavItem(row, "Progress", R.drawable.ic_nav_progress, activeScreen, view -> { stopGuidedRuntime(); showProgress(); });
+        addCoachHeroNavItem(row, "Nutrition", R.drawable.ic_nav_nutrition, activeScreen, view -> { stopGuidedRuntime(); showMeals(); });
+        addCoachHeroNavItem(row, "Endurance", R.drawable.ic_nav_endurance, activeScreen, view -> { stopGuidedRuntime(); showEndurance(); });
+        addCoachHeroNavItem(row, "Scheduler", R.drawable.ic_nav_plan, activeScreen, view -> { stopGuidedRuntime(); showScheduler(); });
+        addCoachHeroNavItem(row, "Body", R.drawable.ic_nav_body, activeScreen, view -> { stopGuidedRuntime(); showBodyContext(); });
+        addCoachHeroNavItem(row, "Settings", R.drawable.ic_nav_settings, activeScreen, view -> { stopGuidedRuntime(); showProfile(); });
+        scroll.addView(row, new HorizontalScrollView.LayoutParams(-2, -1));
+        return scroll;
+    }
+
+    private void addCoachHeroNavItem(LinearLayout row, String label, int icon, String activeScreen, View.OnClickListener listener) {
+        boolean selected = label.equals(activeScreen);
+        LinearLayout item = new LinearLayout(this);
+        item.setOrientation(LinearLayout.VERTICAL);
+        item.setGravity(Gravity.CENTER);
+        item.setPadding(dp(6), dp(3), dp(6), dp(2));
+        item.setClickable(true);
+        item.setFocusable(true);
+        item.setContentDescription(selected ? label + ", current page" : "Open " + label);
+        item.setBackground(surface(selected ? mint : Color.TRANSPARENT, 14, 0, Color.TRANSPARENT));
+        item.setOnClickListener(listener);
+        ImageView glyph = new ImageView(this);
+        glyph.setImageResource(icon);
+        glyph.setImageTintList(ColorStateList.valueOf(selected ? navy : Color.rgb(198, 215, 235)));
+        glyph.setContentDescription(null);
+        item.addView(glyph, new LinearLayout.LayoutParams(dp(23), dp(23)));
+        TextView caption = text(label, 9, selected ? navy : Color.rgb(198, 215, 235));
+        caption.setGravity(Gravity.CENTER);
+        caption.setSingleLine(true);
+        caption.setTypeface(Typeface.create("sans-serif", selected ? Typeface.BOLD : Typeface.NORMAL));
+        item.addView(caption, new LinearLayout.LayoutParams(-1, dp(19)));
+        LinearLayout.LayoutParams itemParams = new LinearLayout.LayoutParams(dp(76), dp(60));
+        itemParams.rightMargin = dp(4);
+        row.addView(item, itemParams);
+        applyPressMotion(item);
     }
 
     /**
@@ -642,16 +744,14 @@ public final class MainActivity extends FragmentActivity {
         stopOtaStatusPolling();
     }
 
-    /** A restrained entrance makes navigation legible without becoming decorative noise. */
+    /**
+     * Dashboard navigation replaces the current surface synchronously.  A page-level fade was
+     * visibly read as a white/navy flash on some Android devices, so navigation intentionally
+     * has no entrance animation; individual controls retain their press feedback.
+     */
     private void animatePage(View view) {
-        if (reducedMotion || suppressNextPageEntrance) {
-            view.setAlpha(1f);
-            view.setTranslationY(0f);
-            return;
-        }
-        view.setAlpha(0f);
-        view.setTranslationY(dp(10));
-        view.animate().alpha(1f).translationY(0f).setDuration(180L).start();
+        view.setAlpha(1f);
+        view.setTranslationY(0f);
     }
 
     /** Supplies tangible press feedback for every shared action control. */
@@ -1021,6 +1121,25 @@ public final class MainActivity extends FragmentActivity {
         return field;
     }
 
+    /**
+     * The signed-out experience deliberately uses one visual system.  These fields are not
+     * reused by the app's light forms: their contrast is tuned for the fixed full-hero login
+     * canvas so a change of coach cannot accidentally turn into a change of login design.
+     */
+    private EditText heroLoginInput(String hint, int inputType) {
+        EditText field = new EditText(this);
+        field.setHint(hint);
+        field.setTextSize(15);
+        field.setTextColor(Color.WHITE);
+        field.setHintTextColor(Color.rgb(196, 210, 226));
+        field.setInputType(inputType);
+        field.setSingleLine(true);
+        field.setPadding(dp(15), dp(6), dp(15), dp(6));
+        field.setBackground(surface(Color.rgb(22, 38, 64), 14, 1, Color.rgb(62, 91, 122)));
+        field.setLayoutParams(new LinearLayout.LayoutParams(-1, dp(52)));
+        return field;
+    }
+
     private void toast(String value) { Toast.makeText(this, value, Toast.LENGTH_SHORT).show(); }
 
     // Signed-out flow
@@ -1034,56 +1153,105 @@ public final class MainActivity extends FragmentActivity {
 
     private void showLogin() {
         LinearLayout body = signedOutPage();
+        // This is one locked template for every coach.  Do not branch the layout by coach:
+        // Settings supplies only the selected portrait and its identifying label below.
+        body.setPadding(0, 0, 0, 0);
+        body.setGravity(Gravity.CENTER_HORIZONTAL);
         String heroCoach = AccountStore.exists(this) ? profile().coachName : CoachPreferences.defaultCoach(selectedTrainer);
-        gap(body, 8);
 
         FrameLayout hero = new FrameLayout(this);
-        hero.setPadding(dp(20), dp(20), dp(20), dp(18));
-        hero.setBackground(surface(navyPanel, 28, 1, Color.rgb(42, 83, 98)));
-        hero.setClipToOutline(true);
+        hero.setBackgroundColor(navy);
+        hero.setClipChildren(true);
         hero.setContentDescription("Welcome with Coach " + heroCoach);
+        int fullHeroHeight = Math.max(dp(720), getResources().getDisplayMetrics().heightPixels);
+        body.addView(hero, new LinearLayout.LayoutParams(-1, fullHeroHeight));
+
+        // A fixed, slightly oversized ring keeps all six coach portraits in the same visual
+        // position and scale.  The ring is decorative; it never changes with a coach choice.
+        View portraitRing = new View(this);
+        GradientDrawable ringBackground = new GradientDrawable();
+        ringBackground.setShape(GradientDrawable.OVAL);
+        ringBackground.setColor(Color.rgb(19, 40, 67));
+        ringBackground.setStroke(dp(2), mint);
+        portraitRing.setBackground(ringBackground);
+        portraitRing.setAlpha(.72f);
+        FrameLayout.LayoutParams ringParams = new FrameLayout.LayoutParams(dp(450), dp(450), Gravity.RIGHT | Gravity.BOTTOM);
+        ringParams.rightMargin = dp(-164);
+        ringParams.bottomMargin = dp(78);
+        hero.addView(portraitRing, ringParams);
+
         ImageView coach = new ImageView(this);
         coach.setImageResource(coachPortrait(heroCoach));
-        coach.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        coach.setAlpha(.92f);
-        FrameLayout.LayoutParams coachParams = new FrameLayout.LayoutParams(dp(190), dp(244), Gravity.RIGHT | Gravity.BOTTOM);
-        coachParams.rightMargin = dp(-18);
-        coachParams.bottomMargin = dp(-18);
+        coach.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        coach.setAlpha(.98f);
+        FrameLayout.LayoutParams coachParams = new FrameLayout.LayoutParams(dp(398), dp(398), Gravity.RIGHT | Gravity.BOTTOM);
+        coachParams.rightMargin = dp(-124);
+        coachParams.bottomMargin = dp(72);
         hero.addView(coach, coachParams);
-        LinearLayout heroCopy = new LinearLayout(this);
-        heroCopy.setOrientation(LinearLayout.VERTICAL);
-        TextView brand = heading("MY PERSONAL TRAINER", 11, mint);
-        brand.setLetterSpacing(.08f);
-        heroCopy.addView(brand);
-        gap(heroCopy, 14);
-        TextView welcome = heading("Welcome", 37, Color.WHITE);
-        heroCopy.addView(welcome);
-        TextView motto = text("Your Health is\nYour Wealth", 19, Color.rgb(222, 231, 242));
-        motto.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL));
-        heroCopy.addView(motto);
-        gap(heroCopy, 17);
-        TextView coachLabel = heading("COACH " + heroCoach.toUpperCase(Locale.ROOT), 11, mint);
-        heroCopy.addView(coachLabel);
-        TextView coachLine = text("Your coach is ready when you are.", 12, Color.rgb(222, 231, 242));
-        heroCopy.addView(coachLine);
-        FrameLayout.LayoutParams copyParams = new FrameLayout.LayoutParams(dp(225), -2, Gravity.LEFT | Gravity.TOP);
-        hero.addView(heroCopy, copyParams);
-        body.addView(hero, new LinearLayout.LayoutParams(-1, dp(252)));
-        gap(body, 20);
-        EditText email = input("Email address", InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
+
+        // A quiet bottom fade makes the coach read as a background hero, while the controls
+        // remain stable and legible on every phone size.
+        View lowerDepth = new View(this);
+        lowerDepth.setBackgroundColor(Color.argb(58, 0, 0, 0));
+        FrameLayout.LayoutParams depthParams = new FrameLayout.LayoutParams(-1, dp(178), Gravity.BOTTOM);
+        hero.addView(lowerDepth, depthParams);
+
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        int screenDp = (int) (getResources().getDisplayMetrics().widthPixels / getResources().getDisplayMetrics().density);
+        int contentWidth = dp(Math.min(340, Math.max(274, screenDp - 40)));
+        FrameLayout.LayoutParams contentParams = new FrameLayout.LayoutParams(contentWidth, -2, Gravity.LEFT | Gravity.TOP);
+        contentParams.leftMargin = dp(20);
+        contentParams.topMargin = dp(28);
+        hero.addView(content, contentParams);
+
+        LinearLayout brandRow = new LinearLayout(this);
+        brandRow.setGravity(Gravity.CENTER_VERTICAL);
+        ImageView mark = new ImageView(this);
+        mark.setImageResource(R.drawable.trainer_hero_mark);
+        mark.setContentDescription("My Personal Trainer");
+        brandRow.addView(mark, new LinearLayout.LayoutParams(dp(42), dp(42)));
+        TextView brand = heading("MY PERSONAL\nTRAINER", 11, Color.WHITE);
+        brand.setLetterSpacing(.07f);
+        brand.setLineSpacing(0, .96f);
+        brand.setPadding(dp(10), 0, 0, 0);
+        brandRow.addView(brand);
+        content.addView(brandRow);
+        gap(content, 48);
+
+        TextView brandKicker = heading("WELCOME", 11, mint);
+        brandKicker.setLetterSpacing(.10f);
+        content.addView(brandKicker);
+        gap(content, 7);
+        content.addView(heading("Welcome", 40, Color.WHITE));
+        TextView motto = text("Your Health is Your Wealth", 18, Color.rgb(220, 231, 242));
+        motto.setPadding(0, dp(2), 0, 0);
+        content.addView(motto);
+        gap(content, 22);
+
+        // The copy stays fixed as well.  Settings changes the portrait only, not this template.
+        TextView coachPill = heading("YOUR SELECTED COACH", 10, navy);
+        coachPill.setGravity(Gravity.CENTER_VERTICAL);
+        coachPill.setPadding(dp(13), 0, dp(13), 0);
+        coachPill.setBackground(surface(mint, 99, 0, Color.TRANSPARENT));
+        content.addView(coachPill, new LinearLayout.LayoutParams(-2, dp(31)));
+        gap(content, 20);
+
+        EditText email = heroLoginInput("Email address", InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
         if (AccountStore.exists(this)) email.setText(profile().email);
-        body.addView(email);
-        gap(body, 10);
-        EditText password = input("Password", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
-        body.addView(password);
+        content.addView(email);
+        gap(content, 10);
+        EditText password = heroLoginInput("Password", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        content.addView(password);
         CheckBox remember = new CheckBox(this);
         remember.setText("Remember this account on this device");
         remember.setTextColor(Color.WHITE);
         remember.setButtonTintList(ColorStateList.valueOf(mint));
         remember.setChecked(AccountStore.exists(this) && profile().rememberSignIn);
-        body.addView(remember);
-        gap(body, 12);
-        Button signIn = primary("Sign in");
+        remember.setTextSize(13);
+        remember.setPadding(0, dp(2), 0, dp(2));
+        content.addView(remember, new LinearLayout.LayoutParams(-1, dp(39)));
+        Button signIn = action("Sign in  →", coral, Color.WHITE);
         signIn.setOnClickListener(view -> {
             if (AccountStore.authenticate(this, email.getText().toString(), password.getText().toString())) {
                 AccountStore.Profile current = profile();
@@ -1093,21 +1261,38 @@ public final class MainActivity extends FragmentActivity {
                 toast("That email or password does not match this profile.");
             }
         });
-        addButton(body, signIn);
-        gap(body, 8);
-        if (AccountStore.exists(this) && profile().biometricUnlock) {
-            Button biometric = lightAction("Use biometrics");
-            biometric.setOnClickListener(view -> authenticateWithBiometrics());
-            addButton(body, biometric);
-            gap(body, 8);
-        }
-        Button forgot = secondary("Forgot password?");
+        content.addView(signIn, new LinearLayout.LayoutParams(-1, dp(54)));
+        gap(content, 12);
+
+        LinearLayout links = new LinearLayout(this);
+        links.setGravity(Gravity.CENTER_VERTICAL);
+        TextView forgot = heading("Forgot password?", 12, mint);
+        forgot.setPadding(0, dp(10), dp(8), dp(10));
+        forgot.setClickable(true);
         forgot.setOnClickListener(view -> showForgotPassword());
-        addButton(body, forgot);
-        gap(body, 8);
-        Button register = lightAction("New user? Register here");
+        applyPressMotion(forgot);
+        links.addView(forgot, new LinearLayout.LayoutParams(0, dp(38), 1));
+        TextView biometric = heading("Use biometrics", 12, mint);
+        biometric.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
+        biometric.setPadding(dp(8), dp(10), 0, dp(10));
+        biometric.setClickable(true);
+        biometric.setOnClickListener(view -> {
+            if (AccountStore.exists(this) && profile().biometricUnlock) authenticateWithBiometrics();
+            else toast("Enable biometrics in Account Settings to use it here.");
+        });
+        applyPressMotion(biometric);
+        links.addView(biometric, new LinearLayout.LayoutParams(0, dp(38), 1));
+        content.addView(links);
+        gap(content, 8);
+
+        TextView register = heading("New here?  Register", 14, Color.WHITE);
+        register.setGravity(Gravity.CENTER);
+        register.setPadding(0, dp(12), 0, dp(12));
+        register.setBackground(surface(Color.argb(28, 119, 224, 196), 14, 1, mint));
+        register.setClickable(true);
         register.setOnClickListener(view -> showRegistration());
-        addButton(body, register);
+        applyPressMotion(register);
+        content.addView(register, new LinearLayout.LayoutParams(-1, dp(49)));
     }
 
     private void openSignedInHome() {

@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 44,
-  "versionName": "5.3",
-  "publishedAt": "2026-10-17T18:23:29Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.3/app-release.apk",
-  "sha256": "1a8bd56acc44d4cddc67a7e702919884a8a3643fbe8b1e720bcec7b56bf876bd",
-  "sizeBytes": 35438350,
-  "notes": "Adds a selected-coach hero login, a unified launcher icon, account Security with verified password changes, deletable workout history, reliable biometric sign-in, a three-step Endurance wizard, and a responsive Scheduler calendar."
+  "versionCode": 45,
+  "versionName": "5.4",
+  "publishedAt": "2026-10-17T21:05:00Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.4/app-release.apk",
+  "sha256": "e4695b738b4223a3774b786eba578dbb919eb39fb23d0539e6d8debd0302de12",
+  "sizeBytes": 37240462,
+  "notes": "Introduces the Coach Hero Dashboard shell with consistent selected-coach identity, unified bottom navigation, the locked Canvas reference set, and smoother screen changes."
 }
