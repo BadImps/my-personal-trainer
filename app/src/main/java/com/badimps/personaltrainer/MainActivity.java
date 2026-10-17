@@ -161,6 +161,12 @@ public final class MainActivity extends Activity {
     private static final int REQUEST_LIVE_LOCATION = 4102;
     private String pendingLiveTrackingMode;
     private BroadcastReceiver liveTrackingReceiver;
+    private int schedulerMonthOffset;
+    private Calendar schedulerSelectedDate = Calendar.getInstance();
+    private String schedulerActivity = EndurancePlanStore.WALKING;
+    private int schedulerHour = 18;
+    private int schedulerMinute;
+    private int schedulerDurationMinutes = 45;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -660,6 +666,7 @@ public final class MainActivity extends Activity {
         addPlanRailItem(rail, "Progress", R.drawable.ic_nav_progress, false, view -> { stopGuidedRuntime(); showProgress(); });
         addPlanRailItem(rail, "Nutrition", R.drawable.ic_nav_nutrition, false, view -> { stopGuidedRuntime(); showMeals(); });
         addPlanRailItem(rail, "Endurance", R.drawable.ic_nav_endurance, false, view -> { stopGuidedRuntime(); showEndurance(); });
+        addPlanRailItem(rail, "Scheduler", R.drawable.ic_nav_plan, false, view -> { stopGuidedRuntime(); showScheduler(); });
         addPlanRailItem(rail, "Body", R.drawable.ic_nav_body, false, view -> { stopGuidedRuntime(); showBodyContext(); });
         addPlanRailItem(rail, "Settings", R.drawable.ic_nav_settings, false, view -> { stopGuidedRuntime(); showProfile(); });
         return rail;
@@ -727,6 +734,7 @@ public final class MainActivity extends Activity {
         addRailItem(rail, "Progress", R.drawable.ic_nav_progress, activeScreen, view -> { stopGuidedRuntime(); showProgress(); });
         addRailItem(rail, "Nutrition", R.drawable.ic_nav_nutrition, activeScreen, view -> { stopGuidedRuntime(); showMeals(); });
         addRailItem(rail, "Endurance", R.drawable.ic_nav_endurance, activeScreen, view -> { stopGuidedRuntime(); showEndurance(); });
+        addRailItem(rail, "Scheduler", R.drawable.ic_nav_plan, activeScreen, view -> { stopGuidedRuntime(); showScheduler(); });
         addRailItem(rail, "Body", R.drawable.ic_nav_body, activeScreen, view -> { stopGuidedRuntime(); showBodyContext(); });
         addRailItem(rail, "Settings", R.drawable.ic_nav_settings, activeScreen, view -> { stopGuidedRuntime(); showProfile(); });
         return rail;
@@ -3251,6 +3259,7 @@ public final class MainActivity extends Activity {
             MealPlanStore.clear(this);
             EndurancePlanStore.clear(this);
             LiveTrackingStore.clear(this);
+            SchedulerStore.clear(this);
             stopService(new Intent(this, LiveTrackingService.class));
             JourneyStore.clear(this);
             SetTimeStore.clear(this);
@@ -4913,6 +4922,198 @@ public final class MainActivity extends Activity {
         offlineGuide.setOnClickListener(view -> showOfflineMapGuide());
         addButton(guidance, offlineGuide);
         body.addView(guidance);
+    }
+
+    /** One calendar joins strength templates, rest days, and separately booked endurance appointments. */
+    private void showScheduler() {
+        LinearLayout body = appPage("Scheduler");
+        title(body, "SCHEDULER", "Your training calendar", "See existing work plans, rest days, and endurance appointments in one place. Tap a date to add or review a session.");
+        Calendar month = schedulerMonth();
+        LinearLayout header = new LinearLayout(this);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        Button previous = action("‹", navyPanel, mint);
+        previous.setContentDescription("Previous month");
+        previous.setOnClickListener(view -> {
+            schedulerMonthOffset--;
+            schedulerSelectedDate = schedulerMonth();
+            showScheduler();
+        });
+        header.addView(previous, new LinearLayout.LayoutParams(dp(48), dp(46)));
+        TextView label = heading(new SimpleDateFormat("MMMM yyyy", Locale.getDefault()).format(month.getTime()), 21, Color.WHITE);
+        label.setGravity(Gravity.CENTER);
+        header.addView(label, new LinearLayout.LayoutParams(0, -2, 1f));
+        Button next = action("›", navyPanel, mint);
+        next.setContentDescription("Next month");
+        next.setOnClickListener(view -> {
+            schedulerMonthOffset++;
+            schedulerSelectedDate = schedulerMonth();
+            showScheduler();
+        });
+        header.addView(next, new LinearLayout.LayoutParams(dp(48), dp(46)));
+        body.addView(header);
+        gap(body, 10);
+
+        LinearLayout calendarCard = card();
+        calendarCard.addView(text("Mint = work plan  •  Coral = endurance appointment  •  Slate = rest day", 12, muted));
+        GridLayout grid = new GridLayout(this);
+        grid.setColumnCount(7);
+        String[] labels = {"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"};
+        for (String day : labels) {
+            TextView title = text(day, 10, muted);
+            title.setGravity(Gravity.CENTER);
+            GridLayout.LayoutParams params = new GridLayout.LayoutParams();
+            params.width = dp(39); params.height = dp(30);
+            grid.addView(title, params);
+        }
+        int first = (month.get(Calendar.DAY_OF_WEEK) - Calendar.MONDAY + 7) % 7;
+        for (int i = 0; i < first; i++) grid.addView(schedulerCalendarCell(null));
+        int max = month.getActualMaximum(Calendar.DAY_OF_MONTH);
+        for (int day = 1; day <= max; day++) {
+            Calendar date = (Calendar) month.clone();
+            date.set(Calendar.DAY_OF_MONTH, day);
+            grid.addView(schedulerCalendarCell(date));
+        }
+        calendarCard.addView(grid);
+        body.addView(calendarCard);
+        gap(body, 12);
+        addSchedulerDayAgenda(body, schedulerSelectedDate);
+        gap(body, 10);
+        Button book = primary("Schedule endurance appointment");
+        book.setOnClickListener(view -> showSchedulerActivity());
+        addButton(body, book);
+    }
+
+    private Calendar schedulerMonth() {
+        Calendar month = Calendar.getInstance();
+        month.set(Calendar.DAY_OF_MONTH, 1);
+        month.set(Calendar.HOUR_OF_DAY, 0); month.set(Calendar.MINUTE, 0); month.set(Calendar.SECOND, 0); month.set(Calendar.MILLISECOND, 0);
+        month.add(Calendar.MONTH, schedulerMonthOffset);
+        return month;
+    }
+
+    private TextView schedulerCalendarCell(Calendar date) {
+        if (date == null) {
+            TextView empty = text("", 10, muted);
+            GridLayout.LayoutParams params = new GridLayout.LayoutParams(); params.width = dp(39); params.height = dp(54); empty.setLayoutParams(params);
+            return empty;
+        }
+        List<SchedulerStore.Appointment> appointments = SchedulerStore.onDate(this, date);
+        boolean planned = isMonthWorkoutDay(date);
+        boolean selected = sameSchedulerDate(date, schedulerSelectedDate);
+        String state = !appointments.isEmpty() ? appointmentAbbreviation(appointments.get(0).mode) : planned ? "Plan" : "Rest";
+        int fill = !appointments.isEmpty() ? coral : planned ? mint : Color.rgb(232, 236, 244);
+        TextView cell = text(date.get(Calendar.DAY_OF_MONTH) + "\n" + state, 10, selected ? navy : (planned || !appointments.isEmpty() ? navy : muted));
+        cell.setGravity(Gravity.CENTER);
+        cell.setTypeface(Typeface.create("sans-serif", selected ? Typeface.BOLD : Typeface.NORMAL));
+        cell.setBackground(surface(fill, 9, selected ? 2 : 0, selected ? navy : Color.TRANSPARENT));
+        cell.setContentDescription(new SimpleDateFormat("EEEE, MMMM d", Locale.getDefault()).format(date.getTime()) + ", " + state);
+        cell.setClickable(true);
+        cell.setOnClickListener(view -> { schedulerSelectedDate = (Calendar) date.clone(); showScheduler(); });
+        GridLayout.LayoutParams params = new GridLayout.LayoutParams(); params.width = dp(39); params.height = dp(54); params.setMargins(dp(1), dp(1), dp(1), dp(1));
+        cell.setLayoutParams(params);
+        return cell;
+    }
+
+    private void addSchedulerDayAgenda(LinearLayout body, Calendar date) {
+        LinearLayout agenda = card();
+        agenda.addView(heading(new SimpleDateFormat("EEEE, MMMM d", Locale.getDefault()).format(date.getTime()), 19, ink));
+        if (isMonthWorkoutDay(date)) agenda.addView(text("Work plan · " + schedulerStrengthSummary(date), 14, Color.rgb(46, 116, 103)));
+        else agenda.addView(text("Rest day in your current work plan", 13, muted));
+        List<SchedulerStore.Appointment> appointments = SchedulerStore.onDate(this, date);
+        for (SchedulerStore.Appointment appointment : appointments) {
+            gap(agenda, 8);
+            LinearLayout row = new LinearLayout(this); row.setGravity(Gravity.CENTER_VERTICAL);
+            TextView copy = text(appointment.mode + " · " + schedulerTime(appointment.when) + " · " + appointment.durationMinutes + " min", 14, ink);
+            row.addView(copy, new LinearLayout.LayoutParams(0, -2, 1f));
+            Button remove = action("Remove", paper, coral);
+            remove.setTextSize(12);
+            remove.setOnClickListener(view -> { SchedulerStore.remove(this, appointment.id); showScheduler(); });
+            row.addView(remove, new LinearLayout.LayoutParams(dp(78), dp(40)));
+            agenda.addView(row);
+        }
+        if (appointments.isEmpty()) agenda.addView(text("No endurance appointment booked for this date.", 13, muted));
+        body.addView(agenda);
+    }
+
+    private String schedulerStrengthSummary(Calendar date) {
+        Calendar weekStart = (Calendar) date.clone(); weekStart.setFirstDayOfWeek(Calendar.MONDAY);
+        weekStart.add(Calendar.DAY_OF_YEAR, -((weekStart.get(Calendar.DAY_OF_WEEK) - Calendar.MONDAY + 7) % 7));
+        int day = (date.get(Calendar.DAY_OF_WEEK) - Calendar.MONDAY + 7) % 7;
+        WeeklyScheduleStore.Schedule schedule = WeeklyScheduleStore.load(this, weekStart, defaultWeeklyDays(), defaultWeeklyTargets());
+        return focusSummary(schedule.targets.get(day));
+    }
+
+    private boolean sameSchedulerDate(Calendar one, Calendar two) { return one != null && two != null && SchedulerStore.dateKey(one).equals(SchedulerStore.dateKey(two)); }
+    private String appointmentAbbreviation(String mode) { return EndurancePlanStore.CYCLING.equals(mode) ? "Cycle" : EndurancePlanStore.RUNNING.equals(mode) ? "Run" : "Walk"; }
+    private String schedulerTime(long when) { Calendar time = Calendar.getInstance(); time.setTimeInMillis(when); return new SimpleDateFormat("h:mm a", Locale.getDefault()).format(time.getTime()); }
+
+    /** Appointment wizard step 1: choose a single endurance activity. */
+    private void showSchedulerActivity() {
+        LinearLayout body = appPage("Scheduler");
+        title(body, "SCHEDULE ENDURANCE", "Choose an activity", "Step 1 of 3. This appointment is separate from your workout-plan template and appears beside it on Scheduler.");
+        addSchedulerModeChoice(body, EndurancePlanStore.WALKING, "Walking", "Plan a low-impact outdoor session.");
+        gap(body, 10);
+        addSchedulerModeChoice(body, EndurancePlanStore.RUNNING, "Running", "Set a route and duration for your run.");
+        gap(body, 10);
+        addSchedulerModeChoice(body, EndurancePlanStore.CYCLING, "Cycling", "Book a ride with a planned duration.");
+        gap(body, 14);
+        Button next = primary("Next: date and time");
+        next.setOnClickListener(view -> showSchedulerDetails());
+        addButton(body, next);
+        gap(body, 8);
+        Button back = secondary("Back to Scheduler"); back.setOnClickListener(view -> showScheduler()); addButton(body, back);
+    }
+
+    private void addSchedulerModeChoice(LinearLayout body, String mode, String label, String copy) {
+        boolean selected = mode.equals(schedulerActivity);
+        Button choice = action((selected ? "✓  " : "") + label + "\n" + copy, selected ? mint : paper, ink);
+        choice.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+        choice.setTextSize(16);
+        choice.setOnClickListener(view -> { schedulerActivity = mode; showSchedulerActivity(); });
+        body.addView(choice, new LinearLayout.LayoutParams(-1, dp(78)));
+    }
+
+    /** Appointment wizard steps 2 and 3: set timing, then explicitly save. */
+    private void showSchedulerDetails() {
+        LinearLayout body = appPage("Scheduler");
+        title(body, "SCHEDULE ENDURANCE", "Set the appointment", "Step 2 of 3. Choose when you want to " + enduranceAction(schedulerActivity) + " and how long you plan to be active.");
+        LinearLayout details = card();
+        details.addView(heading(appointmentAbbreviation(schedulerActivity), 20, ink));
+        Button date = lightAction("Date · " + new SimpleDateFormat("EEE, MMM d", Locale.getDefault()).format(schedulerSelectedDate.getTime()));
+        date.setOnClickListener(view -> new android.app.DatePickerDialog(this, (picker, year, month, day) -> {
+            schedulerSelectedDate.set(year, month, day); showSchedulerDetails();
+        }, schedulerSelectedDate.get(Calendar.YEAR), schedulerSelectedDate.get(Calendar.MONTH), schedulerSelectedDate.get(Calendar.DAY_OF_MONTH)).show());
+        addButton(details, date); gap(details, 8);
+        Button time = lightAction("Time · " + String.format(Locale.US, "%02d:%02d", schedulerHour, schedulerMinute));
+        time.setOnClickListener(view -> new android.app.TimePickerDialog(this, (picker, hour, minute) -> { schedulerHour = hour; schedulerMinute = minute; showSchedulerDetails(); }, schedulerHour, schedulerMinute, false).show());
+        addButton(details, time); gap(details, 8);
+        EditText duration = input("Planned minutes", InputType.TYPE_CLASS_NUMBER); duration.setText(String.valueOf(schedulerDurationMinutes)); details.addView(duration);
+        body.addView(details); gap(body, 12);
+        Button review = primary("Next: review appointment");
+        review.setOnClickListener(view -> {
+            try { schedulerDurationMinutes = Integer.parseInt(duration.getText().toString().trim()); showSchedulerReview(); }
+            catch (NumberFormatException error) { duration.setError("Enter planned minutes"); }
+        });
+        addButton(body, review); gap(body, 8);
+        Button back = secondary("Back to activity"); back.setOnClickListener(view -> showSchedulerActivity()); addButton(body, back);
+    }
+
+    private void showSchedulerReview() {
+        LinearLayout body = appPage("Scheduler");
+        title(body, "SCHEDULE ENDURANCE", "Review appointment", "Step 3 of 3. Save only when this date, time, and duration look right.");
+        Calendar when = (Calendar) schedulerSelectedDate.clone(); when.set(Calendar.HOUR_OF_DAY, schedulerHour); when.set(Calendar.MINUTE, schedulerMinute); when.set(Calendar.SECOND, 0); when.set(Calendar.MILLISECOND, 0);
+        LinearLayout summary = card();
+        summary.addView(heading(appointmentAbbreviation(schedulerActivity) + " appointment", 21, ink));
+        summary.addView(text(new SimpleDateFormat("EEEE, MMMM d · h:mm a", Locale.getDefault()).format(when.getTime()), 15, ink));
+        summary.addView(text(schedulerDurationMinutes + " planned minutes", 14, muted));
+        body.addView(summary); gap(body, 12);
+        Button save = primary("Save to Scheduler");
+        save.setOnClickListener(view -> {
+            try { SchedulerStore.save(this, schedulerActivity, when, schedulerDurationMinutes); toast("Endurance appointment saved."); showScheduler(); }
+            catch (IllegalArgumentException error) { toast(error.getMessage()); showSchedulerDetails(); }
+        });
+        addButton(body, save); gap(body, 8);
+        Button back = secondary("Back to date and time"); back.setOnClickListener(view -> showSchedulerDetails()); addButton(body, back);
     }
 
     /** Sends a standard GPX file to a user-chosen map app; no mapping account or map data is bundled. */
