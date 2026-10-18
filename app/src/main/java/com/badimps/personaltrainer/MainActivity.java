@@ -4294,6 +4294,7 @@ public final class MainActivity extends FragmentActivity {
             SimpleDateFormat dayFormat = new SimpleDateFormat("EEE, MMM d", Locale.getDefault());
             for (JourneyStore.WorkoutRecord record : completed) {
                 SetTimeStore.WorkoutSummary timing = SetTimeStore.loadWorkout(this, record.timestamp);
+                EnduranceHistoryStore.Entry endurance = EnduranceHistoryStore.load(this, record.timestamp);
                 LinearLayout row = new LinearLayout(this);
                 row.setOrientation(LinearLayout.HORIZONTAL);
                 row.setGravity(Gravity.CENTER_VERTICAL);
@@ -4309,12 +4310,21 @@ public final class MainActivity extends FragmentActivity {
                 copy.setOrientation(LinearLayout.VERTICAL);
                 copy.addView(heading(record.target, 15, ink));
                 copy.addView(text(dayFormat.format(record.timestamp) + "  •  " + record.minutes + " guided min", 12, muted));
+                if (endurance != null) {
+                    copy.addView(text(enduranceSummary(endurance) + "  •  view route", 12, mint));
+                }
                 if (timing != null && timing.totalActiveMillis > 0L) {
                     copy.addView(text("Set time " + WorkoutTiming.formatElapsedMillis(timing.totalActiveMillis)
                             + "  •  open leaderboard", 12, mint));
                 }
                 row.addView(copy, new LinearLayout.LayoutParams(0, -2, 1));
-                if (timing != null && timing.totalActiveMillis > 0L) {
+                if (endurance != null) {
+                    row.setClickable(true);
+                    row.setFocusable(true);
+                    row.setContentDescription(record.target + ", completed " + dayFormat.format(record.timestamp)
+                            + ", " + enduranceSummary(endurance) + ". Open completed route.");
+                    row.setOnClickListener(view -> showEnduranceSessionDetails(endurance));
+                } else if (timing != null && timing.totalActiveMillis > 0L) {
                     row.setClickable(true);
                     row.setFocusable(true);
                     row.setContentDescription(record.target + ", completed " + dayFormat.format(record.timestamp)
@@ -4434,8 +4444,16 @@ public final class MainActivity extends FragmentActivity {
                 copy.addView(heading(record.target, 17, ink));
                 copy.addView(text(timestamp.format(record.timestamp) + "  •  " + record.minutes + " min", 13, muted));
                 SetTimeStore.WorkoutSummary details = SetTimeStore.loadWorkout(this, record.timestamp);
+                EnduranceHistoryStore.Entry endurance = EnduranceHistoryStore.load(this, record.timestamp);
                 if (details != null && details.totalActiveMillis > 0L) copy.addView(text("Set time " + WorkoutTiming.formatElapsedMillis(details.totalActiveMillis), 12, mint));
+                if (endurance != null) copy.addView(text(enduranceSummary(endurance) + "  •  private route saved", 12, mint));
                 item.addView(copy, new LinearLayout.LayoutParams(0, -2, 1));
+                if (endurance != null) {
+                    item.setClickable(true);
+                    item.setFocusable(true);
+                    item.setContentDescription("Open " + endurance.mode + " route completed " + timestamp.format(record.timestamp));
+                    item.setOnClickListener(view -> showEnduranceSessionDetails(endurance));
+                }
                 Button delete = action("Delete", paper, coral);
                 delete.setTextSize(12);
                 delete.setContentDescription("Delete " + record.target + " completed " + timestamp.format(record.timestamp));
@@ -4446,6 +4464,7 @@ public final class MainActivity extends FragmentActivity {
                         .setPositiveButton("Delete", (dialog, which) -> {
                             JourneyStore.removeWorkout(this, record.timestamp);
                             SetTimeStore.removeWorkout(this, record.timestamp);
+                            EnduranceHistoryStore.remove(this, record.timestamp);
                             refreshCurrentPageKeepingScroll(this::showWorkoutHistory);
                         }).show());
                 item.addView(delete, new LinearLayout.LayoutParams(dp(78), dp(42)));
@@ -4453,6 +4472,38 @@ public final class MainActivity extends FragmentActivity {
             }
         }
         Button back = secondary("Back to Progress"); back.setOnClickListener(view -> showProgress()); addButton(body, back);
+    }
+
+    /** Full local record for a finished walk, run, or ride; no third-party map or account is involved. */
+    private void showEnduranceSessionDetails(EnduranceHistoryStore.Entry entry) {
+        LinearLayout body = appPage("Progress");
+        title(body, "COMPLETED ENDURANCE", entry.mode + " route", "A private, on-device record of this completed session.");
+        LinearLayout overview = card();
+        overview.addView(heading(enduranceSummary(entry), 22, ink));
+        overview.addView(text(new SimpleDateFormat("EEEE, MMMM d · h:mm a", Locale.getDefault()).format(entry.timestamp), 14, muted));
+        overview.addView(text(entry.points.isEmpty() ? "No route points were captured for this session." : entry.points.size() + " route points saved locally", 13, muted));
+        body.addView(overview);
+        gap(body, 12);
+        if (!entry.points.isEmpty()) {
+            LinearLayout route = card();
+            route.addView(heading("Your route", 19, ink));
+            route.addView(text("Start is white. Finish is coral. This is a private route trace, not a Google map.", 13, muted));
+            RouteTraceView trace = new RouteTraceView(this);
+            trace.setPoints(entry.points);
+            LinearLayout.LayoutParams traceParams = new LinearLayout.LayoutParams(-1, dp(235));
+            traceParams.topMargin = dp(10);
+            route.addView(trace, traceParams);
+            body.addView(route);
+            gap(body, 12);
+        }
+        Button back = secondary("Back to completed sessions");
+        back.setOnClickListener(view -> showWorkoutHistory());
+        addButton(body, back);
+    }
+
+    private String enduranceSummary(EnduranceHistoryStore.Entry entry) {
+        String pace = entry.distanceMeters < 10f ? "pace —" : String.format(Locale.US, "%.1f min/km", (entry.activeMillis / 60000d) / (entry.distanceMeters / 1000d));
+        return formatLiveDistance(entry.distanceMeters) + "  •  " + formatLiveDuration(entry.activeMillis) + "  •  " + pace;
     }
 
     /** Detailed progress record for a normally completed guided workout only. */

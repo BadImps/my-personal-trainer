@@ -73,7 +73,9 @@ public final class LiveTrackingService extends Service implements LocationListen
         LiveTrackingStore.Session session = LiveTrackingStore.finish(this);
         if (session != null) {
             int minutes = Math.max(1, (int) Math.round(session.activeMillis / 60000d));
-            JourneyStore.recordWorkout(this, "Endurance · " + session.mode, minutes);
+            long completedAt = System.currentTimeMillis();
+            JourneyStore.recordWorkoutAt(this, "Endurance · " + session.mode, minutes, completedAt);
+            EnduranceHistoryStore.record(this, completedAt, session);
         }
         stopTracking();
     }

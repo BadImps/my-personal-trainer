@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 56,
-  "versionName": "5.15",
-  "publishedAt": "2026-10-18T10:56:46Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.15/app-release.apk",
-  "sha256": "c2c657fa731b0c8badaf85928a38cb5c763fa2faf61a4a3d77b5aa58a978319b",
-  "sizeBytes": 61484699,
-  "notes": "Makes dashboard Coach Hero backgrounds full-width while preserving comfortable gutters for cards and text."
+  "versionCode": 57,
+  "versionName": "5.16",
+  "publishedAt": "2026-10-18T11:42:38Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.16/app-release.apk",
+  "sha256": "17911fe126c43761835974c7944b9f26d76665b344a6ba49e05f0ec1bb2cd44a",
+  "sizeBytes": 61486379,
+  "notes": "Adds private completed walk, run, and ride records with distance, pace, duration, and route details in Progress."
 }
