@@ -70,14 +70,14 @@ import java.text.SimpleDateFormat;
 /** The complete on-device My Personal Trainer experience. */
 public final class MainActivity extends FragmentActivity {
     public static final String EXTRA_START_GUIDED_WORKOUT = "start_guided_workout";
-    private int navy = Color.rgb(16, 23, 42);
-    private int navyPanel = Color.rgb(26, 58, 72);
-    private int coral = Color.rgb(255, 107, 95);
-    private int mint = Color.rgb(119, 224, 196);
-    private int paper = Color.rgb(247, 248, 252);
-    private int ink = Color.rgb(43, 52, 77);
-    private int muted = Color.rgb(107, 122, 147);
-    private int cardLine = Color.rgb(218, 226, 233);
+    private int navy = CoachHeroDesign.NAVY;
+    private int navyPanel = CoachHeroDesign.NAVY_PANEL;
+    private int coral = CoachHeroDesign.CORAL;
+    private int mint = CoachHeroDesign.MINT;
+    private int paper = CoachHeroDesign.PAPER;
+    private int ink = CoachHeroDesign.INK;
+    private int muted = CoachHeroDesign.MUTED;
+    private int cardLine = CoachHeroDesign.CARD_LINE;
     private boolean reducedMotion;
     /** Image-led focuses for the approved plan-flow. Core includes trunk work; there is no Abs category. */
     private static final String[] WIZARD_TARGETS = {"Upper", "Lower", "Arms", "Chest", "Legs", "Full Body", "Back", "Shoulders", "Core", "Endurance"};
@@ -178,6 +178,9 @@ public final class MainActivity extends FragmentActivity {
     private int schedulerMinute;
     private int schedulerDurationMinutes = 45;
     private String enduranceWizardMode = EndurancePlanStore.WALKING;
+    private String endurancePlanMode = "Weekly";
+    private boolean[] enduranceWorkoutDays = {true, false, true, false, true, false, false};
+    private int enduranceDailyDay = 2;
     private String enduranceWizardName = "";
     private String enduranceWizardOrigin = "";
     private String enduranceWizardDestination = "";
@@ -188,6 +191,11 @@ public final class MainActivity extends FragmentActivity {
     private String manualEnduranceMode;
     private long manualEnduranceStartedAt;
     private Runnable manualEnduranceTimer;
+    /** Guided endurance is timer-first; walking and running may add manual lap marks. */
+    private String guidedEnduranceMode;
+    private long guidedEnduranceStartedAt;
+    private Runnable guidedEnduranceTimer;
+    private final List<Long> guidedEnduranceLaps = new ArrayList<>();
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -307,12 +315,31 @@ public final class MainActivity extends FragmentActivity {
     private String coachName() { return profile().coachName; }
 
     private int coachPortrait(String name) {
-        if ("Amy".equals(name)) return R.drawable.amy_launcher;
-        if ("Claudia".equals(name)) return R.drawable.claudia_launcher;
-        if ("Leo".equals(name)) return R.drawable.leo_launcher;
-        if ("Mark".equals(name)) return R.drawable.mark_launcher;
-        if ("Stephen".equals(name)) return R.drawable.stephen_launcher;
-        return R.drawable.mia_launcher;
+        // Do not extract a fake headshot from a composited Coach Hero login screen.
+        // The approved six login canvases are rendered intact by coachLoginArtwork().
+        // Small identity surfaces use the approved app mark until individual source portraits
+        // are supplied; this avoids displaying fragments of old or baked UI art.
+        return R.drawable.trainer_launcher_premium_v2;
+    }
+
+    /** Exact full login references supplied by the user; coach selection changes only this artwork. */
+    private int coachLoginArtwork(String name) {
+        if ("Amy".equals(name)) return R.drawable.coach_hero_login_amy;
+        if ("Claudia".equals(name)) return R.drawable.coach_hero_login_claudia;
+        if ("Leo".equals(name)) return R.drawable.coach_hero_login_leo;
+        if ("Mark".equals(name)) return R.drawable.coach_hero_login_mark;
+        if ("Stephen".equals(name)) return R.drawable.coach_hero_login_stephen;
+        return R.drawable.coach_hero_login_mia;
+    }
+
+    /** Full-height, background-only Coach Hero assets for the responsive sign-in surface. */
+    private int coachHeroBackground(String name) {
+        if ("Amy".equals(name)) return R.drawable.coach_hero_background_amy;
+        if ("Claudia".equals(name)) return R.drawable.coach_hero_background_claudia;
+        if ("Leo".equals(name)) return R.drawable.coach_hero_background_leo;
+        if ("Mark".equals(name)) return R.drawable.coach_hero_background_mark;
+        if ("Stephen".equals(name)) return R.drawable.coach_hero_background_stephen;
+        return R.drawable.coach_hero_background_mia;
     }
 
     private void applyKeepPhoneAwake(boolean keepAwake) {
@@ -532,7 +559,7 @@ public final class MainActivity extends FragmentActivity {
         LinearLayout content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
         content.setBackgroundColor(navy);
-        content.setPadding(dp(22), dp(24), dp(22), dp(36));
+        content.setPadding(dp(CoachHeroDesign.GUTTER_DP), dp(24), dp(CoachHeroDesign.GUTTER_DP), dp(36));
         return content;
     }
 
@@ -553,11 +580,12 @@ public final class MainActivity extends FragmentActivity {
     }
 
     /**
-     * Signed-in Coach Hero Dashboard shell.
+     * Signed-in dashboard shell.
      *
-     * The approved dashboard references use one selected coach, a hero area, and one bottom
-     * navigation system.  Keep this shell shared by every top-level page: page content may
-     * change, but coach identity, spacing, navigation and palette must not silently fork.
+     * The Coach Hero references define each page's header as part of that page's composition.
+     * Do not inject a generic banner here: it changes the approved hierarchy before the page
+     * renderer gets a chance to build its own hero. Navigation remains shared, while every
+     * screen owns its visible header, artwork, and content rhythm.
      */
     private LinearLayout appPage(String activeScreen) {
         beginNewPage();
@@ -567,13 +595,23 @@ public final class MainActivity extends FragmentActivity {
         scroll.setClipToPadding(false);
         scroll.setBackgroundColor(navy);
         LinearLayout body = column();
-        body.addView(coachHeroHeader(activeScreen));
+        // Signed-in pages use the same full Coach Hero composition as the workout
+        // flow.  Individual renderers keep their own content cards beneath it.
+        body.setPadding(dp(CoachHeroDesign.GUTTER_DP), 0, dp(CoachHeroDesign.GUTTER_DP), dp(28));
+        body.addView(coachHeroHeader(activeScreen), new LinearLayout.LayoutParams(-1, dp(218)));
         gap(body, 18);
         scroll.addView(body, new ScrollView.LayoutParams(-1, -2));
 
         LinearLayout shell = new LinearLayout(this);
         shell.setOrientation(LinearLayout.VERTICAL);
         shell.setBackgroundColor(navy);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            shell.setOnApplyWindowInsetsListener((view, insets) -> {
+                android.graphics.Insets bars = insets.getInsets(WindowInsets.Type.systemBars());
+                view.setPadding(0, bars.top, 0, bars.bottom);
+                return insets;
+            });
+        }
         shell.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
         shell.addView(coachHeroBottomNavigation(activeScreen), new LinearLayout.LayoutParams(-1, dp(76)));
         setContentView(shell);
@@ -586,43 +624,43 @@ public final class MainActivity extends FragmentActivity {
     private FrameLayout coachHeroHeader(String activeScreen) {
         FrameLayout hero = new FrameLayout(this);
         hero.setClipChildren(true);
-        hero.setBackground(surface(navyPanel, 24, 1, Color.rgb(39, 78, 97)));
+        hero.setBackgroundColor(navy);
         hero.setContentDescription("Coach " + coachName() + " dashboard header");
-
-        View ring = new View(this);
-        GradientDrawable ringShape = new GradientDrawable();
-        ringShape.setShape(GradientDrawable.OVAL);
-        ringShape.setColor(Color.TRANSPARENT);
-        ringShape.setStroke(dp(3), mint);
-        ring.setBackground(ringShape);
-        ring.setAlpha(.70f);
-        FrameLayout.LayoutParams ringParams = new FrameLayout.LayoutParams(dp(176), dp(176), Gravity.RIGHT | Gravity.CENTER_VERTICAL);
-        ringParams.rightMargin = dp(-23);
-        hero.addView(ring, ringParams);
-
-        ImageView portrait = new ImageView(this);
-        portrait.setImageResource(coachPortrait(coachName()));
-        portrait.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        portrait.setContentDescription("Coach " + coachName());
-        FrameLayout.LayoutParams portraitParams = new FrameLayout.LayoutParams(dp(164), dp(164), Gravity.RIGHT | Gravity.BOTTOM);
-        portraitParams.rightMargin = dp(-14);
-        portraitParams.bottomMargin = dp(-13);
-        hero.addView(portrait, portraitParams);
+        ImageView coach = new ImageView(this);
+        coach.setImageResource(coachHeroBackground(coachName()));
+        coach.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        coach.setContentDescription("Coach " + coachName());
+        hero.addView(coach, new FrameLayout.LayoutParams(-1, dp(292), Gravity.TOP));
+        View shade = new View(this);
+        GradientDrawable shadeBackground = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
+                new int[]{Color.rgb(7, 24, 45), Color.argb(216, 7, 24, 45), Color.argb(22, 7, 24, 45)});
+        shade.setBackground(shadeBackground);
+        hero.addView(shade, new FrameLayout.LayoutParams(-1, -1));
 
         LinearLayout copy = new LinearLayout(this);
         copy.setOrientation(LinearLayout.VERTICAL);
         copy.setGravity(Gravity.CENTER_VERTICAL);
-        TextView eyebrow = heading("COACH " + coachName().toUpperCase(Locale.ROOT), 11, mint);
+        TextView eyebrow = heading("COACH " + coachName().toUpperCase(Locale.ROOT) + " · " + activeScreen.toUpperCase(Locale.ROOT), 10, mint);
         eyebrow.setLetterSpacing(.09f);
         copy.addView(eyebrow);
-        TextView title = heading(activeScreen, 27, Color.WHITE);
+        TextView title = heading(activeScreen, 30, Color.WHITE);
         title.setSingleLine(true);
         copy.addView(title);
-        copy.addView(text("Your personal training dashboard", 13, Color.rgb(211, 225, 233)));
-        FrameLayout.LayoutParams copyParams = new FrameLayout.LayoutParams(dp(208), -2, Gravity.LEFT | Gravity.CENTER_VERTICAL);
-        copyParams.leftMargin = dp(17);
+        copy.addView(text(coachHeroSubtitle(activeScreen), 13, Color.rgb(221, 235, 246)));
+        FrameLayout.LayoutParams copyParams = new FrameLayout.LayoutParams(dp(235), -2, Gravity.LEFT | Gravity.CENTER_VERTICAL);
+        copyParams.leftMargin = dp(18);
         hero.addView(copy, copyParams);
         return hero;
+    }
+
+    private String coachHeroSubtitle(String screen) {
+        if ("Progress".equals(screen)) return "Your private training story, in focus.";
+        if ("Nutrition".equals(screen)) return "Fuel that fits your real life.";
+        if ("Endurance".equals(screen)) return "Plan your distance. Own your pace.";
+        if ("Scheduler".equals(screen)) return "Every session, one clear calendar.";
+        if ("Body".equals(screen)) return "Your numbers, clearly and privately.";
+        if ("Settings".equals(screen)) return "Make your coach experience yours.";
+        return "Your personal training dashboard.";
     }
 
     /**
@@ -682,6 +720,11 @@ public final class MainActivity extends FragmentActivity {
      * screens or introducing a second navigation style.
      */
     private LinearLayout planPage() {
+        return planPage("Workouts");
+    }
+
+    /** Legacy wizard content can opt into the correct Coach Hero section. */
+    private LinearLayout planPage(String activeScreen) {
         beginNewPage();
         setSystemBars();
         ScrollView scroll = new ScrollView(this);
@@ -691,11 +734,13 @@ public final class MainActivity extends FragmentActivity {
         LinearLayout body = new LinearLayout(this);
         body.setOrientation(LinearLayout.VERTICAL);
         body.setBackgroundColor(navy);
-        body.setPadding(dp(8), dp(hasTallPlanViewport() ? 18 : 10), dp(12), dp(32));
+        body.setPadding(dp(CoachHeroDesign.GUTTER_DP), 0, dp(CoachHeroDesign.GUTTER_DP), dp(28));
+        body.addView(coachHeroHeader(activeScreen), new LinearLayout.LayoutParams(-1, dp(218)));
+        gap(body, 16);
         scroll.addView(body, new ScrollView.LayoutParams(-1, -2));
 
         LinearLayout shell = new LinearLayout(this);
-        shell.setOrientation(LinearLayout.HORIZONTAL);
+        shell.setOrientation(LinearLayout.VERTICAL);
         shell.setBackgroundColor(navy);
         // Android 15 draws edge-to-edge by default; keep the coach and wizard clear of system text.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -705,12 +750,31 @@ public final class MainActivity extends FragmentActivity {
                 return insets;
             });
         }
-        shell.addView(planCoachRail(), new LinearLayout.LayoutParams(dp(76), -1));
-        shell.addView(scroll, new LinearLayout.LayoutParams(0, -1, 1));
+        shell.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+        shell.addView(coachHeroBottomNavigation(activeScreen), new LinearLayout.LayoutParams(-1, dp(76)));
         setContentView(shell);
         activateScroll(scroll);
         animatePage(scroll);
         return body;
+    }
+
+    /** Applies the shared bottom navigation to full-bleed Coach Hero wizard screens. */
+    private void setCoachHeroWizardShell(ScrollView scroll, String activeScreen) {
+        LinearLayout shell = new LinearLayout(this);
+        shell.setOrientation(LinearLayout.VERTICAL);
+        shell.setBackgroundColor(navy);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            shell.setOnApplyWindowInsetsListener((view, insets) -> {
+                android.graphics.Insets bars = insets.getInsets(WindowInsets.Type.systemBars());
+                view.setPadding(0, bars.top, 0, bars.bottom);
+                return insets;
+            });
+        }
+        shell.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+        shell.addView(coachHeroBottomNavigation(activeScreen), new LinearLayout.LayoutParams(-1, dp(76)));
+        setContentView(shell);
+        activateScroll(scroll);
+        animatePage(shell);
     }
 
     /** Restores an explicitly requested in-place refresh only after the replacement page is laid out. */
@@ -1033,7 +1097,7 @@ public final class MainActivity extends FragmentActivity {
         LinearLayout view = new LinearLayout(this);
         view.setOrientation(LinearLayout.VERTICAL);
         view.setPadding(dp(16), dp(16), dp(16), dp(16));
-        view.setBackground(surface(paper, 20, 1, cardLine));
+        view.setBackground(surface(paper, CoachHeroDesign.CARD_RADIUS_DP, 1, cardLine));
         view.setElevation(dp(2));
         return view;
     }
@@ -1043,7 +1107,7 @@ public final class MainActivity extends FragmentActivity {
         LinearLayout view = new LinearLayout(this);
         view.setOrientation(LinearLayout.VERTICAL);
         view.setPadding(dp(15), dp(14), dp(15), dp(14));
-        view.setBackground(surface(Color.rgb(20, 38, 66), 16, 1, Color.rgb(35, 58, 91)));
+        view.setBackground(surface(Color.rgb(20, 38, 66), CoachHeroDesign.COMPACT_RADIUS_DP, 1, Color.rgb(35, 58, 91)));
         view.setElevation(dp(3));
         return view;
     }
@@ -1135,15 +1199,26 @@ public final class MainActivity extends FragmentActivity {
     private EditText heroLoginInput(String hint, int inputType) {
         EditText field = new EditText(this);
         field.setHint(hint);
-        field.setTextSize(15);
+        field.setTextSize(14);
         field.setTextColor(Color.WHITE);
         field.setHintTextColor(Color.rgb(196, 210, 226));
         field.setInputType(inputType);
         applyPasswordMask(field, inputType);
         field.setSingleLine(true);
-        field.setPadding(dp(15), dp(6), dp(15), dp(6));
-        field.setBackground(surface(Color.rgb(22, 38, 64), 14, 1, Color.rgb(62, 91, 122)));
-        field.setLayoutParams(new LinearLayout.LayoutParams(-1, dp(52)));
+        field.setPadding(dp(13), dp(4), dp(13), dp(4));
+        field.setCompoundDrawablePadding(dp(10));
+        int icon = (inputType & InputType.TYPE_MASK_CLASS) == InputType.TYPE_CLASS_TEXT
+                && (inputType & InputType.TYPE_MASK_VARIATION) != InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS
+                ? android.R.drawable.ic_lock_lock : android.R.drawable.ic_dialog_email;
+        android.graphics.drawable.Drawable leadingIcon = getDrawable(icon);
+        if (leadingIcon != null) {
+            leadingIcon = leadingIcon.mutate();
+            leadingIcon.setBounds(0, 0, dp(18), dp(18));
+        }
+        field.setCompoundDrawables(leadingIcon, null, null, null);
+        field.setCompoundDrawableTintList(ColorStateList.valueOf(Color.rgb(230, 239, 247)));
+        field.setBackground(surface(Color.argb(224, 24, 40, 63), 10, 1, Color.rgb(76, 99, 128)));
+        field.setLayoutParams(new LinearLayout.LayoutParams(-1, dp(48)));
         return field;
     }
 
@@ -1189,76 +1264,49 @@ public final class MainActivity extends FragmentActivity {
         int fullHeroHeight = Math.max(dp(720), getResources().getDisplayMetrics().heightPixels);
         body.addView(hero, new LinearLayout.LayoutParams(-1, fullHeroHeight));
 
-        // A fixed, slightly oversized ring keeps all six coach portraits in the same visual
-        // position and scale.  The ring is decorative; it never changes with a coach choice.
-        View portraitRing = new View(this);
-        GradientDrawable ringBackground = new GradientDrawable();
-        ringBackground.setShape(GradientDrawable.OVAL);
-        ringBackground.setColor(Color.rgb(19, 40, 67));
-        ringBackground.setStroke(dp(2), mint);
-        portraitRing.setBackground(ringBackground);
-        portraitRing.setAlpha(.72f);
-        FrameLayout.LayoutParams ringParams = new FrameLayout.LayoutParams(dp(450), dp(450), Gravity.RIGHT | Gravity.BOTTOM);
-        ringParams.rightMargin = dp(-164);
-        ringParams.bottomMargin = dp(78);
-        hero.addView(portraitRing, ringParams);
-
+        // A full-height background is generated from the approved individual Coach Hero panel.
+        // It contains no baked fields or labels, allowing the native form to adapt to a real
+        // S23 Ultra canvas without stretching or leaving an empty lower region.
         ImageView coach = new ImageView(this);
-        coach.setImageResource(coachPortrait(heroCoach));
-        coach.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        coach.setImageResource(coachHeroBackground(heroCoach));
+        coach.setScaleType(ImageView.ScaleType.CENTER_CROP);
         coach.setAlpha(.98f);
-        FrameLayout.LayoutParams coachParams = new FrameLayout.LayoutParams(dp(398), dp(398), Gravity.RIGHT | Gravity.BOTTOM);
-        coachParams.rightMargin = dp(-124);
-        coachParams.bottomMargin = dp(72);
+        FrameLayout.LayoutParams coachParams = new FrameLayout.LayoutParams(-1, fullHeroHeight, Gravity.LEFT | Gravity.TOP);
         hero.addView(coach, coachParams);
-
-        // A quiet bottom fade makes the coach read as a background hero, while the controls
-        // remain stable and legible on every phone size.
-        View lowerDepth = new View(this);
-        lowerDepth.setBackgroundColor(Color.argb(58, 0, 0, 0));
-        FrameLayout.LayoutParams depthParams = new FrameLayout.LayoutParams(-1, dp(178), Gravity.BOTTOM);
-        hero.addView(lowerDepth, depthParams);
 
         LinearLayout content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
         int screenDp = (int) (getResources().getDisplayMetrics().widthPixels / getResources().getDisplayMetrics().density);
-        int contentWidth = dp(Math.min(340, Math.max(274, screenDp - 40)));
+        int contentWidth = dp(Math.min(310, Math.max(274, screenDp - 92)));
         FrameLayout.LayoutParams contentParams = new FrameLayout.LayoutParams(contentWidth, -2, Gravity.LEFT | Gravity.TOP);
-        contentParams.leftMargin = dp(20);
-        contentParams.topMargin = dp(28);
+        contentParams.leftMargin = dp(24);
+        contentParams.topMargin = dp(18);
         hero.addView(content, contentParams);
 
         LinearLayout brandRow = new LinearLayout(this);
         brandRow.setGravity(Gravity.CENTER_VERTICAL);
         ImageView mark = new ImageView(this);
-        mark.setImageResource(R.drawable.trainer_hero_mark);
+        // The premium running-dumbbell mark is the locked product icon used everywhere.
+        mark.setImageResource(R.drawable.trainer_hero_mark_premium_transparent);
+        mark.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
         mark.setContentDescription("My Personal Trainer");
-        brandRow.addView(mark, new LinearLayout.LayoutParams(dp(42), dp(42)));
-        TextView brand = heading("MY PERSONAL\nTRAINER", 11, Color.WHITE);
-        brand.setLetterSpacing(.07f);
+        brandRow.addView(mark, new LinearLayout.LayoutParams(dp(50), dp(50)));
+        TextView brand = heading("My\nPersonal\nTrainer", 12, Color.WHITE);
+        brand.setLetterSpacing(.01f);
         brand.setLineSpacing(0, .96f);
-        brand.setPadding(dp(10), 0, 0, 0);
+        brand.setPadding(dp(9), 0, 0, 0);
         brandRow.addView(brand);
         content.addView(brandRow);
-        gap(content, 48);
+        gap(content, 36);
 
-        TextView brandKicker = heading("WELCOME", 11, mint);
-        brandKicker.setLetterSpacing(.10f);
-        content.addView(brandKicker);
-        gap(content, 7);
-        content.addView(heading("Welcome", 40, Color.WHITE));
-        TextView motto = text("Your Health is Your Wealth", 18, Color.rgb(220, 231, 242));
-        motto.setPadding(0, dp(2), 0, 0);
+        content.addView(heading("Welcome", 35, Color.WHITE));
+        TextView motto = text("Your Health is Your Wealth", 16, Color.rgb(232, 239, 247));
+        motto.setLetterSpacing(.01f);
+        motto.setPadding(0, dp(5), 0, 0);
         content.addView(motto);
-        gap(content, 22);
-
-        // The copy stays fixed as well.  Settings changes the portrait only, not this template.
-        TextView coachPill = heading("YOUR SELECTED COACH", 10, navy);
-        coachPill.setGravity(Gravity.CENTER_VERTICAL);
-        coachPill.setPadding(dp(13), 0, dp(13), 0);
-        coachPill.setBackground(surface(mint, 99, 0, Color.TRANSPARENT));
-        content.addView(coachPill, new LinearLayout.LayoutParams(-2, dp(31)));
-        gap(content, 20);
+        // Preserve a clear facial area on tall screens: the fields begin over the coach's
+        // torso, as in the approved Coach Hero reference, rather than cutting across the face.
+        gap(content, 108);
 
         EditText email = heroLoginInput("Email address", InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
         if (AccountStore.exists(this)) email.setText(profile().email);
@@ -1266,14 +1314,24 @@ public final class MainActivity extends FragmentActivity {
         gap(content, 10);
         EditText password = heroLoginInput("Password", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
         content.addView(password);
+        gap(content, 7);
+        LinearLayout accountRow = new LinearLayout(this);
+        accountRow.setGravity(Gravity.CENTER_VERTICAL);
         CheckBox remember = new CheckBox(this);
-        remember.setText("Remember this account on this device");
+        remember.setText("Remember me");
         remember.setTextColor(Color.WHITE);
         remember.setButtonTintList(ColorStateList.valueOf(mint));
         remember.setChecked(AccountStore.exists(this) && profile().rememberSignIn);
-        remember.setTextSize(13);
-        remember.setPadding(0, dp(2), 0, dp(2));
-        content.addView(remember, new LinearLayout.LayoutParams(-1, dp(39)));
+        remember.setTextSize(12);
+        remember.setPadding(0, 0, 0, 0);
+        accountRow.addView(remember, new LinearLayout.LayoutParams(0, dp(34), 1));
+        TextView forgot = heading("Forgot password?", 12, mint);
+        forgot.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
+        forgot.setClickable(true);
+        forgot.setOnClickListener(view -> showForgotPassword());
+        applyPressMotion(forgot);
+        accountRow.addView(forgot, new LinearLayout.LayoutParams(0, dp(34), 1));
+        content.addView(accountRow);
         Button signIn = action("Sign in  →", coral, Color.WHITE);
         signIn.setOnClickListener(view -> {
             if (AccountStore.authenticate(this, email.getText().toString(), password.getText().toString())) {
@@ -1284,44 +1342,127 @@ public final class MainActivity extends FragmentActivity {
                 toast("That email or password does not match this profile.");
             }
         });
-        content.addView(signIn, new LinearLayout.LayoutParams(-1, dp(54)));
-        gap(content, 12);
+        content.addView(signIn, new LinearLayout.LayoutParams(-1, dp(50)));
+        gap(content, 7);
 
-        LinearLayout links = new LinearLayout(this);
-        links.setGravity(Gravity.CENTER_VERTICAL);
-        TextView forgot = heading("Forgot password?", 12, mint);
-        forgot.setPadding(0, dp(10), dp(8), dp(10));
-        forgot.setClickable(true);
-        forgot.setOnClickListener(view -> showForgotPassword());
-        applyPressMotion(forgot);
-        links.addView(forgot, new LinearLayout.LayoutParams(0, dp(38), 1));
-        TextView biometric = heading("Use biometrics", 12, mint);
-        biometric.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
-        biometric.setPadding(dp(8), dp(10), 0, dp(10));
-        biometric.setClickable(true);
-        biometric.setOnClickListener(view -> {
-            if (AccountStore.exists(this) && profile().biometricUnlock) authenticateWithBiometrics();
-            else toast("Enable biometrics in Account Settings to use it here.");
-        });
-        applyPressMotion(biometric);
-        links.addView(biometric, new LinearLayout.LayoutParams(0, dp(38), 1));
-        content.addView(links);
-        gap(content, 8);
-
-        TextView register = heading("New here?  Register", 14, Color.WHITE);
-        register.setGravity(Gravity.CENTER);
-        register.setPadding(0, dp(12), 0, dp(12));
-        register.setBackground(surface(Color.argb(28, 119, 224, 196), 14, 1, mint));
+        TextView register = text("Don’t have an account?  Register", 12, Color.WHITE);
+        register.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
+        register.setGravity(Gravity.LEFT | Gravity.CENTER_VERTICAL);
+        register.setPadding(0, 0, 0, 0);
         register.setClickable(true);
         register.setOnClickListener(view -> showRegistration());
         applyPressMotion(register);
-        content.addView(register, new LinearLayout.LayoutParams(-1, dp(49)));
+        content.addView(register, new LinearLayout.LayoutParams(-1, dp(34)));
+
+        TextView coachLabel = text("Coach " + heroCoach + " · " + loginCoachAccent(heroCoach), 11, Color.WHITE);
+        coachLabel.setGravity(Gravity.CENTER);
+        coachLabel.setPadding(dp(10), 0, dp(10), 0);
+        coachLabel.setBackground(surface(Color.argb(160, 9, 22, 40), 99, 1, Color.rgb(75, 119, 143)));
+        FrameLayout.LayoutParams coachLabelParams = new FrameLayout.LayoutParams(-2, dp(29), Gravity.RIGHT | Gravity.BOTTOM);
+        coachLabelParams.rightMargin = dp(17);
+        coachLabelParams.bottomMargin = dp(16);
+        hero.addView(coachLabel, coachLabelParams);
 
         if (autoRequestBiometric && AccountStore.exists(this) && profile().biometricUnlock) {
             content.post(() -> {
                 if (content.isAttachedToWindow()) authenticateWithBiometrics();
             });
         }
+    }
+
+    /**
+     * Exact Coach Hero login artwork with accessible, real Android hit targets.  The target
+     * image is never composited with another coach crop: coach choice maps one-to-one to one
+     * approved artwork panel.
+     */
+    private void showLockedCoachHeroLogin(LinearLayout body, String heroCoach, boolean autoRequestBiometric) {
+        FrameLayout hero = new FrameLayout(this);
+        hero.setBackgroundColor(navy);
+        hero.setClipChildren(true);
+        hero.setContentDescription("Welcome with Coach " + heroCoach);
+        int imageWidth = getResources().getDisplayMetrics().widthPixels;
+        int imageHeight = Math.round(imageWidth * (596f / 434f));
+        body.addView(hero, new LinearLayout.LayoutParams(-1, imageHeight));
+
+        ImageView artwork = new ImageView(this);
+        artwork.setImageResource(coachLoginArtwork(heroCoach));
+        artwork.setScaleType(ImageView.ScaleType.FIT_START);
+        artwork.setContentDescription("Coach Hero login artwork for " + heroCoach);
+        hero.addView(artwork, new FrameLayout.LayoutParams(-1, imageHeight));
+
+        float scale = imageWidth / 434f;
+        int fieldX = Math.round(28 * scale);
+        int fieldW = Math.round(318 * scale);
+        int fieldH = Math.round(48 * scale);
+        int emailY = Math.round(282 * scale);
+        int passwordY = Math.round(342 * scale);
+
+        EditText email = lockedArtworkInput("Email address", InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS, scale);
+        if (AccountStore.exists(this)) email.setText(profile().email);
+        addArtworkOverlay(hero, email, fieldX + Math.round(42 * scale), emailY, fieldW - Math.round(48 * scale), fieldH);
+        EditText password = lockedArtworkInput("Password", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD, scale);
+        addArtworkOverlay(hero, password, fieldX + Math.round(42 * scale), passwordY, fieldW - Math.round(48 * scale), fieldH);
+
+        final boolean[] remember = {AccountStore.exists(this) && profile().rememberSignIn};
+        View rememberTarget = lockedArtworkTarget("Remember me", view -> remember[0] = !remember[0]);
+        addArtworkOverlay(hero, rememberTarget, fieldX, Math.round(402 * scale), Math.round(155 * scale), Math.round(35 * scale));
+        View forgotTarget = lockedArtworkTarget("Forgot password", view -> showForgotPassword());
+        addArtworkOverlay(hero, forgotTarget, Math.round(216 * scale), Math.round(402 * scale), Math.round(130 * scale), Math.round(35 * scale));
+        View signInTarget = lockedArtworkTarget("Sign in", view -> {
+            if (AccountStore.authenticate(this, email.getText().toString(), password.getText().toString())) {
+                AccountStore.Profile current = profile();
+                AccountStore.updatePersonalProfile(this, current.username, current.photoUri, remember[0], current.biometricUnlock, "");
+                openSignedInHome();
+            } else {
+                toast("That email or password does not match this profile.");
+            }
+        });
+        addArtworkOverlay(hero, signInTarget, fieldX, Math.round(458 * scale), fieldW, Math.round(51 * scale));
+        View registerTarget = lockedArtworkTarget("Register a new account", view -> showRegistration());
+        addArtworkOverlay(hero, registerTarget, fieldX, Math.round(520 * scale), fieldW, Math.round(32 * scale));
+
+        if (autoRequestBiometric && AccountStore.exists(this) && profile().biometricUnlock) {
+            hero.post(() -> {
+                if (hero.isAttachedToWindow()) authenticateWithBiometrics();
+            });
+        }
+    }
+
+    private EditText lockedArtworkInput(String hint, int inputType, float scale) {
+        EditText field = new EditText(this);
+        field.setHint(""); // The approved artwork already supplies the visible label and icon.
+        field.setTextColor(Color.WHITE);
+        field.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, 14 * scale);
+        field.setSingleLine(true);
+        field.setInputType(inputType);
+        applyPasswordMask(field, inputType);
+        field.setPadding(0, 0, 0, 0);
+        field.setBackgroundColor(Color.TRANSPARENT);
+        field.setContentDescription(hint);
+        return field;
+    }
+
+    private View lockedArtworkTarget(String description, View.OnClickListener listener) {
+        View target = new View(this);
+        target.setBackgroundColor(Color.TRANSPARENT);
+        target.setContentDescription(description);
+        target.setClickable(true);
+        target.setFocusable(true);
+        target.setOnClickListener(listener);
+        return target;
+    }
+
+    private void addArtworkOverlay(FrameLayout parent, View child, int left, int top, int width, int height) {
+        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(width, height, Gravity.LEFT | Gravity.TOP);
+        params.leftMargin = left;
+        params.topMargin = top;
+        parent.addView(child, params);
+    }
+
+    private String loginCoachAccent(String coach) {
+        if ("Mia".equals(coach) || "Leo".equals(coach)) return "Spanish";
+        if ("Claudia".equals(coach) || "Stephen".equals(coach)) return "UK";
+        return "US";
     }
 
     private void openSignedInHome() {
@@ -1439,6 +1580,197 @@ public final class MainActivity extends FragmentActivity {
     // Main app
 
     private void showHome() {
+        showCoachHeroHome();
+    }
+
+    /**
+     * Coach Hero Home v1. The reference is rebuilt from real Android views so the workout,
+     * weekly plan, and meal surfaces remain useful rather than becoming a static mockup.
+     */
+    private void showCoachHeroHome() {
+        beginNewPage();
+        setSystemBars();
+        ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(true);
+        scroll.setClipToPadding(false);
+        scroll.setBackgroundColor(paper);
+
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackgroundColor(paper);
+        scroll.addView(root, new ScrollView.LayoutParams(-1, -2));
+        LinearLayout shell = new LinearLayout(this);
+        shell.setOrientation(LinearLayout.VERTICAL);
+        shell.setBackgroundColor(navy);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            shell.setOnApplyWindowInsetsListener((view, insets) -> {
+                android.graphics.Insets bars = insets.getInsets(WindowInsets.Type.systemBars());
+                view.setPadding(0, bars.top, 0, bars.bottom);
+                return insets;
+            });
+        }
+        shell.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+        shell.addView(coachHeroBottomNavigation("Home"), new LinearLayout.LayoutParams(-1, dp(76)));
+        setContentView(shell);
+        activateScroll(scroll);
+        animatePage(shell);
+
+        int screenHeight = getResources().getDisplayMetrics().heightPixels;
+        FrameLayout hero = new FrameLayout(this);
+        hero.setClipChildren(true);
+        hero.setBackgroundColor(navy);
+        root.addView(hero, new LinearLayout.LayoutParams(-1, dp(518)));
+
+        // The image retains its phone aspect ratio and is clipped at the hero boundary; this
+        // creates a full-bleed close portrait without squeezing or distorting the coach.
+        ImageView heroCoach = new ImageView(this);
+        heroCoach.setImageResource(coachHeroBackground(coachName()));
+        heroCoach.setScaleType(ImageView.ScaleType.FIT_XY);
+        heroCoach.setContentDescription("Coach " + coachName() + " home hero");
+        hero.addView(heroCoach, new FrameLayout.LayoutParams(-1, screenHeight, Gravity.TOP));
+
+        LinearLayout heroCopy = new LinearLayout(this);
+        heroCopy.setOrientation(LinearLayout.VERTICAL);
+        TextView eyebrow = heading("T O D A Y", 11, Color.WHITE);
+        eyebrow.setLetterSpacing(.16f);
+        heroCopy.addView(eyebrow);
+        View line = new View(this);
+        line.setBackgroundColor(mint);
+        LinearLayout.LayoutParams lineParams = new LinearLayout.LayoutParams(dp(35), dp(3));
+        lineParams.topMargin = dp(10); lineParams.bottomMargin = dp(22);
+        heroCopy.addView(line, lineParams);
+        heroCopy.addView(heading("Train with\npurpose.", 31, Color.WHITE));
+        TextView subtitle = text("Stronger habits.\nA healthier you.", 17, Color.rgb(229, 237, 245));
+        subtitle.setLineSpacing(dp(2), 1f);
+        LinearLayout.LayoutParams subtitleParams = new LinearLayout.LayoutParams(-1, -2);
+        subtitleParams.topMargin = dp(10);
+        heroCopy.addView(subtitle, subtitleParams);
+        FrameLayout.LayoutParams copyParams = new FrameLayout.LayoutParams(dp(230), -2, Gravity.LEFT | Gravity.TOP);
+        copyParams.leftMargin = dp(22); copyParams.topMargin = dp(34);
+        hero.addView(heroCopy, copyParams);
+
+        LinearLayout next = new LinearLayout(this);
+        next.setOrientation(LinearLayout.VERTICAL);
+        next.setPadding(dp(18), dp(17), dp(18), dp(16));
+        next.setBackground(surface(Color.WHITE, 22, 0, Color.TRANSPARENT));
+        LinearLayout nextTop = new LinearLayout(this);
+        nextTop.setGravity(Gravity.CENTER_VERTICAL);
+        ImageView nextGlyph = new ImageView(this);
+        nextGlyph.setImageResource(R.drawable.ic_nav_workouts);
+        nextGlyph.setImageTintList(ColorStateList.valueOf(coral));
+        nextGlyph.setPadding(dp(12), dp(12), dp(12), dp(12));
+        nextGlyph.setBackground(surface(Color.rgb(255, 236, 233), 18, 0, Color.TRANSPARENT));
+        LinearLayout.LayoutParams glyphParams = new LinearLayout.LayoutParams(dp(54), dp(54));
+        glyphParams.rightMargin = dp(13);
+        nextTop.addView(nextGlyph, glyphParams);
+        LinearLayout nextText = new LinearLayout(this); nextText.setOrientation(LinearLayout.VERTICAL);
+        TextView nextLabel = heading("NEXT WORKOUT", 10, muted); nextLabel.setLetterSpacing(.12f);
+        nextText.addView(nextLabel);
+        nextText.addView(heading("Full Body\nStrength", 22, ink));
+        nextTop.addView(nextText, new LinearLayout.LayoutParams(0, -2, 1));
+        TextView arrow = heading("›", 36, muted); arrow.setGravity(Gravity.CENTER);
+        nextTop.addView(arrow, new LinearLayout.LayoutParams(dp(36), dp(54)));
+        next.addView(nextTop);
+        next.addView(text("35 min   ·   320 cal   ·   Intermediate", 12, muted));
+        Button start = action("▶  Start workout", coral, Color.WHITE);
+        start.setOnClickListener(view -> showPlans());
+        LinearLayout.LayoutParams startParams = new LinearLayout.LayoutParams(-1, dp(48));
+        startParams.topMargin = dp(13);
+        next.addView(start, startParams);
+        FrameLayout.LayoutParams nextParams = new FrameLayout.LayoutParams(-1, -2, Gravity.LEFT | Gravity.BOTTOM);
+        nextParams.leftMargin = dp(15); nextParams.rightMargin = dp(15); nextParams.bottomMargin = dp(16);
+        hero.addView(next, nextParams);
+
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dp(16), dp(22), dp(16), dp(34));
+        content.setBackgroundColor(paper);
+        root.addView(content, new LinearLayout.LayoutParams(-1, -2));
+
+        LinearLayout weekHeader = new LinearLayout(this);
+        weekHeader.setGravity(Gravity.CENTER_VERTICAL);
+        TextView weekTitle = heading("YOUR WEEK", 12, muted); weekTitle.setLetterSpacing(.14f);
+        weekHeader.addView(weekTitle, new LinearLayout.LayoutParams(0, dp(32), 1));
+        TextView planLink = heading("View plan  ›", 14, muted); planLink.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
+        planLink.setClickable(true); planLink.setOnClickListener(view -> showPlans());
+        weekHeader.addView(planLink, new LinearLayout.LayoutParams(dp(100), dp(32)));
+        content.addView(weekHeader);
+
+        LinearLayout days = new LinearLayout(this);
+        days.setGravity(Gravity.CENTER);
+        String[] dayNames = {"MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"};
+        String[] dayDates = {"12", "13", "14", "15", "16", "17", "18"};
+        String[] dayPlans = {"Strength", "HIIT", "Mobility", "Lower\nBody", "Upper\nBody", "Cardio", "Rest"};
+        int[] dayIcons = {
+                R.drawable.ic_home_complete,
+                R.drawable.ic_home_hiit,
+                R.drawable.ic_nav_body,
+                R.drawable.ic_nav_workouts,
+                R.drawable.ic_nav_workouts,
+                R.drawable.ic_nav_endurance,
+                R.drawable.ic_home_rest
+        };
+        for (int i = 0; i < dayNames.length; i++) {
+            LinearLayout day = new LinearLayout(this);
+            day.setOrientation(LinearLayout.VERTICAL); day.setGravity(Gravity.CENTER);
+            day.setPadding(dp(2), dp(10), dp(2), dp(8));
+            day.setBackground(surface(i == 0 ? Color.rgb(188, 255, 231) : Color.WHITE, 15, 0, Color.TRANSPARENT));
+            day.addView(heading(dayNames[i], 9, ink));
+            day.addView(heading(dayDates[i], 12, ink));
+            ImageView icon = new ImageView(this);
+            icon.setImageResource(dayIcons[i]);
+            icon.setImageTintList(ColorStateList.valueOf(navy));
+            icon.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+            icon.setContentDescription(dayPlans[i].replace("\n", " ") + " day");
+            LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(-1, dp(32)); iconParams.topMargin = dp(5);
+            day.addView(icon, iconParams);
+            TextView plan = text(dayPlans[i], 9, ink); plan.setGravity(Gravity.CENTER); plan.setLineSpacing(0, .95f);
+            day.addView(plan, new LinearLayout.LayoutParams(-1, dp(32)));
+            LinearLayout.LayoutParams dayParams = new LinearLayout.LayoutParams(0, dp(112), 1);
+            if (i > 0) dayParams.leftMargin = dp(4);
+            days.addView(day, dayParams);
+        }
+        content.addView(days);
+        gap(content, 22);
+
+        LinearLayout fuelHeader = new LinearLayout(this); fuelHeader.setGravity(Gravity.CENTER_VERTICAL);
+        TextView fuelTitle = heading("TODAY'S FUEL", 12, muted); fuelTitle.setLetterSpacing(.14f);
+        fuelHeader.addView(fuelTitle, new LinearLayout.LayoutParams(0, dp(30), 1));
+        TextView mealLink = heading("See nutrition  ›", 14, muted); mealLink.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
+        mealLink.setClickable(true); mealLink.setOnClickListener(view -> showMeals());
+        fuelHeader.addView(mealLink, new LinearLayout.LayoutParams(dp(130), dp(30)));
+        content.addView(fuelHeader);
+
+        LinearLayout mealRow = new LinearLayout(this);
+        mealRow.setGravity(Gravity.CENTER_VERTICAL);
+        mealRow.addView(homeMealCard("BREAKFAST", "Protein Oats\n& Berries", "420 cal   ·   28g P", R.drawable.home_meal_protein_oats_berries), new LinearLayout.LayoutParams(0, dp(178), 1));
+        LinearLayout.LayoutParams lunchParams = new LinearLayout.LayoutParams(0, dp(178), 1); lunchParams.leftMargin = dp(10);
+        mealRow.addView(homeMealCard("LUNCH", "Grilled Chicken\nBowl", "520 cal   ·   42g P", R.drawable.home_meal_grilled_chicken_bowl), lunchParams);
+        content.addView(mealRow);
+    }
+
+    private LinearLayout homeMealCard(String label, String meal, String detail, int imageRes) {
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(dp(12), dp(12), dp(12), dp(11));
+        card.setBackground(surface(Color.WHITE, 20, 1, cardLine));
+        TextView top = heading(label, 9, muted); top.setLetterSpacing(.13f); card.addView(top);
+        TextView mealName = heading(meal, 15, ink); LinearLayout.LayoutParams nameParams = new LinearLayout.LayoutParams(-1, -2); nameParams.topMargin = dp(5); card.addView(mealName, nameParams);
+        TextView nutrition = text(detail, 10, muted); card.addView(nutrition);
+        ImageView mealImage = new ImageView(this);
+        mealImage.setImageResource(imageRes);
+        mealImage.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        mealImage.setContentDescription(meal.replace("\n", " "));
+        mealImage.setBackground(surface(Color.rgb(238, 242, 247), 13, 0, Color.TRANSPARENT));
+        mealImage.setClipToOutline(true);
+        LinearLayout.LayoutParams imageParams = new LinearLayout.LayoutParams(-1, 0, 1);
+        imageParams.topMargin = dp(8);
+        card.addView(mealImage, imageParams);
+        card.setClickable(true); card.setOnClickListener(view -> showMeals()); applyPressMotion(card);
+        return card;
+    }
+
+    private void showHomeLegacy() {
         AccountStore.Profile profile = AccountStore.get(this);
         LinearLayout body = appPage("Home");
         title(body, "TODAY", "Train with purpose", "Showing up today builds a stronger tomorrow.");
@@ -2004,7 +2336,165 @@ public final class MainActivity extends FragmentActivity {
     }
 
     private void showPlans() {
-        showPlanType();
+        showCoachHeroWorkout();
+    }
+
+    /**
+     * Premium Coach Hero workout entry. This is deliberately composed from native controls so the
+     * visual contract stays interactive: plan type, focus and equipment all feed the real wizard.
+     */
+    private void showCoachHeroWorkout() {
+        beginNewPage();
+        setSystemBars();
+        ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(true);
+        scroll.setClipToPadding(false);
+        scroll.setBackgroundColor(navy);
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackgroundColor(navy);
+        scroll.addView(root, new ScrollView.LayoutParams(-1, -2));
+        setCoachHeroWizardShell(scroll, "Workouts");
+
+        FrameLayout hero = new FrameLayout(this);
+        hero.setClipChildren(true);
+        hero.setBackgroundColor(navy);
+        root.addView(hero, new LinearLayout.LayoutParams(-1, dp(388)));
+        // Match the login treatment: the coach asset keeps its portrait composition at full
+        // screen height and the workout hero simply crops it at a deliberate boundary.
+        int workoutHeroImageHeight = Math.max(dp(720), getResources().getDisplayMetrics().heightPixels);
+        ImageView portrait = new ImageView(this);
+        portrait.setImageResource(coachHeroBackground(coachName()));
+        portrait.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        portrait.setAlpha(.98f);
+        portrait.setContentDescription("Coach " + coachName() + " workout planner");
+        hero.addView(portrait, new FrameLayout.LayoutParams(-1, workoutHeroImageHeight, Gravity.TOP));
+
+        LinearLayout steps = new LinearLayout(this);
+        steps.setGravity(Gravity.CENTER_VERTICAL);
+        String[] stepNames = {"PLAN", "FOCUS", "EQUIPMENT", "REVIEW"};
+        for (int i = 0; i < stepNames.length; i++) {
+            TextView marker = heading(i == 0 ? "1" : String.valueOf(i + 1), 12, i == 0 ? navy : Color.WHITE);
+            marker.setGravity(Gravity.CENTER);
+            marker.setBackground(surface(i == 0 ? coral : Color.TRANSPARENT, 99, i == 0 ? 0 : 1, Color.rgb(170, 193, 220)));
+            steps.addView(marker, new LinearLayout.LayoutParams(dp(28), dp(28)));
+            if (i < stepNames.length - 1) {
+                View connector = new View(this);
+                connector.setBackgroundColor(Color.rgb(127, 150, 184));
+                LinearLayout.LayoutParams connectorParams = new LinearLayout.LayoutParams(0, dp(2), 1);
+                connectorParams.leftMargin = dp(7); connectorParams.rightMargin = dp(7);
+                steps.addView(connector, connectorParams);
+            }
+        }
+        FrameLayout.LayoutParams stepsParams = new FrameLayout.LayoutParams(dp(310), dp(32), Gravity.LEFT | Gravity.TOP);
+        stepsParams.leftMargin = dp(18); stepsParams.topMargin = dp(22);
+        hero.addView(steps, stepsParams);
+        LinearLayout stepLabels = new LinearLayout(this);
+        stepLabels.setGravity(Gravity.CENTER_VERTICAL);
+        for (String label : stepNames) {
+            TextView name = heading(label, 8, Color.rgb(219, 229, 242));
+            name.setGravity(Gravity.CENTER);
+            stepLabels.addView(name, new LinearLayout.LayoutParams(0, dp(16), 1));
+        }
+        FrameLayout.LayoutParams labelParams = new FrameLayout.LayoutParams(dp(310), dp(16), Gravity.LEFT | Gravity.TOP);
+        labelParams.leftMargin = dp(18); labelParams.topMargin = dp(53);
+        hero.addView(stepLabels, labelParams);
+
+        LinearLayout heroCopy = new LinearLayout(this);
+        heroCopy.setOrientation(LinearLayout.VERTICAL);
+        TextView eyebrow = heading("COACH " + coachName().toUpperCase(Locale.ROOT), 11, mint); eyebrow.setLetterSpacing(.16f);
+        heroCopy.addView(eyebrow);
+        TextView heading = heading("Plan your\nworkout", 34, Color.WHITE); heading.setLineSpacing(0, .92f);
+        LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(dp(240), -2); titleParams.topMargin = dp(11);
+        heroCopy.addView(heading, titleParams);
+        TextView copy = text("Choose your schedule, focus, and equipment. I’ll build a session around you.", 15, Color.rgb(222, 233, 245));
+        copy.setLineSpacing(dp(2), 1f);
+        LinearLayout.LayoutParams copyParams = new LinearLayout.LayoutParams(dp(235), -2); copyParams.topMargin = dp(12);
+        heroCopy.addView(copy, copyParams);
+        FrameLayout.LayoutParams heroCopyParams = new FrameLayout.LayoutParams(dp(248), -2, Gravity.LEFT | Gravity.TOP);
+        heroCopyParams.leftMargin = dp(20); heroCopyParams.topMargin = dp(98);
+        hero.addView(heroCopy, heroCopyParams);
+
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dp(16), dp(20), dp(16), dp(34));
+        content.setBackgroundColor(paper);
+        root.addView(content, new LinearLayout.LayoutParams(-1, -2));
+
+        TextView planEyebrow = heading("01  ·  PLAN TYPE", 11, muted); planEyebrow.setLetterSpacing(.12f);
+        content.addView(planEyebrow);
+        content.addView(heading("How do you want to train?", 23, ink));
+        content.addView(text("Select the structure that fits your week.", 13, muted));
+        gap(content, 13);
+        LinearLayout planOptions = new LinearLayout(this);
+        planOptions.setGravity(Gravity.CENTER_VERTICAL);
+        planOptions.addView(coachHeroPlanOption("Weekly", "Build a routine", R.drawable.ic_plan_weekly), new LinearLayout.LayoutParams(0, dp(104), 1));
+        LinearLayout.LayoutParams dailyParams = new LinearLayout.LayoutParams(0, dp(104), 1); dailyParams.leftMargin = dp(8);
+        planOptions.addView(coachHeroPlanOption("Daily", "One focused day", R.drawable.ic_plan_daily), dailyParams);
+        LinearLayout.LayoutParams customParams = new LinearLayout.LayoutParams(0, dp(104), 1); customParams.leftMargin = dp(8);
+        planOptions.addView(coachHeroPlanOption("Custom", "Every detail", R.drawable.ic_plan_custom), customParams);
+        content.addView(planOptions);
+        gap(content, 18);
+        LinearLayout hint = new LinearLayout(this); hint.setOrientation(LinearLayout.VERTICAL);
+        hint.setPadding(dp(15), dp(14), dp(15), dp(14));
+        hint.setBackground(surface(Color.rgb(225, 255, 246), 17, 0, Color.TRANSPARENT));
+        hint.addView(heading("One decision at a time", 16, ink));
+        hint.addView(text("Next, choose the body areas you want to train before placing them on your calendar.", 12, muted));
+        content.addView(hint);
+        gap(content, 16);
+        Button continueButton = action("Next: choose training areas  →", coral, Color.WHITE);
+        continueButton.setOnClickListener(view -> {
+            if ("Daily".equals(planMode)) {
+                if (sessionMinutes < 45) { sessionMinutes = 60; customDuration = false; }
+                showPlanTarget();
+            } else if ("Weekly".equals(planMode)) {
+                if (sessionMinutes < 45) { sessionMinutes = 45; customDuration = false; }
+                showPlanTarget();
+            } else {
+                showPlanTarget();
+            }
+        });
+        content.addView(continueButton, new LinearLayout.LayoutParams(-1, dp(54)));
+    }
+
+    private LinearLayout coachHeroPlanOption(String mode, String detail, int iconRes) {
+        boolean selected = mode.equals(planMode);
+        LinearLayout tile = new LinearLayout(this); tile.setOrientation(LinearLayout.VERTICAL); tile.setGravity(Gravity.CENTER);
+        tile.setPadding(dp(6), dp(9), dp(6), dp(7)); tile.setClickable(true); tile.setFocusable(true);
+        tile.setBackground(surface(selected ? Color.rgb(255, 242, 239) : Color.WHITE, 17, selected ? 2 : 1, selected ? coral : cardLine));
+        ImageView icon = new ImageView(this); icon.setImageResource(iconRes); icon.setImageTintList(ColorStateList.valueOf(selected ? coral : navy));
+        tile.addView(icon, new LinearLayout.LayoutParams(dp(30), dp(30)));
+        TextView title = heading(mode, 13, ink); title.setGravity(Gravity.CENTER); tile.addView(title, new LinearLayout.LayoutParams(-1, dp(20)));
+        TextView caption = text(detail, 9, muted); caption.setGravity(Gravity.CENTER); caption.setMaxLines(2); tile.addView(caption, new LinearLayout.LayoutParams(-1, dp(24)));
+        tile.setOnClickListener(view -> { planMode = mode; refreshCurrentPageKeepingScroll(this::showCoachHeroWorkout); });
+        applyPressMotion(tile);
+        return tile;
+    }
+
+    private LinearLayout coachHeroFocusOption(String value) {
+        boolean selected = value.equalsIgnoreCase(target) || ("Upper body".equals(value) && "Upper".equalsIgnoreCase(target)) || ("Lower body".equals(value) && "Lower".equalsIgnoreCase(target));
+        LinearLayout tile = new LinearLayout(this); tile.setOrientation(LinearLayout.VERTICAL); tile.setGravity(Gravity.CENTER);
+        tile.setPadding(dp(4), dp(8), dp(4), dp(7)); tile.setClickable(true); tile.setFocusable(true);
+        tile.setBackground(surface(selected ? Color.rgb(225, 255, 246) : Color.rgb(247, 249, 252), 15, selected ? 2 : 1, selected ? mint : cardLine));
+        int iconRes;
+        switch (value) {
+            case "Upper body": iconRes = R.drawable.ic_nav_body; break;
+            case "Lower body": iconRes = R.drawable.ic_nav_endurance; break;
+            case "Arms": iconRes = R.drawable.ic_nav_workouts; break;
+            case "Chest": iconRes = R.drawable.ic_home_complete; break;
+            case "Back": iconRes = R.drawable.ic_nav_body; break;
+            case "Shoulders": iconRes = R.drawable.ic_home_hiit; break;
+            case "Core": iconRes = R.drawable.ic_nav_body; break;
+            default: iconRes = R.drawable.ic_nav_endurance;
+        }
+        ImageView icon = new ImageView(this); icon.setImageResource(iconRes);
+        icon.setImageTintList(ColorStateList.valueOf(selected ? navy : muted));
+        tile.addView(icon, new LinearLayout.LayoutParams(dp(30), dp(30)));
+        TextView label = heading(value, 10, ink); label.setGravity(Gravity.CENTER); label.setMaxLines(2);
+        LinearLayout.LayoutParams labelParams = new LinearLayout.LayoutParams(-1, dp(31)); labelParams.topMargin = dp(4); tile.addView(label, labelParams);
+        tile.setOnClickListener(view -> { target = value; refreshCurrentPageKeepingScroll(this::showCoachHeroWorkout); });
+        applyPressMotion(tile);
+        return tile;
     }
 
     /** Step 1: choose a planning rhythm before choosing movements. */
@@ -2115,8 +2605,186 @@ public final class MainActivity extends FragmentActivity {
         return tile;
     }
 
-    /** Step 2 for Weekly and Daily plans: a real week picker before workout details. */
+    /** Step 2, rebuilt in the Coach Hero Suite rather than the retired side-rail shell. */
     private void showPlanSchedule() {
+        boolean weekly = "Weekly".equals(planMode);
+        beginNewPage();
+        setSystemBars();
+        ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(true);
+        scroll.setClipToPadding(false);
+        scroll.setBackgroundColor(navy);
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackgroundColor(navy);
+        scroll.addView(root, new ScrollView.LayoutParams(-1, -2));
+        setCoachHeroWizardShell(scroll, "Workouts");
+
+        FrameLayout hero = new FrameLayout(this);
+        hero.setBackgroundColor(navy);
+        hero.setClipChildren(true);
+        root.addView(hero, new LinearLayout.LayoutParams(-1, dp(265)));
+        ImageView coach = new ImageView(this);
+        coach.setImageResource(coachHeroBackground(coachName()));
+        coach.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        coach.setAlpha(.97f);
+        hero.addView(coach, new FrameLayout.LayoutParams(-1,
+                Math.max(dp(720), getResources().getDisplayMetrics().heightPixels), Gravity.TOP));
+
+        LinearLayout heroCopy = new LinearLayout(this);
+        heroCopy.setOrientation(LinearLayout.VERTICAL);
+        TextView eyebrow = heading(weekly ? "WEEKLY PLAN" : "DAILY PLAN", 11, mint); eyebrow.setLetterSpacing(.14f);
+        heroCopy.addView(eyebrow);
+        TextView title = heading(weekly ? "Choose your\ntraining week" : "Choose your\nworkout day", 29, Color.WHITE);
+        title.setLineSpacing(0, .92f); heroCopy.addView(title);
+        TextView copy = text(weekly ? "Your plan stays separate for every week." : "Choose one date for a focused session.", 14, Color.rgb(225, 235, 246));
+        LinearLayout.LayoutParams copyParams = new LinearLayout.LayoutParams(dp(240), -2); copyParams.topMargin = dp(9);
+        heroCopy.addView(copy, copyParams);
+        FrameLayout.LayoutParams heroCopyParams = new FrameLayout.LayoutParams(dp(260), -2, Gravity.LEFT | Gravity.TOP);
+        heroCopyParams.leftMargin = dp(20); heroCopyParams.topMargin = dp(42);
+        hero.addView(heroCopy, heroCopyParams);
+
+        LinearLayout progress = new LinearLayout(this); progress.setGravity(Gravity.CENTER_VERTICAL);
+        String[] progressSteps = {"PLAN", weekly ? "WEEK" : "DAY", "TRAIN", "EQUIPMENT"};
+        for (int i = 0; i < progressSteps.length; i++) {
+            TextView marker = heading(i == 0 ? "✓" : String.valueOf(i + 1), 11, i <= 1 ? navy : Color.WHITE);
+            marker.setGravity(Gravity.CENTER);
+            marker.setBackground(surface(i <= 1 ? mint : Color.TRANSPARENT, 99, i <= 1 ? 0 : 1, Color.rgb(171, 193, 220)));
+            progress.addView(marker, new LinearLayout.LayoutParams(dp(26), dp(26)));
+            if (i < progressSteps.length - 1) {
+                View link = new View(this); link.setBackgroundColor(i == 0 ? mint : Color.rgb(130, 151, 183));
+                LinearLayout.LayoutParams linkParams = new LinearLayout.LayoutParams(0, dp(2), 1); linkParams.leftMargin = dp(6); linkParams.rightMargin = dp(6);
+                progress.addView(link, linkParams);
+            }
+        }
+        FrameLayout.LayoutParams progressParams = new FrameLayout.LayoutParams(dp(292), dp(26), Gravity.LEFT | Gravity.BOTTOM);
+        progressParams.leftMargin = dp(20); progressParams.bottomMargin = dp(18);
+        hero.addView(progress, progressParams);
+
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dp(16), dp(20), dp(16), dp(36));
+        content.setBackgroundColor(paper);
+        root.addView(content, new LinearLayout.LayoutParams(-1, -2));
+
+        TextView scheduleLabel = heading(weekly ? "01  ·  TRAINING WEEK" : "01  ·  WORKOUT DAY", 11, muted); scheduleLabel.setLetterSpacing(.12f);
+        content.addView(scheduleLabel);
+        content.addView(heading(weekly ? "Place your training days" : "Pick your workout date", 23, ink));
+        content.addView(text(weekly ? "Tap dates to switch between Train and Rest." : "Tap the one day you want to train.", 13, muted));
+        gap(content, 14);
+
+        // Calendar concept 4: an editorial, dark timeline that makes the week's
+        // workout / recovery rhythm readable at a glance.
+        LinearLayout calendar = new LinearLayout(this); calendar.setOrientation(LinearLayout.VERTICAL);
+        calendar.setPadding(dp(16), dp(16), dp(16), dp(16));
+        calendar.setBackground(surface(Color.rgb(10, 29, 50), 24, 1, Color.rgb(41, 83, 115)));
+        LinearLayout header = new LinearLayout(this); header.setGravity(Gravity.CENTER_VERTICAL);
+        Button previous = action("‹", Color.TRANSPARENT, Color.rgb(125, 163, 195)); previous.setTextSize(24); previous.setPadding(0, 0, 0, 0); previous.setMinHeight(0); previous.setEnabled(selectedWeekOffset > 0);
+        previous.setContentDescription("Previous available week");
+        previous.setOnClickListener(view -> { selectPlanningWeek(selectedWeekOffset - 1); refreshCurrentPageKeepingScroll(this::showPlanSchedule); });
+        header.addView(previous, new LinearLayout.LayoutParams(dp(25), dp(42)));
+        TextView weekTitle = heading(selectedWeekTitle().replace("Week of ", ""), 18, Color.WHITE); weekTitle.setGravity(Gravity.LEFT | Gravity.CENTER_VERTICAL);
+        header.addView(weekTitle, new LinearLayout.LayoutParams(0, dp(46), 1));
+        LinearLayout headerMeta = new LinearLayout(this); headerMeta.setOrientation(LinearLayout.VERTICAL); headerMeta.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
+        TextView countText = heading(weekly ? trainingDays + " training days" : "1 training day", 9, Color.WHITE); countText.setGravity(Gravity.RIGHT); headerMeta.addView(countText, new LinearLayout.LayoutParams(-1, dp(18)));
+        LinearLayout meter = new LinearLayout(this); meter.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
+        for (int part = 0; part < 5; part++) { View bar = new View(this); bar.setBackground(surface(part < Math.min(5, Math.max(1, trainingDays)) ? mint : Color.rgb(49, 77, 108), 99, 0, Color.TRANSPARENT)); LinearLayout.LayoutParams barParams = new LinearLayout.LayoutParams(dp(20), dp(7)); if (part > 0) barParams.leftMargin = dp(4); meter.addView(bar, barParams); }
+        headerMeta.addView(meter, new LinearLayout.LayoutParams(-1, dp(13)));
+        header.addView(headerMeta, new LinearLayout.LayoutParams(dp(118), dp(40)));
+        Button nextWeek = action("›", Color.TRANSPARENT, Color.rgb(125, 163, 195)); nextWeek.setTextSize(24); nextWeek.setPadding(0, 0, 0, 0); nextWeek.setMinHeight(0); nextWeek.setEnabled(selectedWeekOffset < maxSelectableWeekOffset());
+        nextWeek.setContentDescription("Next available week");
+        nextWeek.setOnClickListener(view -> { selectPlanningWeek(selectedWeekOffset + 1); refreshCurrentPageKeepingScroll(this::showPlanSchedule); });
+        header.addView(nextWeek, new LinearLayout.LayoutParams(dp(25), dp(42)));
+        calendar.addView(header);
+
+        LinearLayout days = new LinearLayout(this); days.setGravity(Gravity.CENTER_VERTICAL);
+        for (int i = 0; i < weekDays.length; i++) {
+            final int dayIndex = i;
+            boolean selected = weekly ? weeklyWorkoutDays[i] : dailyScheduledDay == i;
+            LinearLayout day = new LinearLayout(this); day.setOrientation(LinearLayout.VERTICAL); day.setGravity(Gravity.CENTER); day.setClickable(true); day.setFocusable(true);
+            day.setPadding(dp(1), dp(4), dp(1), dp(2));
+            day.setBackgroundColor(Color.TRANSPARENT);
+            day.addView(heading(weekDays[i], 8, selected ? mint : Color.rgb(180, 200, 220)), new LinearLayout.LayoutParams(-1, dp(16)));
+            TextView date = heading(String.valueOf(selectedWeekDate(i).get(Calendar.DAY_OF_MONTH)), 14, Color.WHITE); date.setGravity(Gravity.CENTER);
+            day.addView(date, new LinearLayout.LayoutParams(-1, dp(23)));
+            View dot = new View(this); dot.setBackground(surface(selected ? mint : Color.rgb(66, 91, 121), 99, selected ? 2 : 1, selected ? Color.rgb(159, 255, 231) : Color.rgb(101, 128, 159)));
+            LinearLayout.LayoutParams dotParams = new LinearLayout.LayoutParams(dp(selected ? 18 : 13), dp(selected ? 18 : 13)); dotParams.gravity = Gravity.CENTER; dotParams.topMargin = dp(2); day.addView(dot, dotParams);
+            day.setOnClickListener(view -> {
+                if (weekly) {
+                    weeklyWorkoutDays[dayIndex] = !weeklyWorkoutDays[dayIndex];
+                    if (weeklyWorkoutDays[dayIndex] && weeklyDayTargets.get(dayIndex).isEmpty()) weeklyDayTargets.get(dayIndex).addAll(selectedTargets);
+                    activeScheduleDay = dayIndex; syncTrainingDays(); persistCurrentWeekSchedule();
+                } else { dailyScheduledDay = dayIndex; }
+                refreshCurrentPageKeepingScroll(this::showPlanSchedule);
+            });
+            LinearLayout.LayoutParams dayParams = new LinearLayout.LayoutParams(0, dp(65), 1); if (i > 0) dayParams.leftMargin = dp(2);
+            days.addView(day, dayParams);
+        }
+        LinearLayout.LayoutParams daysParams = new LinearLayout.LayoutParams(-1, dp(65)); daysParams.topMargin = dp(7); calendar.addView(days, daysParams);
+
+        View timeline = new View(this); timeline.setBackgroundColor(Color.rgb(65, 111, 143));
+        LinearLayout.LayoutParams timelineParams = new LinearLayout.LayoutParams(-1, dp(1)); timelineParams.leftMargin = dp(9); timelineParams.rightMargin = dp(9); timelineParams.topMargin = dp(-9); calendar.addView(timeline, timelineParams);
+
+        LinearLayout cards = new LinearLayout(this); cards.setGravity(Gravity.CENTER_VERTICAL);
+        for (int i = 0; i < weekDays.length; i++) {
+            final int dayIndex = i;
+            boolean selected = weekly ? weeklyWorkoutDays[i] : dailyScheduledDay == i;
+            String scheduledFocus = selected && weekly && !weeklyDayTargets.get(i).isEmpty()
+                    ? targetLabel(weeklyDayTargets.get(i).get(0)) : selected ? targetLabel(target) : "Rest";
+            LinearLayout detail = new LinearLayout(this); detail.setOrientation(LinearLayout.VERTICAL); detail.setGravity(Gravity.CENTER); detail.setClickable(true);
+            detail.setPadding(dp(2), dp(8), dp(2), dp(7));
+            detail.setBackground(surface(selected ? Color.rgb(18, 63, 81) : Color.rgb(20, 46, 72), 10, selected ? 1 : 0, selected ? mint : Color.TRANSPARENT));
+            ImageView icon = new ImageView(this);
+            int iconRes = selected && "Endurance".equals(scheduledFocus) ? R.drawable.ic_nav_endurance
+                    : selected ? R.drawable.ic_nav_workouts : R.drawable.ic_home_rest;
+            icon.setImageResource(iconRes);
+            icon.setImageTintList(ColorStateList.valueOf(selected ? mint : Color.rgb(154, 178, 205)));
+            icon.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+            LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(-1, dp(22)); iconParams.leftMargin = dp(6); iconParams.rightMargin = dp(6); detail.addView(icon, iconParams);
+            TextView label = heading(scheduledFocus, 9, selected ? Color.WHITE : Color.rgb(180, 200, 220)); label.setGravity(Gravity.CENTER); label.setSingleLine(true); detail.addView(label, new LinearLayout.LayoutParams(-1, dp(19)));
+            TextView minutes = text(selected ? "45 min" : "Recover", 8, selected ? Color.rgb(180, 235, 222) : Color.rgb(132, 159, 188)); minutes.setGravity(Gravity.CENTER); detail.addView(minutes, new LinearLayout.LayoutParams(-1, dp(17)));
+            detail.setOnClickListener(view -> {
+                if (weekly) { weeklyWorkoutDays[dayIndex] = !weeklyWorkoutDays[dayIndex]; if (weeklyWorkoutDays[dayIndex] && weeklyDayTargets.get(dayIndex).isEmpty()) weeklyDayTargets.get(dayIndex).addAll(selectedTargets); activeScheduleDay = dayIndex; syncTrainingDays(); persistCurrentWeekSchedule(); }
+                else { dailyScheduledDay = dayIndex; }
+                refreshCurrentPageKeepingScroll(this::showPlanSchedule);
+            });
+            LinearLayout.LayoutParams detailParams = new LinearLayout.LayoutParams(0, dp(68), 1); if (i > 0) detailParams.leftMargin = dp(3); cards.addView(detail, detailParams);
+        }
+        LinearLayout.LayoutParams cardsParams = new LinearLayout.LayoutParams(-1, dp(68)); cardsParams.topMargin = dp(12); calendar.addView(cards, cardsParams);
+        content.addView(calendar);
+
+        if (weekly) {
+            gap(content, 14);
+            LinearLayout rhythm = new LinearLayout(this); rhythm.setOrientation(LinearLayout.VERTICAL);
+            rhythm.setPadding(dp(15), dp(15), dp(15), dp(15)); rhythm.setBackground(surface(Color.WHITE, 20, 1, cardLine));
+            rhythm.addView(heading("How many days this week?", 18, ink));
+            rhythm.addView(text("Start with a rhythm, then place those days exactly where you want them.", 12, muted));
+            LinearLayout counts = new LinearLayout(this); counts.setGravity(Gravity.CENTER_VERTICAL);
+            for (int count : new int[]{2, 3, 4, 5}) {
+                Button option = action(count + " days", count == trainingDays ? mint : Color.rgb(239, 243, 249), count == trainingDays ? navy : ink);
+                option.setTextSize(11);
+                option.setOnClickListener(view -> { applyTrainingDayCount(count); persistCurrentWeekSchedule(); refreshCurrentPageKeepingScroll(this::showPlanSchedule); });
+                LinearLayout.LayoutParams countParams = new LinearLayout.LayoutParams(0, dp(46), 1); if (count > 2) countParams.leftMargin = dp(6);
+                counts.addView(option, countParams);
+            }
+            LinearLayout.LayoutParams countsParams = new LinearLayout.LayoutParams(-1, dp(46)); countsParams.topMargin = dp(11); rhythm.addView(counts, countsParams);
+            content.addView(rhythm);
+        }
+        gap(content, 17);
+        Button continueButton = action("Next: choose equipment  →", coral, Color.WHITE);
+        continueButton.setOnClickListener(view -> {
+            if (weekly && trainingDays == 0) { toast("Choose at least one workout day."); return; }
+            if (weekly) persistCurrentWeekSchedule();
+            showPlanEquipment();
+        });
+        content.addView(continueButton, new LinearLayout.LayoutParams(-1, dp(54)));
+        Button back = new Button(this); back.setText("Back"); back.setTextColor(mint); back.setTextSize(14); back.setAllCaps(false); back.setBackgroundColor(Color.TRANSPARENT);
+        back.setOnClickListener(view -> showPlanTarget());
+        content.addView(back, new LinearLayout.LayoutParams(-1, dp(48)));
+    }
+
+    /** Retained only as a reference while the remaining legacy wizard screens are migrated. */
+    private void showPlanScheduleLegacy() {
         boolean weekly = "Weekly".equals(planMode);
         LinearLayout body = planPage();
         planTitle(body, weekly ? "WEEKLY PLAN" : "DAILY PLAN", weekly ? "Choose your\ntraining week" : "Choose your\nworkout day", weekly
@@ -2240,8 +2908,80 @@ public final class MainActivity extends FragmentActivity {
         initialisePlanSelections();
     }
 
-    /** Assign one or two focus areas to the single Daily date or the active Weekly date. */
+    /** Step 2: Coach Hero training-area page, shown before the date calendar. */
     private void showPlanTarget() {
+        initialisePlanSelections();
+        final boolean weekly = "Weekly".equals(planMode);
+        final List<String> focuses = activeTargets();
+        beginNewPage();
+        setSystemBars();
+        ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(true); scroll.setClipToPadding(false); scroll.setBackgroundColor(navy);
+        LinearLayout root = new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL); root.setBackgroundColor(navy);
+        scroll.addView(root, new ScrollView.LayoutParams(-1, -2));
+        setCoachHeroWizardShell(scroll, "Workouts");
+
+        FrameLayout hero = new FrameLayout(this); hero.setClipChildren(true); hero.setBackgroundColor(navy);
+        root.addView(hero, new LinearLayout.LayoutParams(-1, dp(250)));
+        ImageView coach = new ImageView(this); coach.setImageResource(coachHeroBackground(coachName())); coach.setScaleType(ImageView.ScaleType.CENTER_CROP); coach.setAlpha(.97f);
+        hero.addView(coach, new FrameLayout.LayoutParams(-1, Math.max(dp(690), getResources().getDisplayMetrics().heightPixels), Gravity.TOP));
+        LinearLayout copy = new LinearLayout(this); copy.setOrientation(LinearLayout.VERTICAL);
+        TextView eyebrow = heading(weekly ? "WEEKLY PLAN · STEP 2" : "Custom".equals(planMode) ? "CUSTOM PLAN · STEP 2" : "DAILY PLAN · STEP 2", 10, mint); eyebrow.setLetterSpacing(.14f); copy.addView(eyebrow);
+        TextView title = heading("What do you want\nto train?", 28, Color.WHITE); title.setLineSpacing(0, .93f); copy.addView(title);
+        TextView subtitle = text("Choose up to two focus areas. Your calendar will use these to shape each session.", 13, Color.rgb(226, 236, 247));
+        LinearLayout.LayoutParams subtitleParams = new LinearLayout.LayoutParams(dp(255), -2); subtitleParams.topMargin = dp(8); copy.addView(subtitle, subtitleParams);
+        FrameLayout.LayoutParams copyParams = new FrameLayout.LayoutParams(dp(274), -2, Gravity.LEFT | Gravity.TOP); copyParams.leftMargin = dp(20); copyParams.topMargin = dp(38); hero.addView(copy, copyParams);
+        LinearLayout markers = new LinearLayout(this); markers.setGravity(Gravity.CENTER_VERTICAL);
+        String[] marks = {"✓", "2", "3", "4"};
+        for (int i = 0; i < marks.length; i++) {
+            TextView marker = heading(marks[i], 11, i <= 1 ? navy : Color.WHITE); marker.setGravity(Gravity.CENTER);
+            marker.setBackground(surface(i <= 1 ? mint : Color.TRANSPARENT, 99, i <= 1 ? 0 : 1, Color.rgb(171, 193, 220)));
+            markers.addView(marker, new LinearLayout.LayoutParams(dp(26), dp(26)));
+            if (i < marks.length - 1) { View line = new View(this); line.setBackgroundColor(i == 0 ? mint : Color.rgb(130, 151, 183)); LinearLayout.LayoutParams lineParams = new LinearLayout.LayoutParams(0, dp(2), 1); lineParams.leftMargin = dp(6); lineParams.rightMargin = dp(6); markers.addView(line, lineParams); }
+        }
+        FrameLayout.LayoutParams markerParams = new FrameLayout.LayoutParams(dp(292), dp(26), Gravity.LEFT | Gravity.BOTTOM); markerParams.leftMargin = dp(20); markerParams.bottomMargin = dp(17); hero.addView(markers, markerParams);
+
+        LinearLayout content = new LinearLayout(this); content.setOrientation(LinearLayout.VERTICAL); content.setPadding(dp(16), dp(20), dp(16), dp(36)); content.setBackgroundColor(paper);
+        root.addView(content, new LinearLayout.LayoutParams(-1, -2));
+        TextView section = heading("02  ·  TRAINING AREAS", 11, muted); section.setLetterSpacing(.12f); content.addView(section);
+        content.addView(heading("Pick up to two areas", 23, ink));
+        content.addView(text("Tap a card to add or remove it. The highlighted anatomy shows exactly what each choice trains.", 13, muted));
+        gap(content, 13);
+        for (int index = 0; index < WIZARD_TARGETS.length; index += 2) {
+            LinearLayout row = new LinearLayout(this); row.setOrientation(LinearLayout.HORIZONTAL);
+            for (int offset = 0; offset < 2; offset++) {
+                String choice = WIZARD_TARGETS[index + offset];
+                LinearLayout tile = targetTile(choice, focuses.contains(choice));
+                tile.setOnClickListener(view -> {
+                    toggleActiveTarget(choice);
+                    if (weekly) {
+                        List<String> template = new ArrayList<>(activeTargets());
+                        for (int day = 0; day < weeklyWorkoutDays.length; day++) if (weeklyWorkoutDays[day]) { weeklyDayTargets.get(day).clear(); weeklyDayTargets.get(day).addAll(template); }
+                        persistCurrentWeekSchedule();
+                    }
+                    session.clear(); resetExerciseSelection(); refreshCurrentPageKeepingScroll(this::showPlanTarget);
+                });
+                LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(151), 1); if (offset == 0) params.rightMargin = dp(9); row.addView(tile, params);
+            }
+            content.addView(row); gap(content, 9);
+        }
+        LinearLayout selected = new LinearLayout(this); selected.setOrientation(LinearLayout.VERTICAL); selected.setPadding(dp(14), dp(12), dp(14), dp(12)); selected.setBackground(surface(Color.rgb(232, 255, 247), 16, 1, mint));
+        selected.addView(heading("YOUR FOCUS", 10, Color.rgb(24, 107, 91)));
+        selected.addView(text(focusSummary(focuses), 15, ink)); content.addView(selected);
+        gap(content, 15);
+        Button next = action((weekly || "Daily".equals(planMode)) ? "Next: choose training week  →" : "Next: choose workout length  →", coral, Color.WHITE);
+        next.setOnClickListener(view -> {
+            if (activeTargets().isEmpty()) { toast("Choose at least one training area."); return; }
+            syncPrimaryTarget();
+            if (weekly || "Daily".equals(planMode)) showPlanSchedule(); else showPlanDuration();
+        });
+        content.addView(next, new LinearLayout.LayoutParams(-1, dp(54)));
+        Button back = new Button(this); back.setText("Back"); back.setTextSize(14); back.setTextColor(mint); back.setAllCaps(false); back.setBackgroundColor(Color.TRANSPARENT); back.setOnClickListener(view -> showCoachHeroWorkout()); content.addView(back, new LinearLayout.LayoutParams(-1, dp(46)));
+    }
+
+    /** Assign one or two focus areas to the single Daily date or the active Weekly date. */
+    /** Retained until the legacy wizard shell is removed. */
+    private void showPlanTargetLegacy() {
         initialisePlanSelections();
         boolean weekly = "Weekly".equals(planMode);
         if (weekly && !weeklyWorkoutDays[activeScheduleDay]) {
@@ -2351,34 +3091,23 @@ public final class MainActivity extends FragmentActivity {
         tile.setClickable(true);
         tile.setFocusable(true);
         tile.setContentDescription((selected ? "Selected training area: " : "Choose training area: ") + targetLabel(choice));
-        tile.setBackground(surface(paper, 16, selected ? 2 : 1, selected ? mint : cardLine));
+        tile.setBackground(surface(Color.WHITE, 18, selected ? 2 : 1, selected ? mint : Color.rgb(220, 229, 239)));
         tile.setClipToOutline(true);
         elevatePlanSurface(tile, selected);
         FrameLayout imageArea = new FrameLayout(this);
-        imageArea.setBackgroundColor(Color.WHITE);
+        imageArea.setBackgroundColor(Color.rgb(248, 250, 253));
         int targetIndex = 0;
         for (int index = 0; index < WIZARD_TARGETS.length; index++) if (WIZARD_TARGETS[index].equals(choice)) targetIndex = index;
-        ReferenceArtworkView artwork;
-        if (targetIndex < 6) {
-            int[] columnLeft = {4, 515};
-            int[] columnRight = {510, 1021};
-            int[] rowTop = {3, 491, 966};
-            int[] rowBottom = {487, 961, 1533};
-            int column = targetIndex % 2;
-            int row = targetIndex / 2;
-            artwork = referenceArtwork(R.drawable.workout_focus_tiles,
-                    columnLeft[column], rowTop[row], columnRight[column], rowBottom[row]);
-        } else {
-            // The extension sheet is a 2×2 grid: Back, Shoulders, Core, Endurance.
-            int extensionIndex = targetIndex - 6;
-            int column = extensionIndex % 2;
-            int row = extensionIndex / 2;
-            int left = column == 0 ? 2 : 629;
-            int right = column == 0 ? 625 : 1252;
-            int top = row == 0 ? 2 : 629;
-            int bottom = row == 0 ? 625 : 1252;
-            artwork = referenceArtwork(R.drawable.workout_focus_tiles_expanded, left, top, right, bottom);
-        }
+        // One consistent anatomy atlas: the selected muscle group is coral-red on the same
+        // human figure, so the picture conveys the choice without relying on text alone.
+        int column = targetIndex % 2;
+        int row = targetIndex / 2;
+        int left = column == 0 ? 0 : 512;
+        int right = column == 0 ? 512 : 1024;
+        int[] rowTop = {0, 307, 614, 921, 1228};
+        int[] rowBottom = {307, 614, 921, 1228, 1536};
+        ReferenceArtworkView artwork = referenceArtwork(R.drawable.workout_anatomy_highlights,
+                left, rowTop[row], right, rowBottom[row]);
         imageArea.addView(artwork, new FrameLayout.LayoutParams(-1, -1));
         if (selected) {
             TextView check = heading("✓", hasTallPlanViewport() ? 14 : 12, navy);
@@ -2391,6 +3120,8 @@ public final class MainActivity extends FragmentActivity {
             imageArea.addView(check, checkParams);
         }
         tile.addView(imageArea, new LinearLayout.LayoutParams(-1, 0, 1));
+        View accent = new View(this); accent.setBackgroundColor(selected ? mint : Color.rgb(235, 240, 246));
+        tile.addView(accent, new LinearLayout.LayoutParams(-1, dp(selected ? 3 : 1)));
         TextView name = heading(targetLabel(choice), hasTallPlanViewport() ? 13 : 11, ink);
         name.setGravity(Gravity.CENTER);
         name.setSingleLine(true);
@@ -2470,7 +3201,75 @@ public final class MainActivity extends FragmentActivity {
         container.addView(row);
     }
 
+    /** Coach Hero Suite equipment step. */
     private void showPlanEquipment() {
+        initialisePlanSelections();
+        beginNewPage(); setSystemBars();
+        ScrollView scroll = new ScrollView(this); scroll.setFillViewport(true); scroll.setClipToPadding(false); scroll.setBackgroundColor(navy);
+        LinearLayout root = new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL); root.setBackgroundColor(navy);
+        scroll.addView(root, new ScrollView.LayoutParams(-1, -2)); setCoachHeroWizardShell(scroll, "Workouts");
+
+        FrameLayout hero = new FrameLayout(this); hero.setClipChildren(true); hero.setBackgroundColor(navy); root.addView(hero, new LinearLayout.LayoutParams(-1, dp(260)));
+        ImageView coach = new ImageView(this); coach.setImageResource(coachHeroBackground(coachName())); coach.setScaleType(ImageView.ScaleType.CENTER_CROP); coach.setAlpha(.97f);
+        hero.addView(coach, new FrameLayout.LayoutParams(-1, Math.max(dp(700), getResources().getDisplayMetrics().heightPixels), Gravity.TOP));
+        LinearLayout copy = new LinearLayout(this); copy.setOrientation(LinearLayout.VERTICAL);
+        TextView eyebrow = heading("PLAN YOUR WORKOUT · STEP 4", 10, mint); eyebrow.setLetterSpacing(.14f); copy.addView(eyebrow);
+        TextView title = heading("Choose your\nequipment", 29, Color.WHITE); title.setLineSpacing(0, .93f); copy.addView(title);
+        TextView subtitle = text("Select one or two categories. We’ll shape movements around your training area.", 13, Color.rgb(226, 236, 247));
+        LinearLayout.LayoutParams subtitleParams = new LinearLayout.LayoutParams(dp(258), -2); subtitleParams.topMargin = dp(8); copy.addView(subtitle, subtitleParams);
+        FrameLayout.LayoutParams copyParams = new FrameLayout.LayoutParams(dp(274), -2, Gravity.LEFT | Gravity.TOP); copyParams.leftMargin = dp(20); copyParams.topMargin = dp(38); hero.addView(copy, copyParams);
+        LinearLayout markers = new LinearLayout(this); markers.setGravity(Gravity.CENTER_VERTICAL);
+        String[] marks = {"✓", "✓", "✓", "4", "5", "6"};
+        for (int i = 0; i < marks.length; i++) {
+            boolean current = i == 3; boolean complete = i < 3;
+            TextView marker = heading(marks[i], 11, complete || current ? navy : Color.WHITE); marker.setGravity(Gravity.CENTER);
+            marker.setBackground(surface(complete || current ? mint : Color.TRANSPARENT, 99, complete || current ? 0 : 1, Color.rgb(171, 193, 220)));
+            markers.addView(marker, new LinearLayout.LayoutParams(dp(26), dp(26)));
+            if (i < marks.length - 1) { View line = new View(this); line.setBackgroundColor(i < 3 ? mint : Color.rgb(130, 151, 183)); LinearLayout.LayoutParams lineParams = new LinearLayout.LayoutParams(0, dp(2), 1); lineParams.leftMargin = dp(5); lineParams.rightMargin = dp(5); markers.addView(line, lineParams); }
+        }
+        // Keep the six-step rail safely inside an S23 Ultra viewport; the former
+        // fixed width allowed the last marker to visually clip at the right edge.
+        FrameLayout.LayoutParams markerParams = new FrameLayout.LayoutParams(dp(360), dp(26), Gravity.LEFT | Gravity.BOTTOM); markerParams.leftMargin = dp(20); markerParams.bottomMargin = dp(17); hero.addView(markers, markerParams);
+
+        LinearLayout content = new LinearLayout(this); content.setOrientation(LinearLayout.VERTICAL); content.setPadding(dp(16), dp(20), dp(16), dp(36)); content.setBackgroundColor(paper); root.addView(content, new LinearLayout.LayoutParams(-1, -2));
+        TextView section = heading("04  ·  EQUIPMENT", 11, muted); section.setLetterSpacing(.12f); content.addView(section);
+        content.addView(heading("Train with what you have", 23, ink));
+        content.addView(text("Pick up to two categories. Every exercise on the next page will fit your selection.", 13, muted));
+        gap(content, 14);
+        LinearLayout guidance = new LinearLayout(this); guidance.setGravity(Gravity.CENTER_VERTICAL); guidance.setPadding(dp(14), dp(11), dp(14), dp(11)); guidance.setBackground(surface(Color.rgb(11, 48, 67), 16, 1, Color.rgb(45, 90, 102)));
+        TextView guidanceMark = heading("✦", 19, mint); guidanceMark.setGravity(Gravity.CENTER); guidance.addView(guidanceMark, new LinearLayout.LayoutParams(dp(30), dp(34)));
+        LinearLayout guidanceCopy = new LinearLayout(this); guidanceCopy.setOrientation(LinearLayout.VERTICAL); guidanceCopy.addView(heading("BUILD YOUR EQUIPMENT MIX", 10, mint)); guidanceCopy.addView(text("One category is enough. Two gives your plan more variety.", 11, Color.rgb(218, 233, 241))); guidance.addView(guidanceCopy, new LinearLayout.LayoutParams(0, dp(38), 1));
+        content.addView(guidance); gap(content, 12);
+        for (int index = 0; index < Coach.EQUIPMENT_TYPES.length; index += 2) {
+            LinearLayout row = new LinearLayout(this); row.setOrientation(LinearLayout.HORIZONTAL);
+            for (int offset = 0; offset < 2; offset++) {
+                String equipment = Coach.EQUIPMENT_TYPES[index + offset];
+                LinearLayout tile = equipmentTile(equipment, selectedEquipmentTypes.contains(equipment));
+                tile.setOnClickListener(view -> {
+                    if (selectedEquipmentTypes.contains(equipment)) { if (selectedEquipmentTypes.size() == 1) { toast("Keep at least one equipment category selected."); return; } selectedEquipmentTypes.remove(equipment); }
+                    else if (selectedEquipmentTypes.size() >= 2) { toast("Choose up to two equipment categories per workout."); return; }
+                    else selectedEquipmentTypes.add(equipment);
+                    equipmentType = selectedEquipmentTypes.get(0); session.clear(); resetExerciseSelection(); refreshCurrentPageKeepingScroll(this::showPlanEquipment);
+                });
+                LinearLayout.LayoutParams tileParams = new LinearLayout.LayoutParams(0, dp(192), 1); if (offset == 0) tileParams.rightMargin = dp(9); row.addView(tile, tileParams);
+            }
+            content.addView(row); gap(content, 9);
+        }
+        LinearLayout selected = new LinearLayout(this); selected.setGravity(Gravity.CENTER_VERTICAL); selected.setPadding(dp(14), dp(12), dp(14), dp(12)); selected.setBackground(surface(Color.rgb(10, 43, 60), 18, 1, Color.rgb(51, 128, 138)));
+        TextView selectionCount = heading(String.valueOf(selectedEquipmentTypes.size()), 24, navy); selectionCount.setGravity(Gravity.CENTER); selectionCount.setBackground(surface(mint, 99, 0, Color.TRANSPARENT)); selected.addView(selectionCount, new LinearLayout.LayoutParams(dp(44), dp(44)));
+        LinearLayout selectedCopy = new LinearLayout(this); selectedCopy.setOrientation(LinearLayout.VERTICAL); selectedCopy.addView(heading("YOUR EQUIPMENT MIX", 10, mint)); selectedCopy.addView(text(equipmentSummary(), 15, Color.WHITE)); LinearLayout.LayoutParams selectedCopyParams = new LinearLayout.LayoutParams(0, dp(48), 1); selectedCopyParams.leftMargin = dp(11); selected.addView(selectedCopy, selectedCopyParams);
+        TextView limit = text("of 2", 11, Color.rgb(177, 203, 216)); limit.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL); selected.addView(limit, new LinearLayout.LayoutParams(dp(36), dp(44)));
+        content.addView(selected);
+        if (selectedEquipmentTypes.contains("Machine-assisted")) {
+            gap(content, 10); LinearLayout machines = new LinearLayout(this); machines.setOrientation(LinearLayout.VERTICAL); machines.setPadding(dp(14), dp(12), dp(14), dp(12)); machines.setBackground(surface(Color.rgb(11, 48, 67), 16, 1, Color.rgb(45, 90, 102)));
+            machines.addView(heading("MACHINE-ASSISTED OPTIONS", 10, mint)); machines.addView(text(machineOptionsSummary(), 11, Color.rgb(221, 236, 239))); content.addView(machines);
+        }
+        gap(content, 15); Button next = action("Next: choose exercises  →", coral, Color.WHITE); next.setOnClickListener(view -> showExerciseSelection()); content.addView(next, new LinearLayout.LayoutParams(-1, dp(54)));
+        Button back = new Button(this); back.setText("Back"); back.setTextColor(mint); back.setTextSize(14); back.setAllCaps(false); back.setBackgroundColor(Color.TRANSPARENT); back.setOnClickListener(view -> { if ("Weekly".equals(planMode) || "Daily".equals(planMode)) showPlanSchedule(); else showPlanDuration(); }); content.addView(back, new LinearLayout.LayoutParams(-1, dp(46)));
+    }
+
+    /** Retained until the legacy wizard shell is removed. */
+    private void showPlanEquipmentLegacy() {
         initialisePlanSelections();
         LinearLayout body = planPage();
         planTitle(body, "PLAN YOUR WORKOUT", "Choose your\nequipment", "Select one or two categories. We’ll combine compatible " + focusSummary(activeTargets()).toLowerCase(Locale.ROOT) + " movements.");
@@ -2764,7 +3563,68 @@ public final class MainActivity extends FragmentActivity {
         } else selectedExercises.add(exercise);
     }
 
+    /** Coach Hero Suite exercise-selection step. */
     private void showExerciseSelection() {
+        prepareExerciseSelection();
+        beginNewPage(); setSystemBars();
+        ScrollView scroll = new ScrollView(this); scroll.setFillViewport(true); scroll.setClipToPadding(false); scroll.setBackgroundColor(navy);
+        LinearLayout root = new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL); root.setBackgroundColor(navy);
+        scroll.addView(root, new ScrollView.LayoutParams(-1, -2)); setCoachHeroWizardShell(scroll, "Workouts");
+
+        FrameLayout hero = new FrameLayout(this); hero.setClipChildren(true); hero.setBackgroundColor(navy); root.addView(hero, new LinearLayout.LayoutParams(-1, dp(266)));
+        ImageView coach = new ImageView(this); coach.setImageResource(coachHeroBackground(coachName())); coach.setScaleType(ImageView.ScaleType.CENTER_CROP); coach.setAlpha(.97f);
+        hero.addView(coach, new FrameLayout.LayoutParams(-1, Math.max(dp(710), getResources().getDisplayMetrics().heightPixels), Gravity.TOP));
+        LinearLayout copy = new LinearLayout(this); copy.setOrientation(LinearLayout.VERTICAL);
+        TextView eyebrow = heading(planMode.toUpperCase(Locale.ROOT) + " PLAN · STEP 5", 10, mint); eyebrow.setLetterSpacing(.14f); copy.addView(eyebrow);
+        TextView title = heading("Choose your\nexercises", 29, Color.WHITE); title.setLineSpacing(0, .93f); copy.addView(title);
+        TextView subtitle = text(sessionMinutes + " minutes, made for " + focusSummary(activeTargets()).toLowerCase(Locale.ROOT) + ". Tap to select; press and hold a card for movement details.", 13, Color.rgb(226, 236, 247));
+        LinearLayout.LayoutParams subtitleParams = new LinearLayout.LayoutParams(dp(268), -2); subtitleParams.topMargin = dp(8); copy.addView(subtitle, subtitleParams);
+        FrameLayout.LayoutParams copyParams = new FrameLayout.LayoutParams(dp(282), -2, Gravity.LEFT | Gravity.TOP); copyParams.leftMargin = dp(20); copyParams.topMargin = dp(37); hero.addView(copy, copyParams);
+        LinearLayout markers = new LinearLayout(this); markers.setGravity(Gravity.CENTER_VERTICAL);
+        String[] marks = {"✓", "✓", "✓", "✓", "5", "6"};
+        for (int i = 0; i < marks.length; i++) {
+            boolean complete = i < 4; boolean current = i == 4;
+            TextView marker = heading(marks[i], 11, complete || current ? navy : Color.WHITE); marker.setGravity(Gravity.CENTER);
+            marker.setBackground(surface(complete || current ? mint : Color.TRANSPARENT, 99, complete || current ? 0 : 1, Color.rgb(171, 193, 220)));
+            markers.addView(marker, new LinearLayout.LayoutParams(dp(26), dp(26)));
+            if (i < marks.length - 1) { View line = new View(this); line.setBackgroundColor(i < 4 ? mint : Color.rgb(130, 151, 183)); LinearLayout.LayoutParams lineParams = new LinearLayout.LayoutParams(0, dp(2), 1); lineParams.leftMargin = dp(5); lineParams.rightMargin = dp(5); markers.addView(line, lineParams); }
+        }
+        FrameLayout.LayoutParams markerParams = new FrameLayout.LayoutParams(dp(360), dp(26), Gravity.LEFT | Gravity.BOTTOM); markerParams.leftMargin = dp(20); markerParams.bottomMargin = dp(17); hero.addView(markers, markerParams);
+
+        LinearLayout content = new LinearLayout(this); content.setOrientation(LinearLayout.VERTICAL); content.setPadding(dp(16), dp(20), dp(16), dp(36)); content.setBackgroundColor(paper); root.addView(content, new LinearLayout.LayoutParams(-1, -2));
+        TextView section = heading("05  ·  EXERCISES", 11, muted); section.setLetterSpacing(.12f); content.addView(section);
+        content.addView(heading("Make the session your own", 23, ink));
+        content.addView(text("Your recommended movements are selected. Keep them all, or tailor the session one card at a time.", 13, muted));
+        gap(content, 14);
+        LinearLayout actions = new LinearLayout(this); actions.setGravity(Gravity.CENTER_VERTICAL); actions.setPadding(dp(12), dp(10), dp(12), dp(10)); actions.setBackground(surface(Color.rgb(11, 48, 67), 17, 1, Color.rgb(45, 90, 102)));
+        Button all = action(selectedExercises.size() == availableExercises.size() ? "Clear all" : "Select all", Color.TRANSPARENT, mint); all.setTextSize(11); all.setMinHeight(0); all.setPadding(dp(6), 0, dp(6), 0); all.setBackground(surface(Color.TRANSPARENT, 99, 1, mint));
+        all.setOnClickListener(view -> { if (selectedExercises.size() == availableExercises.size()) selectedExercises.clear(); else selectedExercises = new ArrayList<>(availableExercises); refreshCurrentPageKeepingScroll(this::showExerciseSelection); }); actions.addView(all, new LinearLayout.LayoutParams(dp(112), dp(40)));
+        LinearLayout actionCopy = new LinearLayout(this); actionCopy.setOrientation(LinearLayout.VERTICAL); actionCopy.setGravity(Gravity.CENTER_VERTICAL); actionCopy.setPadding(dp(12), 0, 0, 0); actionCopy.addView(heading(selectedExercises.size() + " SELECTED", 10, mint)); actionCopy.addView(text("Hold any card for its demo", 10, Color.rgb(205, 224, 235))); actions.addView(actionCopy, new LinearLayout.LayoutParams(0, dp(40), 1));
+        content.addView(actions); gap(content, 11);
+        for (int index = 0; index < availableExercises.size(); index++) {
+            Coach.Exercise exercise = availableExercises.get(index); content.addView(premiumExerciseCard(exercise, index, isSelected(exercise)), new LinearLayout.LayoutParams(-1, dp(136))); gap(content, 10);
+        }
+        Button next = action("Next: set up workout  →", coral, Color.WHITE); next.setOnClickListener(view -> { if (selectedExercises.isEmpty()) toast("Select at least one exercise before continuing."); else showPlanSetup(); }); content.addView(next, new LinearLayout.LayoutParams(-1, dp(54)));
+        Button back = new Button(this); back.setText("Back"); back.setTextColor(mint); back.setTextSize(14); back.setAllCaps(false); back.setBackgroundColor(Color.TRANSPARENT); back.setOnClickListener(view -> showPlanEquipment()); content.addView(back, new LinearLayout.LayoutParams(-1, dp(46)));
+    }
+
+    private LinearLayout premiumExerciseCard(Coach.Exercise exercise, int index, boolean selected) {
+        LinearLayout card = new LinearLayout(this); card.setGravity(Gravity.CENTER_VERTICAL); card.setPadding(dp(8), dp(8), dp(8), dp(8)); card.setClickable(true); card.setFocusable(true);
+        card.setContentDescription((selected ? "Selected " : "Not selected ") + exercise.name + ". Tap to change selection. Press and hold for details and animation.");
+        card.setBackground(surface(Color.WHITE, 18, selected ? 2 : 1, selected ? mint : Color.rgb(220, 229, 239))); elevatePlanSurface(card, selected);
+        card.setOnClickListener(view -> { toggleExercise(exercise); refreshCurrentPageKeepingScroll(this::showExerciseSelection); });
+        card.setOnLongClickListener(view -> { showExercisePreviewDialog(exercise); return true; });
+        FrameLayout posterFrame = new FrameLayout(this); posterFrame.setBackground(surface(Color.rgb(246, 249, 252), 14, 1, Color.rgb(220, 229, 239))); posterFrame.setClipToOutline(true);
+        posterFrame.addView(exerciseSelectionArtwork(exercise, index), new FrameLayout.LayoutParams(-1, -1)); card.addView(posterFrame, new LinearLayout.LayoutParams(dp(112), dp(118)));
+        LinearLayout details = new LinearLayout(this); details.setOrientation(LinearLayout.VERTICAL); details.setPadding(dp(12), dp(3), dp(5), dp(3));
+        details.addView(heading(exercise.name, 16, ink)); TextView area = text(exercise.target.toUpperCase(Locale.ROOT) + "  ·  " + exercise.description, 11, muted); area.setMaxLines(2); details.addView(area);
+        TextView cue = text(exercise.cue, 11, Color.rgb(58, 111, 106)); cue.setMaxLines(2); LinearLayout.LayoutParams cueParams = new LinearLayout.LayoutParams(-1, 0, 1); cueParams.topMargin = dp(4); details.addView(cue, cueParams); card.addView(details, new LinearLayout.LayoutParams(0, dp(118), 1));
+        TextView state = heading(selected ? "✓" : "+", 18, selected ? navy : Color.rgb(74, 105, 137)); state.setGravity(Gravity.CENTER); state.setBackground(surface(selected ? mint : Color.rgb(242, 246, 250), 99, selected ? 0 : 1, selected ? Color.TRANSPARENT : Color.rgb(164, 184, 205))); card.addView(state, new LinearLayout.LayoutParams(dp(36), dp(36)));
+        return card;
+    }
+
+    /** Retained until the legacy wizard shell is removed. */
+    private void showExerciseSelectionLegacy() {
         prepareExerciseSelection();
         LinearLayout body = planPage();
         planTitle(body, planMode.toUpperCase(Locale.ROOT) + " PLAN · " + focusSummary(activeTargets()).toUpperCase(Locale.ROOT), "Choose your\nexercises", "Your " + sessionMinutes + " minute recommendation is preselected. Add or remove movements to make it your own.");
@@ -4368,7 +5228,7 @@ public final class MainActivity extends FragmentActivity {
                 : "Coach " + trainerName + " is counting you in";
         title(body, newExercise ? "NEW EXERCISE" : "NEXT SET", countdownTitle, "Your set timer begins only after the count-in is complete.");
         LinearLayout countCard = card();
-        TextView count = heading(audioCountdown ? "5  ·  4  ·  3  ·  2  ·  1" : "3  ·  2  ·  1  ·  GO", 34, ink);
+        TextView count = heading(audioCountdown ? "5" : "3", 46, ink);
         count.setGravity(Gravity.CENTER);
         countCard.addView(count, new LinearLayout.LayoutParams(-1, dp(96)));
         String dialogueCopy = CoachPreferences.NO_DIALOGUE.equals(dialogueMode) ? "Low · low · low · high start beep"
@@ -4383,7 +5243,7 @@ public final class MainActivity extends FragmentActivity {
         note.addView(heading(newExercise ? session.get(index).name : "Set " + set + " of " + session.get(index).sets, 17, ink));
         note.addView(text("Complete the whole set, then tap Set completed. The app records one time for the full set.", 14, muted));
         body.addView(note);
-        runWorkoutCountIn(phrase, () -> showActive(index, set));
+        runWorkoutCountIn(phrase, count, () -> showActive(index, set));
     }
 
     private void showActive(int index, int set) {
@@ -4935,27 +5795,32 @@ public final class MainActivity extends FragmentActivity {
         if (CoachPreferences.FULL_DIALOGUE.equals(profile().dialogueMode)) speakCoach(words, TextToSpeech.QUEUE_FLUSH, null);
     }
 
-    private void runWorkoutCountIn(String phrase, Runnable done) {
+    /** A visible five-to-one count-in is used before every guided workout set. */
+    private void runWorkoutCountIn(String phrase, TextView countView, Runnable done) {
         String mode = profile().dialogueMode;
-        if (CoachPreferences.usesVoice(mode)) {
-            speakCoach(phrase, TextToSpeech.QUEUE_FLUSH, done);
-            return;
-        }
         stopSpeech();
-        final long generation = speechGeneration;
-        if (CoachPreferences.usesBeeps(mode)) {
-            if (toneGenerator == null) toneGenerator = new ToneGenerator(AudioManager.STREAM_MUSIC, 72);
-            int[] delays = {0, 700, 1400};
-            for (int delay : delays) workoutHandler.postDelayed(() -> {
-                if (generation == speechGeneration && toneGenerator != null) toneGenerator.startTone(ToneGenerator.TONE_DTMF_1, 180);
-            }, delay);
-            workoutHandler.postDelayed(() -> {
-                if (generation == speechGeneration && toneGenerator != null) toneGenerator.startTone(ToneGenerator.TONE_DTMF_9, 260);
-            }, 2100);
-            workoutHandler.postDelayed(() -> { if (generation == speechGeneration) done.run(); }, 2450);
-        } else {
-            workoutHandler.postDelayed(() -> { if (generation == speechGeneration) done.run(); }, 1400);
+        if (CoachPreferences.usesVoice(mode)) {
+            speakCoach(phrase, TextToSpeech.QUEUE_FLUSH, null);
         }
+        final long visualGeneration = speechGeneration;
+        if (CoachPreferences.usesBeeps(mode) && toneGenerator == null) {
+            toneGenerator = new ToneGenerator(AudioManager.STREAM_MUSIC, 72);
+        }
+        for (int index = 0; index < 5; index++) {
+            final int remaining = 5 - index;
+            final int delay = index * 1000;
+            workoutHandler.postDelayed(() -> {
+                if (visualGeneration != speechGeneration) return;
+                countView.setText(String.valueOf(remaining));
+                if (CoachPreferences.usesBeeps(mode) && toneGenerator != null) toneGenerator.startTone(ToneGenerator.TONE_DTMF_1, 150);
+            }, delay);
+        }
+        workoutHandler.postDelayed(() -> {
+            if (visualGeneration != speechGeneration) return;
+            countView.setText("GO");
+            if (CoachPreferences.usesBeeps(mode) && toneGenerator != null) toneGenerator.startTone(ToneGenerator.TONE_DTMF_9, 230);
+            done.run();
+        }, 5000L);
     }
 
     private void configureSpeechVoices() {
@@ -5068,6 +5933,7 @@ public final class MainActivity extends FragmentActivity {
         restTimer = null;
         stopSetClock();
         stopSpeech();
+        stopEnduranceGuided();
     }
 
     // Library, progress and account utilities
@@ -5402,59 +6268,13 @@ public final class MainActivity extends FragmentActivity {
      * the plan the person chose and never requests their location in the background.
      */
     private void showEndurance() {
-        LinearLayout body = appPage("Endurance");
         if (manualEnduranceMode != null) {
             showManualEnduranceSession();
             return;
         }
-        title(body, "ENDURANCE", "Map your next move", "Plan a walking, running, or cycling route, then open it in your installed map app. Route details stay on this phone.");
-        LiveTrackingStore.Session live = LiveTrackingStore.current(this);
-        if (live.active) {
-            addLiveTrackingCard(body, live);
-            gap(body, 16);
-        } else {
-            LiveTrackingStore.Session last = LiveTrackingStore.last(this);
-            if (last != null) {
-                LinearLayout summary = card();
-                summary.addView(heading("Last live session", 18, ink));
-                summary.addView(text(last.mode + "  •  " + formatLiveDistance(last.distanceMeters) + "  •  " + formatLiveDuration(last.activeMillis), 15, ink));
-                summary.addView(text("Finished sessions are saved to Progress. The route trace is stored only on this phone.", 13, muted));
-                if (last.points.size() > 1) {
-                    RouteTraceView trace = new RouteTraceView(this);
-                    trace.setPoints(last.points);
-                    LinearLayout.LayoutParams traceParams = new LinearLayout.LayoutParams(-1, dp(128));
-                    traceParams.topMargin = dp(10);
-                    summary.addView(trace, traceParams);
-                    gap(summary, 9);
-                    Button offlineMap = lightAction("Open route in an offline map app");
-                    offlineMap.setOnClickListener(view -> openTrackInOfflineMap(last));
-                    addButton(summary, offlineMap);
-                }
-                body.addView(summary);
-                gap(body, 16);
-            }
-        }
-        body.addView(heading("Choose an activity", 20, Color.WHITE));
-        gap(body, 9);
-        Button build = primary("Build an endurance plan");
-        build.setOnClickListener(view -> startEnduranceWizard(EndurancePlanStore.WALKING));
-        addButton(body, build);
-        gap(body, 12);
-        addEnduranceActivity(body, EndurancePlanStore.WALKING, "Walking", "A steady, low-impact route for everyday movement.");
-        gap(body, 10);
-        addEnduranceActivity(body, EndurancePlanStore.RUNNING, "Running", "Set a pace-focused route; maps will use a walking route as the closest running option.");
-        gap(body, 10);
-        addEnduranceActivity(body, EndurancePlanStore.CYCLING, "Cycling", "Plan a route for two wheels with a cycling map handoff.");
-        gap(body, 14);
-
-        LinearLayout guidance = card();
-        guidance.addView(heading("Build gradually", 18, ink));
-        guidance.addView(text("Choose a distance, duration, and effort that fit your current ability. General activity guidance can be useful, but pace, route safety, weather, and health needs are personal.", 14, muted));
-        gap(guidance, 9);
-        Button offlineGuide = lightAction("How offline maps work");
-        offlineGuide.setOnClickListener(view -> showOfflineMapGuide());
-        addButton(guidance, offlineGuide);
-        body.addView(guidance);
+        // Endurance starts at the same first decision as Workouts: plan type.
+        // Activity selection follows on the next wizard page.
+        startEnduranceWizard(EndurancePlanStore.WALKING);
     }
 
     /** Three-step counterpart to the workout wizard, tailored for route-based movement. */
@@ -5467,11 +6287,25 @@ public final class MainActivity extends FragmentActivity {
         enduranceWizardDistanceKm = existing == null ? defaultDistance(mode) : existing.distanceKm;
         enduranceWizardMinutes = existing == null ? defaultMinutes(mode) : existing.minutes;
         enduranceWizardEffort = existing == null ? "Steady" : existing.effort;
-        showEnduranceWizardActivity();
+        showEnduranceWizardPlanType();
+    }
+
+    /** Endurance follows the workout wizard rhythm, without workout-only steps. */
+    private void showEnduranceWizardPlanType() {
+        beginNewPage(); setSystemBars();
+        ScrollView scroll = new ScrollView(this); scroll.setFillViewport(true); scroll.setBackgroundColor(navy);
+        LinearLayout root = new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL); root.setBackgroundColor(navy); scroll.addView(root, new ScrollView.LayoutParams(-1, -2)); setCoachHeroWizardShell(scroll, "Endurance");
+        FrameLayout hero = new FrameLayout(this); hero.setClipChildren(true); root.addView(hero, new LinearLayout.LayoutParams(-1, dp(258)));
+        ImageView coach = new ImageView(this); coach.setImageResource(coachHeroBackground(coachName())); coach.setScaleType(ImageView.ScaleType.CENTER_CROP); hero.addView(coach, new FrameLayout.LayoutParams(-1, Math.max(dp(700), getResources().getDisplayMetrics().heightPixels), Gravity.TOP));
+        LinearLayout copy = new LinearLayout(this); copy.setOrientation(LinearLayout.VERTICAL); TextView eyebrow = heading("PLAN YOUR ENDURANCE", 10, mint); eyebrow.setLetterSpacing(.14f); copy.addView(eyebrow); copy.addView(heading("How do you\nwant to plan?", 29, Color.WHITE)); TextView intro = text("Start with a plan type. Next you’ll select walking, running, or cycling.", 13, Color.rgb(226,236,247)); LinearLayout.LayoutParams introParams = new LinearLayout.LayoutParams(dp(265), -2); introParams.topMargin = dp(8); copy.addView(intro, introParams); FrameLayout.LayoutParams copyParams = new FrameLayout.LayoutParams(dp(278), -2, Gravity.LEFT | Gravity.TOP); copyParams.leftMargin = dp(20); copyParams.topMargin = dp(38); hero.addView(copy, copyParams);
+        LinearLayout markers = new LinearLayout(this); markers.setGravity(Gravity.CENTER_VERTICAL); for (int i = 0; i < 5; i++) { TextView marker = heading(i == 0 ? "1" : String.valueOf(i + 1), 11, i == 0 ? navy : Color.WHITE); marker.setGravity(Gravity.CENTER); marker.setBackground(surface(i == 0 ? mint : Color.TRANSPARENT, 99, i == 0 ? 0 : 1, Color.rgb(171,193,220))); markers.addView(marker, new LinearLayout.LayoutParams(dp(26), dp(26))); if (i < 4) { View line = new View(this); line.setBackgroundColor(Color.rgb(130,151,183)); LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, dp(2), 1); p.leftMargin=dp(7); p.rightMargin=dp(7); markers.addView(line,p); } } FrameLayout.LayoutParams markParams = new FrameLayout.LayoutParams(dp(332), dp(26), Gravity.LEFT|Gravity.BOTTOM); markParams.leftMargin=dp(20); markParams.bottomMargin=dp(17); hero.addView(markers,markParams);
+        LinearLayout content = new LinearLayout(this); content.setOrientation(LinearLayout.VERTICAL); content.setPadding(dp(16),dp(20),dp(16),dp(36)); content.setMinimumHeight(Math.max(dp(520), getResources().getDisplayMetrics().heightPixels - dp(258))); content.setBackgroundColor(paper); root.addView(content,new LinearLayout.LayoutParams(-1,-2)); TextView section=heading("01  ·  PLAN TYPE",11,muted); section.setLetterSpacing(.12f); content.addView(section); content.addView(heading("Choose a plan type",23,ink)); content.addView(text("Weekly plans place several sessions. Daily plans focus on one date. Custom is flexible.",13,muted)); gap(content,14);
+        String[] labels={"Weekly","Daily","Custom"}; String[] captions={"Build a repeatable week","Plan one outdoor session","Create a flexible route"}; int[] icons={R.drawable.ic_plan_weekly,R.drawable.ic_plan_daily,R.drawable.ic_plan_custom}; for(int i=0;i<labels.length;i++){ final String choice=labels[i]; LinearLayout tile=new LinearLayout(this); tile.setGravity(Gravity.CENTER_VERTICAL); tile.setPadding(dp(14),dp(12),dp(14),dp(12)); boolean selected=choice.equals(endurancePlanMode); tile.setBackground(surface(selected?Color.rgb(232,255,247):Color.WHITE,17,selected?2:1,selected?mint:cardLine)); ImageView icon=new ImageView(this); icon.setImageResource(icons[i]); icon.setImageTintList(ColorStateList.valueOf(selected?navy:Color.rgb(37,84,105))); tile.addView(icon,new LinearLayout.LayoutParams(dp(44),dp(44))); LinearLayout words=new LinearLayout(this); words.setOrientation(LinearLayout.VERTICAL); words.addView(heading(choice,18,ink)); words.addView(text(captions[i],12,muted)); LinearLayout.LayoutParams wordsParams=new LinearLayout.LayoutParams(0,-2,1); wordsParams.leftMargin=dp(12); tile.addView(words,wordsParams); if(selected){TextView check=heading("✓",18,navy);check.setGravity(Gravity.CENTER);check.setBackground(surface(mint,99,0,Color.TRANSPARENT));tile.addView(check,new LinearLayout.LayoutParams(dp(34),dp(34)));} tile.setOnClickListener(v->{endurancePlanMode=choice; refreshCurrentPageKeepingScroll(this::showEnduranceWizardPlanType);}); content.addView(tile,new LinearLayout.LayoutParams(-1,dp(74))); gap(content,9);}
+        Button next=action("Next: choose activity  →",coral,Color.WHITE); next.setOnClickListener(v->showEnduranceWizardActivity()); content.addView(next,new LinearLayout.LayoutParams(-1,dp(54))); Button back=new Button(this); back.setText("Back"); back.setTextColor(mint); back.setBackgroundColor(Color.TRANSPARENT); back.setOnClickListener(v->showEndurance()); content.addView(back,new LinearLayout.LayoutParams(-1,dp(46)));
     }
 
     private void addEnduranceWizardProgress(LinearLayout body, int active) {
-        String[] labels = {"Activity", "Route", "Review"};
+        String[] labels = {"Plan", "Activity", "Schedule", "Route", "Review"};
         LinearLayout progress = new LinearLayout(this); progress.setOrientation(LinearLayout.VERTICAL);
         LinearLayout dots = new LinearLayout(this); dots.setGravity(Gravity.CENTER_VERTICAL);
         for (int index = 0; index < labels.length; index++) {
@@ -5493,21 +6327,27 @@ public final class MainActivity extends FragmentActivity {
     }
 
     private void showEnduranceWizardActivity() {
-        LinearLayout body = planPage();
+        LinearLayout body = planPage("Endurance");
         planTitle(body, "PLAN YOUR ENDURANCE", "Choose your\nactivity", "Build a simple outdoor or indoor endurance session. You can use live tracking, an external map, or a timer-only session.");
-        addEnduranceWizardProgress(body, 1);
-        body.addView(enduranceModeTile(EndurancePlanStore.WALKING, "Walking", "Low-impact distance and pace", "🚶")); gap(body, 8);
-        body.addView(enduranceModeTile(EndurancePlanStore.RUNNING, "Running", "Pace-focused route or treadmill", "🏃")); gap(body, 8);
-        body.addView(enduranceModeTile(EndurancePlanStore.CYCLING, "Cycling", "Road, bike path, or indoor bike", "🚴")); gap(body, 14);
-        Button next = planPrimary("Next: set up route"); next.setOnClickListener(view -> showEnduranceWizardRoute()); addPlanButton(body, next);
-        gap(body, 8); Button back = planBack(); back.setOnClickListener(view -> showEndurance()); addPlanBack(body, back);
+        addEnduranceWizardProgress(body, 2);
+        body.addView(enduranceModeTile(EndurancePlanStore.WALKING, "Walking", "Low-impact distance and pace")); gap(body, 8);
+        body.addView(enduranceModeTile(EndurancePlanStore.RUNNING, "Running", "Pace-focused route or treadmill")); gap(body, 8);
+        body.addView(enduranceModeTile(EndurancePlanStore.CYCLING, "Cycling", "Road, bike path, or indoor bike")); gap(body, 14);
+        Button next = planPrimary("Next: choose schedule"); next.setOnClickListener(view -> showEnduranceWizardSchedule()); addPlanButton(body, next);
+        gap(body, 8); Button back = planBack(); back.setOnClickListener(view -> showEnduranceWizardPlanType()); addPlanBack(body, back);
     }
 
-    private LinearLayout enduranceModeTile(String mode, String label, String copy, String symbol) {
+    private int enduranceActivityIcon(String mode) {
+        if (EndurancePlanStore.RUNNING.equals(mode)) return R.drawable.ic_endurance_running;
+        if (EndurancePlanStore.CYCLING.equals(mode)) return R.drawable.ic_endurance_cycling;
+        return R.drawable.ic_endurance_walking;
+    }
+
+    private LinearLayout enduranceModeTile(String mode, String label, String copy) {
         boolean selected = mode.equals(enduranceWizardMode);
         LinearLayout tile = new LinearLayout(this); tile.setGravity(Gravity.CENTER_VERTICAL); tile.setPadding(dp(14), dp(13), dp(14), dp(13));
         tile.setBackground(surface(paper, 18, selected ? 2 : 1, selected ? mint : cardLine)); tile.setClickable(true); tile.setFocusable(true);
-        TextView icon = heading(symbol, 24, navy); icon.setGravity(Gravity.CENTER); icon.setBackground(surface(mint, 99, 0, Color.TRANSPARENT)); tile.addView(icon, new LinearLayout.LayoutParams(dp(48), dp(48)));
+        ImageView icon = new ImageView(this); icon.setImageResource(enduranceActivityIcon(mode)); icon.setImageTintList(ColorStateList.valueOf(navy)); icon.setPadding(dp(11), dp(11), dp(11), dp(11)); icon.setBackground(surface(mint, 99, 0, Color.TRANSPARENT)); tile.addView(icon, new LinearLayout.LayoutParams(dp(48), dp(48)));
         LinearLayout copyColumn = new LinearLayout(this); copyColumn.setOrientation(LinearLayout.VERTICAL); copyColumn.addView(heading(label, 18, ink)); copyColumn.addView(text(copy, 13, muted));
         LinearLayout.LayoutParams copyParams = new LinearLayout.LayoutParams(0, -2, 1); copyParams.leftMargin = dp(12); tile.addView(copyColumn, copyParams);
         if (selected) { TextView check = heading("✓", 18, navy); check.setGravity(Gravity.CENTER); check.setBackground(surface(mint, 99, 0, Color.TRANSPARENT)); tile.addView(check, new LinearLayout.LayoutParams(dp(32), dp(32))); }
@@ -5515,10 +6355,66 @@ public final class MainActivity extends FragmentActivity {
         return tile;
     }
 
+    /** Schedule step shared by Daily and Weekly endurance plans. */
+    private void showEnduranceWizardSchedule() {
+        boolean weekly = "Weekly".equals(endurancePlanMode);
+        LinearLayout body = planPage("Endurance");
+        planTitle(body, "PLAN YOUR ENDURANCE", weekly ? "Choose your\ntraining week" : "Choose your\nactivity day", weekly ? "Tap a day to add or remove an endurance session. Rest days stay clear." : "Choose one day for this " + enduranceAction(enduranceWizardMode).toLowerCase(Locale.ROOT) + " session.");
+        addEnduranceWizardProgress(body, 3);
+        addEndurancePremiumCalendar(body, weekly);
+        if (weekly) { int count=0; for(boolean selected:enduranceWorkoutDays)if(selected)count++; LinearLayout rhythm=card(); rhythm.addView(heading(count+" endurance sessions",19,ink)); rhythm.addView(text("Use the days above to place walking, running, or cycling without changing your strength plan.",13,muted)); body.addView(rhythm); gap(body,12); }
+        Button next=planPrimary("Next: set up route"); next.setOnClickListener(v->{if(weekly){boolean any=false;for(boolean selected:enduranceWorkoutDays)if(selected)any=true;if(!any){toast("Choose at least one endurance day.");return;}} showEnduranceWizardRoute();}); addPlanButton(body,next); Button back=planBack(); back.setOnClickListener(v->showEnduranceWizardActivity()); addPlanBack(body,back);
+    }
+
+    /** Uses the same editorial timeline as the Workout planner, with endurance-specific activity icons. */
+    private void addEndurancePremiumCalendar(LinearLayout body, boolean weekly) {
+        int sessions = 0; for (boolean selected : enduranceWorkoutDays) if (selected) sessions++;
+        LinearLayout calendar = new LinearLayout(this); calendar.setOrientation(LinearLayout.VERTICAL);
+        calendar.setPadding(dp(16), dp(16), dp(16), dp(16));
+        calendar.setBackground(surface(Color.rgb(10, 29, 50), 24, 1, Color.rgb(41, 83, 115)));
+        LinearLayout header = new LinearLayout(this); header.setGravity(Gravity.CENTER_VERTICAL);
+        FrameLayout activityBadge = new FrameLayout(this); activityBadge.setBackground(surface(Color.rgb(17, 62, 80), 99, 1, mint));
+        ImageView glyph = new ImageView(this); glyph.setImageResource(enduranceActivityIcon(enduranceWizardMode)); glyph.setImageTintList(ColorStateList.valueOf(mint)); glyph.setPadding(dp(7), dp(7), dp(7), dp(7)); activityBadge.addView(glyph, new FrameLayout.LayoutParams(-1, -1));
+        header.addView(activityBadge, new LinearLayout.LayoutParams(dp(32), dp(32)));
+        TextView weekTitle = heading(selectedWeekTitle().replace("Week of ", ""), 18, Color.WHITE); weekTitle.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams weekParams = new LinearLayout.LayoutParams(0, dp(42), 1); weekParams.leftMargin = dp(8); header.addView(weekTitle, weekParams);
+        LinearLayout meta = new LinearLayout(this); meta.setOrientation(LinearLayout.VERTICAL); meta.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
+        TextView count = heading(weekly ? sessions + " sessions" : "1 session", 10, Color.WHITE); count.setGravity(Gravity.RIGHT); meta.addView(count, new LinearLayout.LayoutParams(-1, dp(17)));
+        LinearLayout meter = new LinearLayout(this); meter.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
+        int filled = weekly ? Math.min(5, Math.max(1, sessions)) : 1;
+        for (int part = 0; part < 5; part++) { View bar = new View(this); bar.setBackground(surface(part < filled ? mint : Color.rgb(49, 77, 108), 99, 0, Color.TRANSPARENT)); LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(dp(18), dp(6)); if (part > 0) p.leftMargin = dp(4); meter.addView(bar, p); }
+        meta.addView(meter, new LinearLayout.LayoutParams(-1, dp(13))); header.addView(meta, new LinearLayout.LayoutParams(dp(104), dp(38))); calendar.addView(header);
+
+        LinearLayout days = new LinearLayout(this); days.setGravity(Gravity.CENTER_VERTICAL);
+        for (int i = 0; i < weekDays.length; i++) {
+            final int day = i; boolean selected = weekly ? enduranceWorkoutDays[i] : enduranceDailyDay == i;
+            LinearLayout item = new LinearLayout(this); item.setOrientation(LinearLayout.VERTICAL); item.setGravity(Gravity.CENTER); item.setClickable(true); item.setFocusable(true); item.setPadding(dp(1), dp(4), dp(1), dp(2));
+            item.addView(heading(weekDays[i], 8, selected ? mint : Color.rgb(180, 200, 220)), new LinearLayout.LayoutParams(-1, dp(16)));
+            TextView date = heading(String.valueOf(selectedWeekDate(i).get(Calendar.DAY_OF_MONTH)), 14, Color.WHITE); date.setGravity(Gravity.CENTER); item.addView(date, new LinearLayout.LayoutParams(-1, dp(23)));
+            View dot = new View(this); dot.setBackground(surface(selected ? mint : Color.rgb(66, 91, 121), 99, selected ? 2 : 1, selected ? Color.rgb(159, 255, 231) : Color.rgb(101, 128, 159))); LinearLayout.LayoutParams dotParams = new LinearLayout.LayoutParams(dp(selected ? 18 : 13), dp(selected ? 18 : 13)); dotParams.gravity = Gravity.CENTER; dotParams.topMargin = dp(2); item.addView(dot, dotParams);
+            item.setOnClickListener(v -> { if (weekly) enduranceWorkoutDays[day] = !enduranceWorkoutDays[day]; else enduranceDailyDay = day; refreshCurrentPageKeepingScroll(this::showEnduranceWizardSchedule); });
+            LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, dp(65), 1); if (i > 0) p.leftMargin = dp(2); days.addView(item, p);
+        }
+        LinearLayout.LayoutParams daysParams = new LinearLayout.LayoutParams(-1, dp(65)); daysParams.topMargin = dp(7); calendar.addView(days, daysParams);
+        View timeline = new View(this); timeline.setBackgroundColor(Color.rgb(65, 111, 143)); LinearLayout.LayoutParams timelineParams = new LinearLayout.LayoutParams(-1, dp(1)); timelineParams.leftMargin = dp(9); timelineParams.rightMargin = dp(9); timelineParams.topMargin = dp(-9); calendar.addView(timeline, timelineParams);
+        LinearLayout cards = new LinearLayout(this); cards.setGravity(Gravity.CENTER_VERTICAL);
+        for (int i = 0; i < weekDays.length; i++) {
+            final int day = i; boolean selected = weekly ? enduranceWorkoutDays[i] : enduranceDailyDay == i;
+            LinearLayout detail = new LinearLayout(this); detail.setOrientation(LinearLayout.VERTICAL); detail.setGravity(Gravity.CENTER); detail.setClickable(true); detail.setPadding(dp(2), dp(7), dp(2), dp(6)); detail.setBackground(surface(selected ? Color.rgb(18, 63, 81) : Color.rgb(20, 46, 72), 10, selected ? 1 : 0, selected ? mint : Color.TRANSPARENT));
+            ImageView icon = new ImageView(this); icon.setImageResource(selected ? enduranceActivityIcon(enduranceWizardMode) : R.drawable.ic_home_rest); icon.setImageTintList(ColorStateList.valueOf(selected ? mint : Color.rgb(154, 178, 205))); icon.setScaleType(ImageView.ScaleType.CENTER_INSIDE); LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(-1, dp(22)); iconParams.leftMargin = dp(6); iconParams.rightMargin = dp(6); detail.addView(icon, iconParams);
+            TextView label = heading(selected ? appointmentAbbreviation(enduranceWizardMode) : "Rest", 9, selected ? Color.WHITE : Color.rgb(180, 200, 220)); label.setGravity(Gravity.CENTER); label.setSingleLine(true); detail.addView(label, new LinearLayout.LayoutParams(-1, dp(19)));
+            TextView note = text(selected ? "Planned" : "Recover", 8, selected ? Color.rgb(180, 235, 222) : Color.rgb(132, 159, 188)); note.setGravity(Gravity.CENTER); detail.addView(note, new LinearLayout.LayoutParams(-1, dp(17)));
+            detail.setOnClickListener(v -> { if (weekly) enduranceWorkoutDays[day] = !enduranceWorkoutDays[day]; else enduranceDailyDay = day; refreshCurrentPageKeepingScroll(this::showEnduranceWizardSchedule); });
+            LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, dp(68), 1); if (i > 0) p.leftMargin = dp(3); cards.addView(detail, p);
+        }
+        LinearLayout.LayoutParams cardsParams = new LinearLayout.LayoutParams(-1, dp(68)); cardsParams.topMargin = dp(12); calendar.addView(cards, cardsParams);
+        body.addView(calendar); gap(body, 12);
+    }
+
     private void showEnduranceWizardRoute() {
-        LinearLayout body = planPage();
+        LinearLayout body = planPage("Endurance");
         planTitle(body, "PLAN YOUR " + enduranceAction(enduranceWizardMode).toUpperCase(Locale.ROOT), "Set your route\nand time", "A destination is optional for an indoor session. Use a landmark or route name when you want map directions.");
-        addEnduranceWizardProgress(body, 2);
+        addEnduranceWizardProgress(body, 4);
         EditText name = input("Session name", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES); name.setText(enduranceWizardName); body.addView(name); gap(body, 8);
         EditText origin = input("Starting point (optional)", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES); origin.setText(enduranceWizardOrigin); body.addView(origin); gap(body, 8);
         EditText destination = input("Destination or loop landmark (optional)", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES); destination.setText(enduranceWizardDestination); body.addView(destination); gap(body, 8);
@@ -5537,23 +6433,115 @@ public final class MainActivity extends FragmentActivity {
                 showEnduranceWizardReview();
             } catch (NumberFormatException error) { toast("Enter a positive distance and at least 5 minutes."); }
         }); addPlanButton(body, next); gap(body, 8);
-        Button back = planBack(); back.setOnClickListener(view -> showEnduranceWizardActivity()); addPlanBack(body, back);
+        Button back = planBack(); back.setOnClickListener(view -> showEnduranceWizardSchedule()); addPlanBack(body, back);
     }
 
     private void showEnduranceWizardReview() {
-        LinearLayout body = planPage();
+        LinearLayout body = planPage("Endurance");
         planTitle(body, "PLAN YOUR ENDURANCE", "Review your\n" + enduranceAction(enduranceWizardMode), "This plan can start with live tracking, an external map, or a timer-only session.");
-        addEnduranceWizardProgress(body, 3);
+        addEnduranceWizardProgress(body, 5);
         LinearLayout review = card();
         review.addView(heading(appointmentAbbreviation(enduranceWizardMode) + " · " + enduranceWizardName, 20, ink));
         review.addView(text(formatDistance(enduranceWizardDistanceKm) + "  •  " + enduranceWizardMinutes + " min  •  " + enduranceWizardEffort, 14, muted));
         review.addView(text(enduranceWizardDestination.isEmpty() ? "Indoor or open route" : "Destination: " + enduranceWizardDestination, 13, muted)); body.addView(review); gap(body, 13);
+        Button start = planPrimary("Start " + appointmentAbbreviation(enduranceWizardMode));
+        start.setOnClickListener(view -> {
+            try {
+                EndurancePlanStore.save(this, enduranceWizardMode, enduranceWizardName, enduranceWizardOrigin, enduranceWizardDestination, enduranceWizardDistanceKm, enduranceWizardMinutes, enduranceWizardEffort);
+                startGuidedEndurance(enduranceWizardMode);
+            } catch (IllegalArgumentException error) { toast(error.getMessage()); }
+        }); addPlanButton(body, start); gap(body, 8);
         Button save = planPrimary("Save endurance plan");
         save.setOnClickListener(view -> {
             try { EndurancePlanStore.save(this, enduranceWizardMode, enduranceWizardName, enduranceWizardOrigin, enduranceWizardDestination, enduranceWizardDistanceKm, enduranceWizardMinutes, enduranceWizardEffort); toast("Endurance plan saved."); showEndurance(); }
             catch (IllegalArgumentException error) { toast(error.getMessage()); }
         }); addPlanButton(body, save); gap(body, 8);
         Button back = planBack(); back.setOnClickListener(view -> showEnduranceWizardRoute()); addPlanBack(body, back);
+    }
+
+    /** Guided endurance shares the Coach 5-to-1 ritual with the strength workout flow. */
+    private void startGuidedEndurance(String mode) {
+        stopEnduranceGuided();
+        guidedEnduranceMode = mode;
+        guidedEnduranceLaps.clear();
+        showEnduranceCountdown();
+    }
+
+    private void showEnduranceCountdown() {
+        if (guidedEnduranceMode == null) return;
+        LinearLayout body = appPage("Endurance");
+        String action = enduranceAction(guidedEnduranceMode);
+        title(body, "GUIDED ENDURANCE", "Start " + action, "Coach " + coachName() + " will count you in before the timer starts.");
+        LinearLayout countCard = card();
+        TextView count = heading("5", 58, ink); count.setGravity(Gravity.CENTER); countCard.addView(count, new LinearLayout.LayoutParams(-1, dp(98)));
+        TextView cue = text("Let’s begin in 5, 4, 3, 2, 1.", 17, muted); cue.setGravity(Gravity.CENTER); countCard.addView(cue);
+        body.addView(countCard);
+        runWorkoutCountIn("Let’s begin in 5, 4, 3, 2, 1.", count, () -> {
+            if (guidedEnduranceMode != null) {
+                guidedEnduranceStartedAt = SystemClock.elapsedRealtime();
+                showGuidedEnduranceActive();
+            }
+        });
+    }
+
+    private void showGuidedEnduranceActive() {
+        if (guidedEnduranceMode == null) return;
+        LinearLayout body = appPage("Endurance");
+        final int sessionPage = pageGeneration;
+        final String action = enduranceAction(guidedEnduranceMode);
+        title(body, "GUIDED ENDURANCE", action + " in progress", "Your timer is running. " + ((EndurancePlanStore.WALKING.equals(guidedEnduranceMode) || EndurancePlanStore.RUNNING.equals(guidedEnduranceMode)) ? "Record a manual lap whenever you reach one." : "Keep a smooth, steady pace."));
+        LinearLayout timerCard = card();
+        timerCard.addView(heading(action.toUpperCase(Locale.ROOT) + " · LIVE TIMER", 13, muted));
+        TextView elapsed = heading("00:00", 54, ink); elapsed.setGravity(Gravity.CENTER); elapsed.setContentDescription(action + " elapsed time"); timerCard.addView(elapsed, new LinearLayout.LayoutParams(-1, dp(92)));
+        timerCard.addView(text("Target · " + formatDistance(enduranceWizardDistanceKm) + "  •  " + enduranceWizardMinutes + " min", 14, muted));
+        body.addView(timerCard); gap(body, 12);
+        final boolean supportsLaps = EndurancePlanStore.WALKING.equals(guidedEnduranceMode) || EndurancePlanStore.RUNNING.equals(guidedEnduranceMode);
+        LinearLayout laps = card(); laps.addView(heading(supportsLaps ? "MANUAL LAPS" : "RIDE CHECKPOINTS", 13, muted));
+        TextView lapSummary = text(supportsLaps ? "No laps recorded yet." : "Cycling uses the continuous timer.", 15, ink); laps.addView(lapSummary); body.addView(laps); gap(body, 12);
+        if (supportsLaps) {
+            Button lap = secondary("Record manual lap");
+            lap.setOnClickListener(view -> {
+                long elapsedMillis = Math.max(0L, SystemClock.elapsedRealtime() - guidedEnduranceStartedAt);
+                guidedEnduranceLaps.add(elapsedMillis);
+                lapSummary.setText(enduranceLapSummary());
+                toast("Lap " + guidedEnduranceLaps.size() + " recorded · " + WorkoutTiming.formatElapsedMillis(elapsedMillis));
+            }); addButton(body, lap); gap(body, 8);
+        }
+        Button finish = primary("Finish " + action);
+        finish.setOnClickListener(view -> {
+            long duration = Math.max(60_000L, SystemClock.elapsedRealtime() - guidedEnduranceStartedAt);
+            JourneyStore.recordWorkout(this, "Endurance · " + guidedEnduranceMode, Math.max(1, Math.round(duration / 60_000f)));
+            stopEnduranceGuided();
+            toast(action + " saved to Progress.");
+            showProgress();
+        }); addButton(body, finish); gap(body, 8);
+        Button end = secondary("End without saving"); end.setOnClickListener(view -> { stopEnduranceGuided(); showEndurance(); }); addButton(body, end);
+        guidedEnduranceTimer = new Runnable() {
+            @Override public void run() {
+                if (guidedEnduranceMode == null || pageGeneration != sessionPage) return;
+                elapsed.setText(formatLiveDuration(SystemClock.elapsedRealtime() - guidedEnduranceStartedAt));
+                workoutHandler.postDelayed(this, 250L);
+            }
+        };
+        workoutHandler.post(guidedEnduranceTimer);
+    }
+
+    private String enduranceLapSummary() {
+        if (guidedEnduranceLaps.isEmpty()) return "No laps recorded yet.";
+        StringBuilder result = new StringBuilder();
+        for (int i = 0; i < guidedEnduranceLaps.size(); i++) {
+            if (i > 0) result.append("  •  ");
+            result.append("Lap ").append(i + 1).append(" ").append(WorkoutTiming.formatElapsedMillis(guidedEnduranceLaps.get(i)));
+        }
+        return result.toString();
+    }
+
+    private void stopEnduranceGuided() {
+        if (guidedEnduranceTimer != null) workoutHandler.removeCallbacks(guidedEnduranceTimer);
+        guidedEnduranceTimer = null;
+        guidedEnduranceMode = null;
+        guidedEnduranceStartedAt = 0L;
+        guidedEnduranceLaps.clear();
     }
 
     /** One calendar joins strength templates, rest days, and separately booked endurance appointments. */

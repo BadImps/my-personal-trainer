@@ -112,11 +112,8 @@ public final class WorkoutReminderActivity extends Activity {
     }
 
     private int portrait(String coach) {
-        if ("Amy".equals(coach)) return R.drawable.amy_launcher;
-        if ("Claudia".equals(coach)) return R.drawable.claudia_launcher;
-        if ("Leo".equals(coach)) return R.drawable.leo_launcher;
-        if ("Mark".equals(coach)) return R.drawable.mark_launcher;
-        if ("Stephen".equals(coach)) return R.drawable.stephen_launcher;
-        return R.drawable.mia_launcher;
+        // A compact reminder has no approved standalone coach portrait. Use the selected
+        // premium app mark rather than a fragment cropped out of the login composition.
+        return R.drawable.trainer_launcher_premium_v2;
     }
 }

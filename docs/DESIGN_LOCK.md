@@ -57,3 +57,44 @@ Functional changes must not silently redesign a locked screen. A visual change m
 - The Full Hero Coach login screen is a single locked template. Settings may change only the selected coach portrait; its layout, logo, copy, fields, actions, and spacing stay fixed.
 - The selected premium launcher icon is treated as a design asset and must be previewed within Android's launcher mask before release.
 - The Coach Hero Dashboard v1 references live in `artifacts/design-lock/coach-hero-dashboard/v1/`. Home, Workouts, Progress, Nutrition, Endurance, Scheduler, Body, and Settings share one coach-led header and one labelled bottom navigation system. When Coach Mia is selected, Mia is the only coach image used across those pages. A different selected coach may replace only the coach portrait and its name.
+
+## Rebuild baseline — October 2026
+
+The v5.4 release did not pass this policy. It used a generic dashboard shell rather than
+implementing the eight approved Coach Hero Dashboard pages. It is therefore **not** a
+design-lock-compliant baseline and must not be used as a visual implementation reference.
+
+The rebuild source set is copied into `app/src/main/res/drawable-nodpi/` with this exact map:
+
+| Screen | Reference asset |
+| --- | --- |
+| Home | `coach_hero_home_mia.png` |
+| Workouts | `coach_hero_workouts_mia.png` |
+| Progress | `coach_hero_progress_mia.png` |
+| Nutrition | `coach_hero_nutrition_mia.png` |
+| Endurance | `coach_hero_endurance_mia.png` |
+| Scheduler | `coach_hero_scheduler_mia.png` |
+| Body | `coach_hero_body_mia.png` |
+| Settings | `coach_hero_settings_mia.png` |
+
+These are source references, not screenshot overlays. The production UI must be composed
+from real controls and data, with only the selected coach portrait/name allowed to vary.
+
+The validation profile is fixed to **MPT_API36: 1080 × 2400 pixels, 420 dpi, Android 16,
+default font scale and display size, gesture navigation**. A screen cannot be marked rebuilt
+until a capture from that profile has been placed beside its reference and reviewed for copy,
+asset crop, spacing, iconography, contrast, and interaction state.
+
+## Coach Hero source-of-truth assets — v6 rebuild
+
+- Login uses the six-panel Coach Hero artwork supplied on 2026-10-17: Mia, Amy, Claudia,
+  Leo, Mark, and Stephen. Each panel is imported intact and selected only by the saved coach.
+- The S23 Ultra login implementation uses matching, background-only full-height Coach Hero
+  extensions. Native controls reproduce the fixed visual hierarchy while remaining functional
+  and responsive on the 1440 × 3088 validation profile.
+- In-app page direction is the approved Coach Hero suite for Home, Workouts, Progress,
+  Nutrition, Endurance, Scheduler, Body, and Settings.
+- Legacy `*_launcher` portraits and temporary crops taken from the composited login artwork
+  are retired. They must not be reintroduced as coach photos.
+- A composited login panel must never be cropped into a substitute coach portrait. Use an
+  approved standalone source asset, or the premium app mark, until one is available.
