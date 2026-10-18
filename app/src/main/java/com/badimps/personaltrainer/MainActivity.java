@@ -1633,6 +1633,7 @@ public final class MainActivity extends FragmentActivity {
     private void showCoachHeroHome() {
         beginNewPage();
         setSystemBars();
+        HomeSession nextSession = nextHomeSession();
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
         scroll.setClipToPadding(false);
@@ -1709,12 +1710,12 @@ public final class MainActivity extends FragmentActivity {
         LinearLayout nextText = new LinearLayout(this); nextText.setOrientation(LinearLayout.VERTICAL);
         TextView nextLabel = heading("NEXT WORKOUT", 10, muted); nextLabel.setLetterSpacing(.12f);
         nextText.addView(nextLabel);
-        nextText.addView(heading("Full Body\nStrength", 22, ink));
+        nextText.addView(heading(nextSession.title, 22, ink));
         nextTop.addView(nextText, new LinearLayout.LayoutParams(0, -2, 1));
         TextView arrow = heading("›", 36, muted); arrow.setGravity(Gravity.CENTER);
         nextTop.addView(arrow, new LinearLayout.LayoutParams(dp(36), dp(54)));
         next.addView(nextTop);
-        next.addView(text("35 min   ·   320 cal   ·   Intermediate", 12, muted));
+        next.addView(text(nextSession.detail, 12, muted));
         Button start = action("▶  Start workout", coral, Color.WHITE);
         start.setOnClickListener(view -> showPlans());
         LinearLayout.LayoutParams startParams = new LinearLayout.LayoutParams(-1, dp(48));
@@ -1741,34 +1742,12 @@ public final class MainActivity extends FragmentActivity {
 
         LinearLayout days = new LinearLayout(this);
         days.setGravity(Gravity.CENTER);
-        String[] dayNames = {"MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"};
-        String[] dayDates = {"12", "13", "14", "15", "16", "17", "18"};
-        String[] dayPlans = {"Strength", "HIIT", "Mobility", "Lower\nBody", "Upper\nBody", "Cardio", "Rest"};
-        int[] dayIcons = {
-                R.drawable.ic_home_complete,
-                R.drawable.ic_home_hiit,
-                R.drawable.ic_nav_body,
-                R.drawable.ic_nav_workouts,
-                R.drawable.ic_nav_workouts,
-                R.drawable.ic_nav_endurance,
-                R.drawable.ic_home_rest
-        };
-        for (int i = 0; i < dayNames.length; i++) {
-            LinearLayout day = new LinearLayout(this);
-            day.setOrientation(LinearLayout.VERTICAL); day.setGravity(Gravity.CENTER);
-            day.setPadding(dp(2), dp(10), dp(2), dp(8));
-            day.setBackground(surface(i == 0 ? Color.rgb(188, 255, 231) : Color.WHITE, 15, 0, Color.TRANSPARENT));
-            day.addView(heading(dayNames[i], 9, ink));
-            day.addView(heading(dayDates[i], 12, ink));
-            ImageView icon = new ImageView(this);
-            icon.setImageResource(dayIcons[i]);
-            icon.setImageTintList(ColorStateList.valueOf(navy));
-            icon.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-            icon.setContentDescription(dayPlans[i].replace("\n", " ") + " day");
-            LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(-1, dp(32)); iconParams.topMargin = dp(5);
-            day.addView(icon, iconParams);
-            TextView plan = text(dayPlans[i], 9, ink); plan.setGravity(Gravity.CENTER); plan.setLineSpacing(0, .95f);
-            day.addView(plan, new LinearLayout.LayoutParams(-1, dp(32)));
+        Calendar homeWeek = homeWeekStart(0);
+        boolean homeWeekConfirmed = hasHomeWeekSchedule(0, homeWeek);
+        WeeklyScheduleStore.Schedule savedWeek = homeWeekSchedule(0, homeWeek, homeWeekConfirmed);
+        for (int i = 0; i < weekDays.length; i++) {
+            Calendar date = homeDate(homeWeek, i);
+            LinearLayout day = homeScheduleDayTile(date, i, savedWeek.workoutDays[i], homeWeekConfirmed, savedWeek, isToday(homeWeek, i));
             LinearLayout.LayoutParams dayParams = new LinearLayout.LayoutParams(0, dp(112), 1);
             if (i > 0) dayParams.leftMargin = dp(4);
             days.addView(day, dayParams);
@@ -2280,6 +2259,35 @@ public final class MainActivity extends FragmentActivity {
     private String homeFocusForDay(int index, WeeklyScheduleStore.Schedule schedule) {
         if (index >= 0 && index < schedule.targets.size() && !schedule.targets.get(index).isEmpty()) return focusSummary(schedule.targets.get(index));
         return target;
+    }
+
+    /** The Home hero must be a view of the user's schedule, never a demo workout. */
+    private HomeSession nextHomeSession() {
+        Calendar week = homeWeekStart(0);
+        boolean confirmed = hasHomeWeekSchedule(0, week);
+        WeeklyScheduleStore.Schedule schedule = homeWeekSchedule(0, week, confirmed);
+        for (int i = 0; i < weekDays.length; i++) {
+            Calendar date = homeDate(week, i);
+            if (schedule.workoutDays[i]) {
+                return new HomeSession(homeFocusForDay(i, schedule), sessionMinutes + " min  ·  Scheduled workout");
+            }
+            List<SchedulerStore.Appointment> appointments = SchedulerStore.onDate(this, date);
+            if (!appointments.isEmpty()) {
+                SchedulerStore.Appointment appointment = appointments.get(0);
+                return new HomeSession(appointmentAbbreviation(appointment.mode), appointment.durationMinutes + " min  ·  Scheduled endurance");
+            }
+        }
+        return new HomeSession("Build your\nfirst plan", "Choose a workout or endurance session");
+    }
+
+    private static final class HomeSession {
+        final String title;
+        final String detail;
+
+        HomeSession(String title, String detail) {
+            this.title = title;
+            this.detail = detail;
+        }
     }
 
     private void addMealSuggestion(LinearLayout container, String label, String title, String detail) {

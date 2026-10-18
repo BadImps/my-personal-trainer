@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 49,
-  "versionName": "5.8",
-  "publishedAt": "2026-10-18T03:50:43Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.8/app-release.apk",
-  "sha256": "b4f9a90b5bd6754ba13acb1aaca33cd4dd8f234afc74518002f4aeb6ef7a94be",
-  "sizeBytes": 61484391,
-  "notes": "Adds the current-theme Scheduler month-and-agenda view, shared workout/endurance calendar data, per-day weekly training assignments, launch security, Coach Profile Cards, and navigation position retention."
+  "versionCode": 50,
+  "versionName": "5.9",
+  "publishedAt": "2026-10-18T04:01:49Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.9/app-release.apk",
+  "sha256": "3d5244481897c574c01f1d81009dafadaa20f3775fb2d237e3b28c90ccc3ceea",
+  "sizeBytes": 61484195,
+  "notes": "Fixes Home so Your Week and Next Workout use only the plans, rest days, and endurance sessions you saved."
 }
