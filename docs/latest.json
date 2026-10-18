@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 58,
-  "versionName": "5.17",
-  "publishedAt": "2026-10-18T12:00:17Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.17/app-release.apk",
-  "sha256": "afe379f3f4ff8817dbc207ef8505ce8faeb2b291430365283534956519f8a934",
-  "sizeBytes": 61487583,
-  "notes": "Fixes live Endurance routing, preserves complete long-route traces, and hardens private local profile data."
+  "versionCode": 59,
+  "versionName": "5.18",
+  "publishedAt": "2026-10-18T15:35:23Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.18/app-release.apk",
+  "sha256": "16a398e7477d510208601c1da9e0441a0ea674b3202a347d9dbacac84ba04749",
+  "sizeBytes": 61977016,
+  "notes": "Adds a free, stored Trinidad & Tobago street map for private live and completed endurance routes."
 }

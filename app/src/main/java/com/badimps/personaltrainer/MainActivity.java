@@ -4487,12 +4487,22 @@ public final class MainActivity extends FragmentActivity {
         if (!entry.points.isEmpty()) {
             LinearLayout route = card();
             route.addView(heading("Your route", 19, ink));
-            route.addView(text("Start is white. Finish is coral. This is a private route trace, not a Google map.", 13, muted));
-            RouteTraceView trace = new RouteTraceView(this);
-            trace.setPoints(entry.points);
-            LinearLayout.LayoutParams traceParams = new LinearLayout.LayoutParams(-1, dp(235));
-            traceParams.topMargin = dp(10);
-            route.addView(trace, traceParams);
+            if (OfflineMapStore.hasTrinidadAndTobago(this)) {
+                route.addView(text("Offline Trinidad & Tobago map · your coral route stays private on this phone.", 13, muted));
+                try {
+                    OfflineRouteMapView map = new OfflineRouteMapView(this, OfflineMapStore.mapFile(this), entry.points);
+                    LinearLayout.LayoutParams mapParams = new LinearLayout.LayoutParams(-1, dp(300));
+                    mapParams.topMargin = dp(10);
+                    route.addView(map, mapParams);
+                } catch (RuntimeException error) { addPrivateRouteTrace(route, entry.points, dp(235)); }
+                gap(route, 8);
+                addTrinidadOfflineMapControl(route, () -> showEnduranceSessionDetails(entry));
+            } else {
+                route.addView(text("Download the free Trinidad & Tobago map once to place this private route on real streets while offline.", 13, muted));
+                addPrivateRouteTrace(route, entry.points, dp(235));
+                gap(route, 8);
+                addTrinidadOfflineMapControl(route, () -> showEnduranceSessionDetails(entry));
+            }
             body.addView(route);
             gap(body, 12);
         }
@@ -4504,6 +4514,37 @@ public final class MainActivity extends FragmentActivity {
     private String enduranceSummary(EnduranceHistoryStore.Entry entry) {
         String pace = entry.distanceMeters < 10f ? "pace —" : String.format(Locale.US, "%.1f min/km", (entry.activeMillis / 60000d) / (entry.distanceMeters / 1000d));
         return formatLiveDistance(entry.distanceMeters) + "  •  " + formatLiveDuration(entry.activeMillis) + "  •  " + pace;
+    }
+
+    private void addPrivateRouteTrace(LinearLayout parent, List<LiveTrackingStore.Point> points, int height) {
+        RouteTraceView trace = new RouteTraceView(this); trace.setPoints(points);
+        LinearLayout.LayoutParams traceParams = new LinearLayout.LayoutParams(-1, height); traceParams.topMargin = dp(10);
+        parent.addView(trace, traceParams);
+    }
+
+    /** Offers one country map as an optional, integrity-checked local download. */
+    private void addTrinidadOfflineMapControl(LinearLayout parent, Runnable refreshAfterChange) {
+        if (OfflineMapStore.hasTrinidadAndTobago(this)) {
+            parent.addView(text("Stored on this phone · " + Math.round(OfflineMapStore.trinidadAndTobagoBytes() / 1_000_000f) + " MB · © OpenStreetMap contributors", 12, mint));
+            Button remove = secondary("Remove Trinidad & Tobago offline map");
+            remove.setOnClickListener(view -> new AlertDialog.Builder(this).setTitle("Remove offline map?")
+                    .setMessage("This removes only the downloaded street map. Your private completed routes remain on this phone.")
+                    .setNegativeButton("Cancel", null).setPositiveButton("Remove", (dialog, which) -> { OfflineMapStore.removeTrinidadAndTobago(this); refreshAfterChange.run(); }).show());
+            addButton(parent, remove);
+            return;
+        }
+        TextView status = text("Map data © OpenStreetMap contributors, licensed under ODbL. Download once over Wi‑Fi; it works without mobile data afterwards.", 12, muted);
+        parent.addView(status); gap(parent, 7);
+        Button download = lightAction("Download Trinidad & Tobago map · 10 MB");
+        download.setOnClickListener(view -> {
+            download.setEnabled(false); status.setText("Preparing secure map download…");
+            OfflineMapStore.downloadTrinidadAndTobago(this, new OfflineMapStore.Listener() {
+                @Override public void onProgress(long downloaded, long total) { runOnUiThread(() -> status.setText("Downloading offline map · " + Math.min(100, Math.round(downloaded * 100f / Math.max(1L, total))) + "%")); }
+                @Override public void onReady() { runOnUiThread(() -> { toast("Trinidad & Tobago is ready offline."); refreshAfterChange.run(); }); }
+                @Override public void onError(String message) { runOnUiThread(() -> { status.setText(message); download.setEnabled(true); }); }
+            });
+        });
+        addButton(parent, download);
     }
 
     /** Detailed progress record for a normally completed guided workout only. */
@@ -7203,12 +7244,25 @@ public final class MainActivity extends FragmentActivity {
         TextView stats = text(liveTrackingStats(live), 20, ink);
         tracker.addView(state);
         tracker.addView(stats);
-        tracker.addView(text("GPS route trace is local to this phone. The Android notification confirms that tracking is active.", 13, muted));
-        RouteTraceView trace = new RouteTraceView(this);
-        trace.setPoints(live.points);
-        LinearLayout.LayoutParams traceParams = new LinearLayout.LayoutParams(-1, dp(150));
-        traceParams.topMargin = dp(10);
-        tracker.addView(trace, traceParams);
+        tracker.addView(text(OfflineMapStore.hasTrinidadAndTobago(this)
+                ? "Trinidad & Tobago streets are stored on this phone. Your coral route is drawn locally."
+                : "GPS route trace is local to this phone. Download Trinidad & Tobago streets below for a full offline map.", 13, muted));
+        LiveRouteRenderer routeRenderer;
+        if (OfflineMapStore.hasTrinidadAndTobago(this)) {
+            try {
+                OfflineRouteMapView map = new OfflineRouteMapView(this, OfflineMapStore.mapFile(this), live.points);
+                LinearLayout.LayoutParams mapParams = new LinearLayout.LayoutParams(-1, dp(235)); mapParams.topMargin = dp(10);
+                tracker.addView(map, mapParams); routeRenderer = map::setRoute;
+            } catch (RuntimeException error) {
+                RouteTraceView trace = new RouteTraceView(this); trace.setPoints(live.points);
+                tracker.addView(trace, new LinearLayout.LayoutParams(-1, dp(150))); routeRenderer = trace::setPoints;
+            }
+        } else {
+            RouteTraceView trace = new RouteTraceView(this); trace.setPoints(live.points);
+            LinearLayout.LayoutParams traceParams = new LinearLayout.LayoutParams(-1, dp(150)); traceParams.topMargin = dp(10);
+            tracker.addView(trace, traceParams); routeRenderer = trace::setPoints;
+            gap(tracker, 8); addTrinidadOfflineMapControl(tracker, this::showLiveTrackingSession);
+        }
         gap(tracker, 10);
         Button pause = live.paused ? primary("Resume live tracking") : lightAction("Pause live tracking");
         pause.setOnClickListener(view -> {
@@ -7231,7 +7285,7 @@ public final class MainActivity extends FragmentActivity {
         });
         addButton(tracker, discard);
         body.addView(tracker);
-        observeLiveTracking(state, stats, trace);
+        observeLiveTracking(state, stats, routeRenderer);
     }
 
     /** Dedicated in-app surface for an active GPS session; it remains available after navigation. */
@@ -7288,7 +7342,9 @@ public final class MainActivity extends FragmentActivity {
         startService(new Intent(this, LiveTrackingService.class).setAction(action));
     }
 
-    private void observeLiveTracking(TextView state, TextView stats, RouteTraceView trace) {
+    private interface LiveRouteRenderer { void setRoute(List<LiveTrackingStore.Point> points); }
+
+    private void observeLiveTracking(TextView state, TextView stats, LiveRouteRenderer routeRenderer) {
         stopLiveTrackingUiObserver();
         liveTrackingReceiver = new BroadcastReceiver() {
             @Override public void onReceive(Context context, Intent intent) {
@@ -7296,7 +7352,7 @@ public final class MainActivity extends FragmentActivity {
                 if (!latest.active) return;
                 state.setText("LIVE " + latest.mode.toUpperCase(Locale.ROOT) + (latest.paused ? " · PAUSED" : " · TRACKING"));
                 stats.setText(liveTrackingStats(latest));
-                trace.setPoints(latest.points);
+                routeRenderer.setRoute(latest.points);
             }
         };
         IntentFilter filter = new IntentFilter(LiveTrackingService.ACTION_UPDATE);
