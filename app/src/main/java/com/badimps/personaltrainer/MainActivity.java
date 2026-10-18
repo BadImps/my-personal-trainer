@@ -4883,16 +4883,18 @@ public final class MainActivity extends FragmentActivity {
         options.setPadding(padding, dp(4), padding, 0);
         RadioGroup group = new RadioGroup(this);
         group.setOrientation(RadioGroup.VERTICAL);
+        final RadioButton[] themeOptions = new RadioButton[themes.length];
         for (int i = 0; i < themes.length; i++) {
             RadioButton option = new RadioButton(this);
-            option.setId(7000 + i);
+            option.setId(View.generateViewId());
             option.setText(themes[i]);
             option.setTextSize(16);
             option.setMinHeight(dp(48));
             option.setContentDescription(themes[i] + " theme");
             group.addView(option);
+            themeOptions[i] = option;
         }
-        group.check(7000 + checked);
+        group.check(themeOptions[checked].getId());
         options.addView(group);
         CheckBox motion = new CheckBox(this);
         motion.setText("Reduce motion");
@@ -4907,8 +4909,10 @@ public final class MainActivity extends FragmentActivity {
                 .setView(options)
                 .setNegativeButton("Cancel", null)
                 .setPositiveButton("Apply", (dialog, which) -> {
-                    int selection = group.getCheckedRadioButtonId() - 7000;
-                    if (selection < 0 || selection >= themes.length) selection = 0;
+                    int selection = 0;
+                    for (int i = 0; i < themeOptions.length; i++) {
+                        if (themeOptions[i].isChecked()) { selection = i; break; }
+                    }
                     AppearanceStore.theme(this, themes[selection]);
                     AppearanceStore.reducedMotion(this, motion.isChecked());
                     applyAppearance();
@@ -6567,6 +6571,10 @@ public final class MainActivity extends FragmentActivity {
             showManualEnduranceSession();
             return;
         }
+        if (LiveTrackingStore.current(this).active) {
+            showLiveTrackingSession();
+            return;
+        }
         // Endurance starts at the same first decision as Workouts: plan type.
         // Activity selection follows on the next wizard page.
         startEnduranceWizard(EndurancePlanStore.WALKING);
@@ -7205,14 +7213,14 @@ public final class MainActivity extends FragmentActivity {
         Button pause = live.paused ? primary("Resume live tracking") : lightAction("Pause live tracking");
         pause.setOnClickListener(view -> {
             sendTrackingCommand(live.paused ? LiveTrackingService.ACTION_RESUME : LiveTrackingService.ACTION_PAUSE);
-            workoutHandler.postDelayed(this::showEndurance, 180L);
+            workoutHandler.postDelayed(this::showLiveTrackingSession, 180L);
         });
         addButton(tracker, pause);
         gap(tracker, 7);
         Button finish = primary("Finish and save to Progress");
         finish.setOnClickListener(view -> {
             sendTrackingCommand(LiveTrackingService.ACTION_FINISH);
-            workoutHandler.postDelayed(this::showEndurance, 250L);
+            workoutHandler.postDelayed(this::showWorkoutHistory, 300L);
         });
         addButton(tracker, finish);
         gap(tracker, 7);
@@ -7224,6 +7232,23 @@ public final class MainActivity extends FragmentActivity {
         addButton(tracker, discard);
         body.addView(tracker);
         observeLiveTracking(state, stats, trace);
+    }
+
+    /** Dedicated in-app surface for an active GPS session; it remains available after navigation. */
+    private void showLiveTrackingSession() {
+        LiveTrackingStore.Session live = LiveTrackingStore.current(this);
+        if (!live.active) {
+            showEndurance();
+            return;
+        }
+        LinearLayout body = appPage("Endurance");
+        title(body, "LIVE ENDURANCE", enduranceAction(live.mode) + " in progress",
+                "Your route and totals stay on this phone. You can safely leave this screen while Android keeps tracking.");
+        addLiveTrackingCard(body, live);
+        gap(body, 8);
+        Button background = secondary("Keep tracking in background");
+        background.setOnClickListener(view -> startEnduranceWizard(live.mode));
+        addButton(body, background);
     }
 
     private void requestLiveTracking(String mode) {
@@ -7245,8 +7270,18 @@ public final class MainActivity extends FragmentActivity {
 
     private void startLiveTrackingService(String mode) {
         Intent intent = new Intent(this, LiveTrackingService.class).setAction(LiveTrackingService.ACTION_START).putExtra(LiveTrackingService.EXTRA_MODE, mode);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(intent); else startService(intent);
-        workoutHandler.postDelayed(this::showEndurance, 180L);
+        // Create visible local session state first so a slow service launch never throws the person
+        // back into the planner. The service repeats this initialization when it reaches START.
+        LiveTrackingStore.start(this, mode);
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(intent); else startService(intent);
+        } catch (RuntimeException error) {
+            LiveTrackingStore.discard(this);
+            toast("Android could not start live tracking. Try again after allowing location access.");
+            showEndurance();
+            return;
+        }
+        showLiveTrackingSession();
     }
 
     private void sendTrackingCommand(String action) {
@@ -7265,8 +7300,7 @@ public final class MainActivity extends FragmentActivity {
             }
         };
         IntentFilter filter = new IntentFilter(LiveTrackingService.ACTION_UPDATE);
-        if (Build.VERSION.SDK_INT >= 33) registerReceiver(liveTrackingReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
-        else registerReceiver(liveTrackingReceiver, filter);
+        ContextCompat.registerReceiver(this, liveTrackingReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED);
     }
 
     private void stopLiveTrackingUiObserver() {

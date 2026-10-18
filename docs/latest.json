@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 57,
-  "versionName": "5.16",
-  "publishedAt": "2026-10-18T11:42:38Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.16/app-release.apk",
-  "sha256": "17911fe126c43761835974c7944b9f26d76665b344a6ba49e05f0ec1bb2cd44a",
-  "sizeBytes": 61486379,
-  "notes": "Adds private completed walk, run, and ride records with distance, pace, duration, and route details in Progress."
+  "versionCode": 58,
+  "versionName": "5.17",
+  "publishedAt": "2026-10-18T12:00:17Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.17/app-release.apk",
+  "sha256": "afe379f3f4ff8817dbc207ef8505ce8faeb2b291430365283534956519f8a934",
+  "sizeBytes": 61487583,
+  "notes": "Fixes live Endurance routing, preserves complete long-route traces, and hardens private local profile data."
 }

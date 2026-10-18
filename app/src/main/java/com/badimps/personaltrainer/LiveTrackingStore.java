@@ -61,7 +61,7 @@ public final class LiveTrackingStore {
         float distance = p.getFloat("distance_meters", 0f);
         if (!points.isEmpty()) distance += metersBetween(points.get(points.size() - 1), new Point(latitude, longitude));
         points.add(new Point(latitude, longitude));
-        while (points.size() > MAX_POINTS) points.remove(0);
+        points = compactForStorage(points);
         preferences(context).edit().putFloat("distance_meters", distance).putString("points", serialize(points)).apply();
     }
 
@@ -120,6 +120,21 @@ public final class LiveTrackingStore {
             value.append(String.format(Locale.US, "%.6f,%.6f", point.latitude, point.longitude));
         }
         return value.toString();
+    }
+
+    /**
+     * Keep the route's complete shape without allowing SharedPreferences to grow forever.
+     * Dropping the oldest samples made longer sessions display only their final segment.
+     */
+    private static List<Point> compactForStorage(List<Point> points) {
+        while (points.size() > MAX_POINTS) {
+            List<Point> compacted = new ArrayList<>((points.size() + 1) / 2);
+            for (int index = 0; index < points.size(); index += 2) compacted.add(points.get(index));
+            Point last = points.get(points.size() - 1);
+            if (compacted.get(compacted.size() - 1) != last) compacted.add(last);
+            points = compacted;
+        }
+        return points;
     }
 
     private static float metersBetween(Point one, Point two) {

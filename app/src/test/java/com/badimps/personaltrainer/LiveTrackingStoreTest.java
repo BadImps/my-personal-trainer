@@ -40,4 +40,17 @@ public final class LiveTrackingStoreTest {
         assertFalse(LiveTrackingStore.current(context).active);
         assertEquals(2, LiveTrackingStore.last(context).points.size());
     }
+
+    @Test public void longRouteKeepsItsStartAndFinishRatherThanOnlyTheTail() {
+        LiveTrackingStore.start(context, EndurancePlanStore.WALKING);
+        for (int index = 0; index < 725; index++) {
+            LiveTrackingStore.addPoint(context, 10d + index * .00001d, -61d + index * .00001d);
+        }
+
+        LiveTrackingStore.Session session = LiveTrackingStore.current(context);
+        assertTrue(session.points.size() <= 360);
+        assertEquals(10d, session.points.get(0).latitude, .0000001d);
+        assertEquals(10d + 724 * .00001d, session.points.get(session.points.size() - 1).latitude, .0000001d);
+        assertTrue(session.distanceMeters > 1000f);
+    }
 }
