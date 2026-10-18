@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 55,
-  "versionName": "5.14",
-  "publishedAt": "2026-10-18T10:43:09Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.14/app-release.apk",
-  "sha256": "d22846e4fba688d981590675fbd7a688632af64f80fe40aea863990c0a396c30",
-  "sizeBytes": 61484543,
-  "notes": "Keeps the bottom Coach Hero navigation positioned on the active tab instead of snapping back to Home."
+  "versionCode": 56,
+  "versionName": "5.15",
+  "publishedAt": "2026-10-18T10:56:46Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.15/app-release.apk",
+  "sha256": "c2c657fa731b0c8badaf85928a38cb5c763fa2faf61a4a3d77b5aa58a978319b",
+  "sizeBytes": 61484699,
+  "notes": "Makes dashboard Coach Hero backgrounds full-width while preserving comfortable gutters for cards and text."
 }

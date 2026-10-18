@@ -628,14 +628,20 @@ public final class MainActivity extends FragmentActivity {
         scroll.setFillViewport(true);
         scroll.setClipToPadding(false);
         scroll.setBackgroundColor(navy);
+        // Dashboard pages are split into two deliberate surfaces: the Coach Hero is full-bleed
+        // like Home/Workouts, while only the text and cards below receive reading gutters.
+        // Padding the former was the source of the visibly narrow Progress/Nutrition/Settings UI.
+        LinearLayout page = new LinearLayout(this);
+        page.setOrientation(LinearLayout.VERTICAL);
+        page.setBackgroundColor(navy);
+        page.setClipChildren(false);
+        page.addView(coachHeroHeader(activeScreen), new LinearLayout.LayoutParams(-1, dp(250)));
+
         LinearLayout body = column();
-        // Signed-in pages use the same full Coach Hero composition as the workout
-        // flow.  Individual renderers keep their own content cards beneath it.
-        body.setPadding(dp(CoachHeroDesign.GUTTER_DP), 0, dp(CoachHeroDesign.GUTTER_DP), dp(28));
+        body.setPadding(dp(CoachHeroDesign.GUTTER_DP), dp(18), dp(CoachHeroDesign.GUTTER_DP), dp(28));
         body.setClipChildren(false);
-        body.addView(coachHeroHeader(activeScreen), new LinearLayout.LayoutParams(-1, dp(250)));
-        gap(body, 18);
-        scroll.addView(body, new ScrollView.LayoutParams(-1, -2));
+        page.addView(body, new LinearLayout.LayoutParams(-1, -2));
+        scroll.addView(page, new ScrollView.LayoutParams(-1, -2));
 
         LinearLayout shell = new LinearLayout(this);
         shell.setOrientation(LinearLayout.VERTICAL);
