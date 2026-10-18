@@ -60,9 +60,18 @@ public final class OfflineRouteMapView extends FrameLayout {
         route.setPoints(routePoints);
         if (!positioned) {
             LatLong center = center(routePoints);
-            mapView.setCenter(center == null ? new LatLong(10.6918d, -61.2225d) : center);
+            LatLong initialCenter = center == null ? new LatLong(10.6918d, -61.2225d) : center;
             byte requested = zoomFor(routePoints);
-            mapView.setZoomLevel((byte) Math.max(mapZoomMinimum, Math.min(mapZoomMaximum, requested)));
+            byte initialZoom = (byte) Math.max(mapZoomMinimum, Math.min(mapZoomMaximum, requested));
+            // Set the underlying position now and again after the Android view has a measured size.
+            // Some devices otherwise leave a newly embedded MapView at its empty default position.
+            mapView.getModel().mapViewPosition.setCenter(initialCenter);
+            mapView.getModel().mapViewPosition.setZoomLevel(initialZoom);
+            mapView.post(() -> {
+                mapView.getModel().mapViewPosition.setCenter(initialCenter);
+                mapView.getModel().mapViewPosition.setZoomLevel(initialZoom);
+                mapView.getLayerManager().redrawLayers();
+            });
             positioned = true;
         }
         mapView.getLayerManager().redrawLayers();
