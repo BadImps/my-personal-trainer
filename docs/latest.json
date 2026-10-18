@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 54,
-  "versionName": "5.13",
-  "publishedAt": "2026-10-18T10:40:01Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.13/app-release.apk",
-  "sha256": "b29605a3e9ecc26b3c99f9a174d4fda6a0cc3cb88db91091133ce0a47daf9371",
-  "sizeBytes": 61484135,
-  "notes": "Unifies every Coach Hero surface around one top-anchored coach image, crop, and overlay treatment."
+  "versionCode": 55,
+  "versionName": "5.14",
+  "publishedAt": "2026-10-18T10:43:09Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.14/app-release.apk",
+  "sha256": "d22846e4fba688d981590675fbd7a688632af64f80fe40aea863990c0a396c30",
+  "sizeBytes": 61484543,
+  "notes": "Keeps the bottom Coach Hero navigation positioned on the active tab instead of snapping back to Home."
 }

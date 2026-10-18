@@ -159,6 +159,8 @@ public final class MainActivity extends FragmentActivity {
     private int pendingScrollRestore = -1;
     /** Each dashboard tab owns its reading position; bottom navigation must never throw it away. */
     private final Map<String, Integer> dashboardScrollPositions = new HashMap<>();
+    /** The horizontally scrolling Coach Hero navigation is stateful too; rebuilding a tab must not snap it to Home. */
+    private final Map<String, Integer> dashboardNavigationPositions = new HashMap<>();
     private String activeDashboardScrollKey = "";
     /** True only while a selector redraws its current page; full navigation still receives its entrance motion. */
     private boolean suppressNextPageEntrance;
@@ -730,7 +732,27 @@ public final class MainActivity extends FragmentActivity {
         addCoachHeroNavItem(row, "Body", R.drawable.ic_nav_body, activeScreen, view -> navigateDashboard("Body", this::showBodyContext));
         addCoachHeroNavItem(row, "Settings", R.drawable.ic_nav_settings, activeScreen, view -> navigateDashboard("Settings", this::showProfile));
         scroll.addView(row, new HorizontalScrollView.LayoutParams(-2, -1));
+        scroll.setOnScrollChangeListener((view, scrollX, scrollY, oldScrollX, oldScrollY) ->
+                dashboardNavigationPositions.put(activeScreen, scrollX));
+        // A rebuilt strip is otherwise positioned at X=0, making Settings appear to jump back
+        // to Home. Restore the tab's last position, or center its selected item on first visit.
+        scroll.post(() -> {
+            int maximum = Math.max(0, row.getWidth() - scroll.getWidth());
+            int selectedIndex = coachHeroNavigationIndex(activeScreen);
+            int focused = Math.max(0, selectedIndex * dp(80) - (scroll.getWidth() - dp(76)) / 2);
+            int desired = dashboardNavigationPositions.containsKey(activeScreen)
+                    ? dashboardNavigationPositions.get(activeScreen) : focused;
+            scroll.scrollTo(Math.min(Math.max(0, desired), maximum), 0);
+        });
         return scroll;
+    }
+
+    private int coachHeroNavigationIndex(String screen) {
+        String[] screens = {"Home", "Workouts", "Progress", "Nutrition", "Endurance", "Scheduler", "Body", "Settings"};
+        for (int index = 0; index < screens.length; index++) {
+            if (screens[index].equals(screen)) return index;
+        }
+        return 0;
     }
 
     private void addCoachHeroNavItem(LinearLayout row, String label, int icon, String activeScreen, View.OnClickListener listener) {
