@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 60,
-  "versionName": "5.19",
-  "publishedAt": "2026-10-18T17:15:00Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.19/app-release.apk",
-  "sha256": "5251af39e21969d1ab1f41a2d14ee36f8b94fd31ecac64b5079452a21797f182",
-  "sizeBytes": 61981856,
-  "notes": "Adds Settings > Offline maps: verified Trinidad & Tobago download, country-map selection, and safe import of compatible offline country files."
+  "versionCode": 61,
+  "versionName": "5.20",
+  "publishedAt": "2026-10-18T17:35:00Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.20/app-release.apk",
+  "sha256": "aaf20a7047d5bf849d3cc49533be4f603a968a2f95f94d9d92474d9894bf3ccc",
+  "sizeBytes": 61981928,
+  "notes": "Fixes offline country-map rendering by isolating map caches, respecting the map zoom range, and forcing the first street redraw."
 }

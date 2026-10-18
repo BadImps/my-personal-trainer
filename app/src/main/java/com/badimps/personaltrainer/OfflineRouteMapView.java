@@ -18,10 +18,12 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
-/** A real, touchable vector map backed only by the locally stored Trinidad & Tobago map file. */
+/** A real, touchable vector map backed only by the locally stored country map file. */
 public final class OfflineRouteMapView extends FrameLayout {
     private final MapView mapView;
     private final Polyline route;
+    private final byte mapZoomMinimum;
+    private final byte mapZoomMaximum;
     private boolean positioned;
 
     public OfflineRouteMapView(Context context, File map, List<LiveTrackingStore.Point> points) {
@@ -31,12 +33,19 @@ public final class OfflineRouteMapView extends FrameLayout {
         mapView.setBuiltInZoomControls(false);
         mapView.getMapScaleBar().setVisible(true);
         mapView.getModel().displayModel.setBackgroundColor(0xff0b1930);
-        TileCache cache = AndroidUtil.createTileCache(context, "mpt-tt-map-cache",
+        // Cache keys must identify the country file. Reusing an old empty/mismatched cache can
+        // make a valid newly downloaded map look blank until Android eventually evicts it.
+        String cacheId = "mpt-country-" + Integer.toHexString((map.getName() + map.length() + map.lastModified()).hashCode());
+        TileCache cache = AndroidUtil.createTileCache(context, cacheId,
                 mapView.getModel().displayModel.getTileSize(), 1f,
                 mapView.getModel().frameBufferModel.getOverdrawFactor());
         MapFile data = new MapFile(map);
+        mapZoomMinimum = data.getMapFileInfo().zoomLevelMin;
+        mapZoomMaximum = data.getMapFileInfo().zoomLevelMax;
+        mapView.setZoomLevelMin(mapZoomMinimum);
+        mapView.setZoomLevelMax(mapZoomMaximum);
         mapView.getLayerManager().getLayers().add(AndroidUtil.createTileRendererLayer(cache,
-                mapView.getModel().mapViewPosition, data, MapsforgeThemes.BIKER));
+                mapView.getModel().mapViewPosition, data, MapsforgeThemes.DEFAULT));
         Paint routePaint = AndroidGraphicFactory.INSTANCE.createPaint();
         routePaint.setColor(0xffff665c);
         routePaint.setStyle(Style.STROKE);
@@ -54,9 +63,11 @@ public final class OfflineRouteMapView extends FrameLayout {
         if (!positioned) {
             LatLong center = center(routePoints);
             mapView.setCenter(center == null ? new LatLong(10.6918d, -61.2225d) : center);
-            mapView.setZoomLevel(zoomFor(routePoints));
+            byte requested = zoomFor(routePoints);
+            mapView.setZoomLevel((byte) Math.max(mapZoomMinimum, Math.min(mapZoomMaximum, requested)));
             positioned = true;
         }
+        mapView.getLayerManager().redrawLayers();
         mapView.repaint();
     }
 
