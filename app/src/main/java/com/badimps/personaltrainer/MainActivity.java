@@ -175,6 +175,7 @@ public final class MainActivity extends FragmentActivity {
     private boolean showingUpdatePage;
     private static final int REQUEST_LIVE_LOCATION = 4102;
     private static final int REQUEST_PROFILE_PHOTO = 4103;
+    private static final int REQUEST_OFFLINE_MAP = 4104;
     private String pendingLiveTrackingMode;
     private String selectedProfilePhotoUri;
     private BroadcastReceiver liveTrackingReceiver;
@@ -285,6 +286,12 @@ public final class MainActivity extends FragmentActivity {
 
     @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQUEST_OFFLINE_MAP && resultCode == RESULT_OK && data != null && data.getData() != null) {
+            Uri map = data.getData();
+            try { getContentResolver().takePersistableUriPermission(map, Intent.FLAG_GRANT_READ_URI_PERMISSION); } catch (SecurityException ignored) { }
+            askForImportedMapCountry(map);
+            return;
+        }
         if (requestCode != REQUEST_PROFILE_PHOTO || resultCode != RESULT_OK || data == null || data.getData() == null) return;
         Uri photo = data.getData();
         try { getContentResolver().takePersistableUriPermission(photo, Intent.FLAG_GRANT_READ_URI_PERMISSION); } catch (SecurityException ignored) { }
@@ -4487,8 +4494,9 @@ public final class MainActivity extends FragmentActivity {
         if (!entry.points.isEmpty()) {
             LinearLayout route = card();
             route.addView(heading("Your route", 19, ink));
-            if (OfflineMapStore.hasTrinidadAndTobago(this)) {
-                route.addView(text("Offline Trinidad & Tobago map · your coral route stays private on this phone.", 13, muted));
+            if (OfflineMapStore.hasAnyMap(this)) {
+                OfflineMapStore.MapRecord selectedMap = OfflineMapStore.selectedMap(this);
+                route.addView(text("Offline " + (selectedMap == null ? "country" : selectedMap.country) + " map · your coral route stays private on this phone.", 13, muted));
                 try {
                     OfflineRouteMapView map = new OfflineRouteMapView(this, OfflineMapStore.mapFile(this), entry.points);
                     LinearLayout.LayoutParams mapParams = new LinearLayout.LayoutParams(-1, dp(300));
@@ -4498,7 +4506,7 @@ public final class MainActivity extends FragmentActivity {
                 gap(route, 8);
                 addTrinidadOfflineMapControl(route, () -> showEnduranceSessionDetails(entry));
             } else {
-                route.addView(text("Download the free Trinidad & Tobago map once to place this private route on real streets while offline.", 13, muted));
+                route.addView(text("Choose a country map in Settings to place this private route on real streets while offline.", 13, muted));
                 addPrivateRouteTrace(route, entry.points, dp(235));
                 gap(route, 8);
                 addTrinidadOfflineMapControl(route, () -> showEnduranceSessionDetails(entry));
@@ -4545,6 +4553,75 @@ public final class MainActivity extends FragmentActivity {
             });
         });
         addButton(parent, download);
+    }
+
+    /** Settings-owned country selector: managed downloads stay verified; other country packages are imported locally. */
+    private void showOfflineMapCatalog() {
+        LinearLayout body = appPage("Settings");
+        title(body, "OFFLINE MAPS", "Country maps on your phone", "Download a country once, then view your private endurance route without mobile data.");
+        LinearLayout notice = card();
+        notice.addView(heading("Your route stays private", 18, ink));
+        notice.addView(text("Map files are stored only in My Personal Trainer. Downloaded and imported files can be removed here at any time.", 14, muted));
+        body.addView(notice); gap(body, 12);
+
+        body.addView(heading("AVAILABLE COUNTRY DOWNLOAD", 11, mint));
+        LinearLayout trinidad = card();
+        trinidad.addView(heading("Trinidad & Tobago", 20, ink));
+        trinidad.addView(text("Verified street map · 10 MB · works offline", 14, muted));
+        gap(trinidad, 7);
+        addTrinidadOfflineMapControl(trinidad, this::showOfflineMapCatalog);
+        body.addView(trinidad); gap(body, 12);
+
+        body.addView(heading("YOUR COUNTRY MAPS", 11, mint));
+        List<OfflineMapStore.MapRecord> maps = OfflineMapStore.installedMaps(this);
+        if (maps.isEmpty()) {
+            LinearLayout empty = card();
+            empty.addView(text("No country map is installed yet.", 14, muted));
+            body.addView(empty);
+        } else {
+            OfflineMapStore.MapRecord selected = OfflineMapStore.selectedMap(this);
+            for (OfflineMapStore.MapRecord record : maps) {
+                LinearLayout item = card();
+                item.addView(heading(record.country, 18, ink));
+                String detail = (record.verifiedDownload ? "Verified download" : "Imported Mapsforge file") + " · " + Math.max(1, Math.round(record.bytes / 1_000_000f)) + " MB";
+                item.addView(text(detail, 13, muted)); gap(item, 8);
+                Button use = record.id.equals(selected == null ? "" : selected.id) ? secondary("Used for my routes") : lightAction("Use for my routes");
+                use.setEnabled(!record.id.equals(selected == null ? "" : selected.id));
+                use.setOnClickListener(view -> { OfflineMapStore.selectMap(this, record.id); showOfflineMapCatalog(); });
+                addButton(item, use); gap(item, 6);
+                Button remove = secondary("Remove " + record.country + " map");
+                remove.setOnClickListener(view -> new AlertDialog.Builder(this).setTitle("Remove " + record.country + "?")
+                        .setMessage("This removes only the map. Your saved routes stay on this phone.")
+                        .setNegativeButton("Cancel", null).setPositiveButton("Remove", (dialog, which) -> { OfflineMapStore.removeMap(this, record); showOfflineMapCatalog(); }).show());
+                addButton(item, remove); body.addView(item); gap(body, 10);
+            }
+        }
+        LinearLayout importCard = card();
+        importCard.addView(heading("Add another country", 19, ink));
+        importCard.addView(text("Choose a compatible Mapsforge .map country file already on your phone. It is copied into private app storage, checked before use, and then becomes available for your routes.", 14, muted));
+        gap(importCard, 10);
+        Button choose = lightAction("Choose country map file");
+        choose.setOnClickListener(view -> {
+            Intent picker = new Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("application/octet-stream").addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+            startActivityForResult(picker, REQUEST_OFFLINE_MAP);
+        });
+        addButton(importCard, choose); body.addView(importCard); gap(body, 12);
+        body.addView(text("© OpenStreetMap contributors. Country map data may have its own open-data license. Use a country package that covers where you exercise.", 12, Color.rgb(202, 216, 234)));
+        gap(body, 12); Button back = secondary("Back to settings"); back.setOnClickListener(view -> showProfile()); addButton(body, back);
+    }
+
+    private void askForImportedMapCountry(Uri map) {
+        EditText country = input("Country or region name", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_WORDS);
+        country.setHint("For example: Jamaica");
+        new AlertDialog.Builder(this).setTitle("Name this offline map").setMessage("Use the country or region this map covers.").setView(country)
+                .setNegativeButton("Cancel", null).setPositiveButton("Add map", (dialog, which) -> {
+                    String name = country.getText().toString().trim();
+                    if (name.isEmpty()) { toast("Enter the country or region name."); return; }
+                    new Thread(() -> {
+                        try { OfflineMapStore.importMap(this, map, name); runOnUiThread(() -> { toast(name + " is ready for offline routes."); showOfflineMapCatalog(); }); }
+                        catch (Exception error) { runOnUiThread(() -> toast(error.getMessage() == null ? "Could not add that country map." : error.getMessage())); }
+                    }, "offline-map-import").start();
+                }).show();
     }
 
     /** Detailed progress record for a normally completed guided workout only. */
@@ -4767,6 +4844,8 @@ public final class MainActivity extends FragmentActivity {
 
         body.addView(settingsGroup("APP"));
         LinearLayout appGroup = settingsPanel();
+        appGroup.addView(settingsRow("⌖", "Offline maps", OfflineMapStore.hasAnyMap(this) ? "Country map ready for routes" : "Download a country for offline routes", view -> showOfflineMapCatalog()));
+        appGroup.addView(settingsDivider());
         appGroup.addView(settingsRow("↻", "Updates", "Check for a newer version", view -> showUpdate()));
         body.addView(appGroup);
         gap(body, 18);
@@ -7244,11 +7323,12 @@ public final class MainActivity extends FragmentActivity {
         TextView stats = text(liveTrackingStats(live), 20, ink);
         tracker.addView(state);
         tracker.addView(stats);
-        tracker.addView(text(OfflineMapStore.hasTrinidadAndTobago(this)
-                ? "Trinidad & Tobago streets are stored on this phone. Your coral route is drawn locally."
-                : "GPS route trace is local to this phone. Download Trinidad & Tobago streets below for a full offline map.", 13, muted));
+        OfflineMapStore.MapRecord selectedMap = OfflineMapStore.selectedMap(this);
+        tracker.addView(text(OfflineMapStore.hasAnyMap(this)
+                ? (selectedMap == null ? "A country street map is stored on this phone." : selectedMap.country + " streets are stored on this phone.") + " Your coral route is drawn locally."
+                : "GPS route trace is local to this phone. Choose a country in Settings for a full offline map.", 13, muted));
         LiveRouteRenderer routeRenderer;
-        if (OfflineMapStore.hasTrinidadAndTobago(this)) {
+        if (OfflineMapStore.hasAnyMap(this)) {
             try {
                 OfflineRouteMapView map = new OfflineRouteMapView(this, OfflineMapStore.mapFile(this), live.points);
                 LinearLayout.LayoutParams mapParams = new LinearLayout.LayoutParams(-1, dp(235)); mapParams.topMargin = dp(10);

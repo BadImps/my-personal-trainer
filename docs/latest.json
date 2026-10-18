@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 59,
-  "versionName": "5.18",
-  "publishedAt": "2026-10-18T15:35:23Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.18/app-release.apk",
-  "sha256": "16a398e7477d510208601c1da9e0441a0ea674b3202a347d9dbacac84ba04749",
-  "sizeBytes": 61977016,
-  "notes": "Adds a free, stored Trinidad & Tobago street map for private live and completed endurance routes."
+  "versionCode": 60,
+  "versionName": "5.19",
+  "publishedAt": "2026-10-18T17:15:00Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.19/app-release.apk",
+  "sha256": "5251af39e21969d1ab1f41a2d14ee36f8b94fd31ecac64b5079452a21797f182",
+  "sizeBytes": 61981856,
+  "notes": "Adds Settings > Offline maps: verified Trinidad & Tobago download, country-map selection, and safe import of compatible offline country files."
 }
