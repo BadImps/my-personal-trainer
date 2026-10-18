@@ -7,6 +7,7 @@ import org.junit.Test;
 import org.mapsforge.core.model.BoundingBox;
 import org.mapsforge.core.model.Tile;
 import org.mapsforge.map.datastore.MapReadResult;
+import org.mapsforge.map.datastore.Way;
 import org.mapsforge.map.reader.MapFile;
 
 import java.io.File;
@@ -27,6 +28,11 @@ public final class OfflineMapPackageTest {
             int tileY = (int) Math.floor((1d - mercator / Math.PI) / 2d * (1 << zoom));
             MapReadResult data = map.readMapData(new Tile(tileX, tileY, zoom, 256));
             assertFalse("The hosted map has no drawable ways near Port of Spain", data.ways.isEmpty());
+            boolean hasRoad = false;
+            for (Way way : data.ways) for (org.mapsforge.core.model.Tag tag : way.tags) {
+                if ("highway".equals(tag.key)) { hasRoad = true; break; }
+            }
+            assertTrue("The hosted map has no highway tags that the street theme can draw", hasRoad);
         } finally { map.close(); }
     }
 }

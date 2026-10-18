@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 63,
-  "versionName": "5.22",
-  "publishedAt": "2026-10-18T18:10:00Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.22/app-release.apk",
-  "sha256": "7c654bf67bca4102c8c9f6b6f6dc17b2d826a174335a75a588ff31bce619efd3",
-  "sizeBytes": 61982216,
-  "notes": "Fixes the embedded offline map view so it recenters and redraws after Android measures the route panel."
+  "versionCode": 64,
+  "versionName": "5.23",
+  "publishedAt": "2026-10-18T18:25:00Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.23/app-release.apk",
+  "sha256": "96186cbe01e5d2cd3dbc629a00558c3a040df1a17c0c5720a42234bedd1d9e66",
+  "sizeBytes": 61982656,
+  "notes": "Replaces the blank offline tile renderer with direct on-device road drawing from the verified country map."
 }

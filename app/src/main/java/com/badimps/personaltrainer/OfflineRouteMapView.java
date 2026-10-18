@@ -1,103 +1,14 @@
 package com.badimps.personaltrainer;
-
-import android.content.Context;
-import android.widget.FrameLayout;
-
-import org.mapsforge.core.graphics.Paint;
-import org.mapsforge.core.graphics.Style;
-import org.mapsforge.core.model.LatLong;
-import org.mapsforge.map.android.graphics.AndroidGraphicFactory;
-import org.mapsforge.map.android.util.AndroidUtil;
-import org.mapsforge.map.android.view.MapView;
-import org.mapsforge.map.layer.cache.TileCache;
-import org.mapsforge.map.layer.cache.InMemoryTileCache;
-import org.mapsforge.map.layer.overlay.Polyline;
-import org.mapsforge.map.reader.MapFile;
-import org.mapsforge.map.rendertheme.internal.MapsforgeThemes;
-
-import java.io.File;
-import java.util.ArrayList;
-import java.util.List;
-
-/** A real, touchable vector map backed only by the locally stored country map file. */
+import android.content.Context; import android.graphics.*; import android.view.View; import android.widget.FrameLayout;
+import org.mapsforge.core.model.*; import org.mapsforge.map.datastore.*; import org.mapsforge.map.reader.MapFile;
+import java.io.File; import java.util.*;
+/** Draws verified local road geometry directly; avoids the device tile renderer. */
 public final class OfflineRouteMapView extends FrameLayout {
-    private final MapView mapView;
-    private final Polyline route;
-    private final byte mapZoomMinimum;
-    private final byte mapZoomMaximum;
-    private boolean positioned;
-
-    public OfflineRouteMapView(Context context, File map, List<LiveTrackingStore.Point> points) {
-        super(context);
-        if (AndroidGraphicFactory.INSTANCE == null) AndroidGraphicFactory.createInstance(context.getApplicationContext());
-        mapView = new MapView(context);
-        mapView.setBuiltInZoomControls(false);
-        mapView.getMapScaleBar().setVisible(true);
-        mapView.getModel().displayModel.setBackgroundColor(0xff0b1930);
-        // Keep the small route preview cache in app memory. A file-backed cache can be denied or
-        // return stale blank tiles on individual Android devices, even when the country file is valid.
-        TileCache cache = new InMemoryTileCache(64);
-        MapFile data = new MapFile(map);
-        mapZoomMinimum = data.getMapFileInfo().zoomLevelMin;
-        mapZoomMaximum = data.getMapFileInfo().zoomLevelMax;
-        mapView.setZoomLevelMin(mapZoomMinimum);
-        mapView.setZoomLevelMax(mapZoomMaximum);
-        mapView.getLayerManager().getLayers().add(AndroidUtil.createTileRendererLayer(cache,
-                mapView.getModel().mapViewPosition, data, MapsforgeThemes.DEFAULT));
-        Paint routePaint = AndroidGraphicFactory.INSTANCE.createPaint();
-        routePaint.setColor(0xffff665c);
-        routePaint.setStyle(Style.STROKE);
-        routePaint.setStrokeWidth(7f);
-        route = new Polyline(routePaint, AndroidGraphicFactory.INSTANCE);
-        mapView.getLayerManager().getLayers().add(route);
-        addView(mapView, new FrameLayout.LayoutParams(-1, -1));
-        setRoute(points);
-    }
-
-    public void setRoute(List<LiveTrackingStore.Point> points) {
-        ArrayList<LatLong> routePoints = new ArrayList<>();
-        if (points != null) for (LiveTrackingStore.Point point : points) routePoints.add(new LatLong(point.latitude, point.longitude));
-        route.setPoints(routePoints);
-        if (!positioned) {
-            LatLong center = center(routePoints);
-            LatLong initialCenter = center == null ? new LatLong(10.6918d, -61.2225d) : center;
-            byte requested = zoomFor(routePoints);
-            byte initialZoom = (byte) Math.max(mapZoomMinimum, Math.min(mapZoomMaximum, requested));
-            // Set the underlying position now and again after the Android view has a measured size.
-            // Some devices otherwise leave a newly embedded MapView at its empty default position.
-            mapView.getModel().mapViewPosition.setCenter(initialCenter);
-            mapView.getModel().mapViewPosition.setZoomLevel(initialZoom);
-            mapView.post(() -> {
-                mapView.getModel().mapViewPosition.setCenter(initialCenter);
-                mapView.getModel().mapViewPosition.setZoomLevel(initialZoom);
-                mapView.getLayerManager().redrawLayers();
-            });
-            positioned = true;
-        }
-        mapView.getLayerManager().redrawLayers();
-        mapView.repaint();
-    }
-
-    @Override protected void onDetachedFromWindow() {
-        mapView.destroyAll();
-        super.onDetachedFromWindow();
-    }
-
-    private static LatLong center(List<LatLong> points) {
-        if (points.isEmpty()) return null;
-        double minLat = points.get(0).latitude, maxLat = minLat, minLon = points.get(0).longitude, maxLon = minLon;
-        for (LatLong point : points) { minLat = Math.min(minLat, point.latitude); maxLat = Math.max(maxLat, point.latitude); minLon = Math.min(minLon, point.longitude); maxLon = Math.max(maxLon, point.longitude); }
-        return new LatLong((minLat + maxLat) / 2d, (minLon + maxLon) / 2d);
-    }
-
-    private static byte zoomFor(List<LatLong> points) {
-        if (points.size() < 2) return 13;
-        double minLat = points.get(0).latitude, maxLat = minLat, minLon = points.get(0).longitude, maxLon = minLon;
-        for (LatLong point : points) { minLat = Math.min(minLat, point.latitude); maxLat = Math.max(maxLat, point.latitude); minLon = Math.min(minLon, point.longitude); maxLon = Math.max(maxLon, point.longitude); }
-        double span = Math.max(maxLat - minLat, maxLon - minLon);
-        if (span < .003d) return 16;
-        if (span < .012d) return 14;
-        if (span < .05d) return 12;
-        return 10;
-    }
+ private final Roads roads; public OfflineRouteMapView(Context c,File f,List<LiveTrackingStore.Point> p){super(c);roads=new Roads(c,f);addView(roads,new FrameLayout.LayoutParams(-1,-1));setRoute(p);} public void setRoute(List<LiveTrackingStore.Point> p){roads.route(p);}
+ static final class Roads extends View { final MapFile map; final List<Way> ways=new ArrayList<>(); List<LiveTrackingStore.Point> points=new ArrayList<>(); double lat=10.6918,lon=-61.2225; boolean loaded;
+  Roads(Context c,File f){super(c);map=new MapFile(f);setBackgroundColor(0xff18334f);} void route(List<LiveTrackingStore.Point> p){points=p==null?new ArrayList<>():new ArrayList<>(p);if(!points.isEmpty()){LiveTrackingStore.Point q=points.get(points.size()-1);lat=q.latitude;lon=q.longitude;loaded=false;}if(!loaded)load();invalidate();}
+  void load(){ways.clear();byte z=13;int n=1<<z,x=(int)Math.floor((lon+180)/360*n);double r=Math.toRadians(lat);int y=(int)Math.floor((1-Math.log(Math.tan(Math.PI/4+r/2))/Math.PI)/2*n);for(int i=x-2;i<=x+2;i++)for(int j=y-2;j<=y+2;j++)try{for(Way w:map.readMapData(new Tile(i,j,z,256)).ways)if(road(w))ways.add(w);}catch(RuntimeException e){}loaded=true;}
+  boolean road(Way w){for(Tag t:w.tags)if("highway".equals(t.key))return true;return false;} float x(double a,double b,float w){return(float)((b-lon)/.07*w+w/2);} float y(double a,double b,float h){return(float)((lat-a)/.07*h+h/2);} Paint p(int c,float s){Paint p=new Paint(1);p.setColor(c);p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(s);return p;}
+  protected void onDraw(Canvas c){super.onDraw(c);float w=getWidth(),h=getHeight();Paint rd=p(0xffd7edf2,3),rt=p(0xffff6b5f,7);for(Way q:ways)for(LatLong[] a:q.latLongs){Path d=new Path();for(int i=0;i<a.length;i++){if(i==0)d.moveTo(x(a[i].latitude,a[i].longitude,w),y(a[i].latitude,a[i].longitude,h));else d.lineTo(x(a[i].latitude,a[i].longitude,w),y(a[i].latitude,a[i].longitude,h));}c.drawPath(d,rd);}Path d=new Path();for(int i=0;i<points.size();i++){LiveTrackingStore.Point q=points.get(i);if(i==0)d.moveTo(x(q.latitude,q.longitude,w),y(q.latitude,q.longitude,h));else d.lineTo(x(q.latitude,q.longitude,w),y(q.latitude,q.longitude,h));}c.drawPath(d,rt);Paint t=new Paint(1);t.setColor(Color.WHITE);t.setTextSize(18);c.drawText("OFFLINE STREET MAP",12,26,t);} protected void onDetachedFromWindow(){map.close();super.onDetachedFromWindow();}
+ }
 }
