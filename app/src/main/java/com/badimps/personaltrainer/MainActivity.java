@@ -231,13 +231,10 @@ public final class MainActivity extends FragmentActivity {
         restoreSavedPlan();
         if (hasLocalAccount) {
             AccountStore.Profile profile = AccountStore.get(this);
-            // Biometric unlock is an account-entry method, not an extra tap on the login form.
-            // It must be requested automatically whenever the member enabled it; cancelling it
-            // simply leaves the same masked password form available as a fallback.
-            if (profile.biometricUnlock) showLogin(true);
-            else if (!profile.rememberSignIn) showLogin();
-            else if (getIntent().getBooleanExtra(EXTRA_START_GUIDED_WORKOUT, false) && !session.isEmpty()) showWorkoutCountdown();
-            else showHome();
+            // A saved account is always protected at launch. Android presents enrolled
+            // biometrics or the device credential; the masked password form remains behind it
+            // when the device has no credential or the member cancels.
+            showLogin(true);
         } else {
             showWelcome();
         }
@@ -473,8 +470,15 @@ public final class MainActivity extends FragmentActivity {
     }
 
     private void persistCurrentWeekSchedule() {
-        if (!"Weekly".equals(planMode)) return;
-        WeeklyScheduleStore.save(this, selectedWeekStart(), weeklyWorkoutDays, weeklyDayTargets);
+        if ("Weekly".equals(planMode)) {
+            WeeklyScheduleStore.save(this, selectedWeekStart(), weeklyWorkoutDays, weeklyDayTargets);
+        } else if ("Daily".equals(planMode)) {
+            boolean[] days = new boolean[7];
+            days[Math.max(0, Math.min(6, dailyScheduledDay))] = true;
+            ArrayList<List<String>> focuses = emptyWeeklyTargets();
+            focuses.get(Math.max(0, Math.min(6, dailyScheduledDay))).addAll(selectedTargets);
+            WeeklyScheduleStore.save(this, selectedWeekStart(), days, focuses);
+        }
     }
 
     private void loadSelectedWeekSchedule() {
@@ -612,7 +616,7 @@ public final class MainActivity extends FragmentActivity {
         // flow.  Individual renderers keep their own content cards beneath it.
         body.setPadding(dp(CoachHeroDesign.GUTTER_DP), 0, dp(CoachHeroDesign.GUTTER_DP), dp(28));
         body.setClipChildren(false);
-        body.addView(coachHeroHeader(activeScreen), new LinearLayout.LayoutParams(-1, dp(218)));
+        body.addView(coachHeroHeader(activeScreen), new LinearLayout.LayoutParams(-1, dp(250)));
         gap(body, 18);
         scroll.addView(body, new ScrollView.LayoutParams(-1, -2));
 
@@ -645,7 +649,7 @@ public final class MainActivity extends FragmentActivity {
         coach.setImageResource(coachHeroBackground(coachName()));
         coach.setScaleType(ImageView.ScaleType.CENTER_CROP);
         coach.setContentDescription("Coach " + coachName());
-        hero.addView(coach, new FrameLayout.LayoutParams(-1, dp(292), Gravity.TOP));
+        hero.addView(coach, new FrameLayout.LayoutParams(-1, -1, Gravity.TOP));
         View shade = new View(this);
         GradientDrawable shadeBackground = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
                 new int[]{Color.rgb(7, 24, 45), Color.argb(216, 7, 24, 45), Color.argb(22, 7, 24, 45)});
@@ -662,8 +666,8 @@ public final class MainActivity extends FragmentActivity {
         title.setSingleLine(true);
         copy.addView(title);
         copy.addView(text(coachHeroSubtitle(activeScreen), 13, Color.rgb(221, 235, 246)));
-        FrameLayout.LayoutParams copyParams = new FrameLayout.LayoutParams(dp(235), -2, Gravity.LEFT | Gravity.CENTER_VERTICAL);
-        copyParams.leftMargin = dp(18);
+        FrameLayout.LayoutParams copyParams = new FrameLayout.LayoutParams(dp(245), -2, Gravity.LEFT | Gravity.BOTTOM);
+        copyParams.leftMargin = dp(18); copyParams.bottomMargin = dp(20);
         hero.addView(copy, copyParams);
         return hero;
     }
@@ -764,7 +768,7 @@ public final class MainActivity extends FragmentActivity {
         body.setBackgroundColor(navy);
         body.setPadding(dp(CoachHeroDesign.GUTTER_DP), 0, dp(CoachHeroDesign.GUTTER_DP), dp(28));
         body.setClipChildren(false);
-        body.addView(coachHeroHeader(activeScreen), new LinearLayout.LayoutParams(-1, dp(218)));
+        body.addView(coachHeroHeader(activeScreen), new LinearLayout.LayoutParams(-1, dp(250)));
         gap(body, 16);
         scroll.addView(body, new ScrollView.LayoutParams(-1, -2));
 
@@ -913,14 +917,14 @@ public final class MainActivity extends FragmentActivity {
         dividerParams.bottomMargin = dp(planGridGap());
         rail.addView(divider, dividerParams);
 
-        addPlanRailItem(rail, "Home", R.drawable.ic_nav_home, false, view -> { stopGuidedRuntime(); showHome(); });
-        addPlanRailItem(rail, "Workouts", R.drawable.ic_nav_workouts, true, view -> { stopGuidedRuntime(); showPlans(); });
-        addPlanRailItem(rail, "Progress", R.drawable.ic_nav_progress, false, view -> { stopGuidedRuntime(); showProgress(); });
-        addPlanRailItem(rail, "Nutrition", R.drawable.ic_nav_nutrition, false, view -> { stopGuidedRuntime(); showMeals(); });
-        addPlanRailItem(rail, "Endurance", R.drawable.ic_nav_endurance, false, view -> { stopGuidedRuntime(); showEndurance(); });
-        addPlanRailItem(rail, "Scheduler", R.drawable.ic_nav_plan, false, view -> { stopGuidedRuntime(); showScheduler(); });
-        addPlanRailItem(rail, "Body", R.drawable.ic_nav_body, false, view -> { stopGuidedRuntime(); showBodyContext(); });
-        addPlanRailItem(rail, "Settings", R.drawable.ic_nav_settings, false, view -> { stopGuidedRuntime(); showProfile(); });
+        addPlanRailItem(rail, "Home", R.drawable.ic_nav_home, false, view -> navigateDashboard("Home", this::showHome));
+        addPlanRailItem(rail, "Workouts", R.drawable.ic_nav_workouts, true, view -> navigateDashboard("Workouts", this::showPlans));
+        addPlanRailItem(rail, "Progress", R.drawable.ic_nav_progress, false, view -> navigateDashboard("Progress", this::showProgress));
+        addPlanRailItem(rail, "Nutrition", R.drawable.ic_nav_nutrition, false, view -> navigateDashboard("Nutrition", this::showMeals));
+        addPlanRailItem(rail, "Endurance", R.drawable.ic_nav_endurance, false, view -> navigateDashboard("Endurance", this::showEndurance));
+        addPlanRailItem(rail, "Scheduler", R.drawable.ic_nav_plan, false, view -> navigateDashboard("Scheduler", this::showScheduler));
+        addPlanRailItem(rail, "Body", R.drawable.ic_nav_body, false, view -> navigateDashboard("Body", this::showBodyContext));
+        addPlanRailItem(rail, "Settings", R.drawable.ic_nav_settings, false, view -> navigateDashboard("Settings", this::showProfile));
         return rail;
     }
 
@@ -981,14 +985,14 @@ public final class MainActivity extends FragmentActivity {
         dividerParams.bottomMargin = dp(9);
         rail.addView(divider, dividerParams);
 
-        addRailItem(rail, "Home", R.drawable.ic_nav_home, activeScreen, view -> { stopGuidedRuntime(); showHome(); });
-        addRailItem(rail, "Workouts", R.drawable.ic_nav_workouts, activeScreen, view -> { stopGuidedRuntime(); showPlans(); });
-        addRailItem(rail, "Progress", R.drawable.ic_nav_progress, activeScreen, view -> { stopGuidedRuntime(); showProgress(); });
-        addRailItem(rail, "Nutrition", R.drawable.ic_nav_nutrition, activeScreen, view -> { stopGuidedRuntime(); showMeals(); });
-        addRailItem(rail, "Endurance", R.drawable.ic_nav_endurance, activeScreen, view -> { stopGuidedRuntime(); showEndurance(); });
-        addRailItem(rail, "Scheduler", R.drawable.ic_nav_plan, activeScreen, view -> { stopGuidedRuntime(); showScheduler(); });
-        addRailItem(rail, "Body", R.drawable.ic_nav_body, activeScreen, view -> { stopGuidedRuntime(); showBodyContext(); });
-        addRailItem(rail, "Settings", R.drawable.ic_nav_settings, activeScreen, view -> { stopGuidedRuntime(); showProfile(); });
+        addRailItem(rail, "Home", R.drawable.ic_nav_home, activeScreen, view -> navigateDashboard("Home", this::showHome));
+        addRailItem(rail, "Workouts", R.drawable.ic_nav_workouts, activeScreen, view -> navigateDashboard("Workouts", this::showPlans));
+        addRailItem(rail, "Progress", R.drawable.ic_nav_progress, activeScreen, view -> navigateDashboard("Progress", this::showProgress));
+        addRailItem(rail, "Nutrition", R.drawable.ic_nav_nutrition, activeScreen, view -> navigateDashboard("Nutrition", this::showMeals));
+        addRailItem(rail, "Endurance", R.drawable.ic_nav_endurance, activeScreen, view -> navigateDashboard("Endurance", this::showEndurance));
+        addRailItem(rail, "Scheduler", R.drawable.ic_nav_plan, activeScreen, view -> navigateDashboard("Scheduler", this::showScheduler));
+        addRailItem(rail, "Body", R.drawable.ic_nav_body, activeScreen, view -> navigateDashboard("Body", this::showBodyContext));
+        addRailItem(rail, "Settings", R.drawable.ic_nav_settings, activeScreen, view -> navigateDashboard("Settings", this::showProfile));
         return rail;
     }
 
@@ -1952,19 +1956,11 @@ public final class MainActivity extends FragmentActivity {
     }
 
     private boolean hasHomeWeekSchedule(int offset, Calendar weekStart) {
-        if (offset == 0) return true;
-        return "Weekly".equals(planMode) && WeeklyScheduleStore.hasSavedSchedule(this, weekStart);
+        return WeeklyScheduleStore.hasSavedSchedule(this, weekStart);
     }
 
     private WeeklyScheduleStore.Schedule homeWeekSchedule(int offset, Calendar weekStart, boolean confirmed) {
         if (!confirmed) return new WeeklyScheduleStore.Schedule(new boolean[7], emptyWeeklyTargets());
-        if ("Daily".equals(planMode)) {
-            boolean[] days = new boolean[7];
-            days[Math.max(0, Math.min(6, dailyScheduledDay))] = true;
-            ArrayList<List<String>> focuses = emptyWeeklyTargets();
-            focuses.get(Math.max(0, Math.min(6, dailyScheduledDay))).add(target);
-            return new WeeklyScheduleStore.Schedule(days, focuses);
-        }
         return WeeklyScheduleStore.load(this, weekStart, defaultWeeklyDays(), defaultWeeklyTargets());
     }
 
@@ -2485,7 +2481,7 @@ public final class MainActivity extends FragmentActivity {
         continueButton.setOnClickListener(view -> {
             if ("Daily".equals(planMode)) {
                 if (sessionMinutes < 45) { sessionMinutes = 60; customDuration = false; }
-                showPlanTarget();
+                showPlanSchedule();
             } else if ("Weekly".equals(planMode)) {
                 if (sessionMinutes < 45) { sessionMinutes = 45; customDuration = false; }
                 showPlanTarget();
@@ -2556,13 +2552,13 @@ public final class MainActivity extends FragmentActivity {
                     sessionMinutes = 60;
                     customDuration = false;
                 }
-                showPlanSchedule();
+                showPlanTarget();
             } else if ("Weekly".equals(planMode)) {
                 if (sessionMinutes < 45) {
                     sessionMinutes = 45;
                     customDuration = false;
                 }
-                showPlanSchedule();
+                showPlanTarget();
             } else {
                 showPlanTarget();
             }
@@ -2794,6 +2790,8 @@ public final class MainActivity extends FragmentActivity {
 
         if (weekly) {
             gap(content, 14);
+            addWeeklyDayFocusAssignment(content);
+            gap(content, 14);
             LinearLayout rhythm = new LinearLayout(this); rhythm.setOrientation(LinearLayout.VERTICAL);
             rhythm.setPadding(dp(15), dp(15), dp(15), dp(15)); rhythm.setBackground(surface(Color.WHITE, 20, 1, cardLine));
             rhythm.addView(heading("How many days this week?", 18, ink));
@@ -2820,6 +2818,56 @@ public final class MainActivity extends FragmentActivity {
         Button back = new Button(this); back.setText("Back"); back.setTextColor(mint); back.setTextSize(14); back.setAllCaps(false); back.setBackgroundColor(Color.TRANSPARENT);
         back.setOnClickListener(view -> showPlanTarget());
         content.addView(back, new LinearLayout.LayoutParams(-1, dp(48)));
+    }
+
+    /** Lets a weekly member assign the chosen training areas to each selected calendar day. */
+    private void addWeeklyDayFocusAssignment(LinearLayout content) {
+        LinearLayout assignment = card();
+        assignment.addView(heading("ASSIGN TRAINING AREAS", 11, muted));
+        assignment.addView(heading("What will you train each day?", 18, ink));
+        assignment.addView(text("Select a training day, then choose one or two areas from your weekly choices.", 12, muted));
+        HorizontalScrollView dayScroll = new HorizontalScrollView(this);
+        dayScroll.setHorizontalScrollBarEnabled(false);
+        LinearLayout dayRow = new LinearLayout(this);
+        dayRow.setGravity(Gravity.CENTER_VERTICAL);
+        for (int i = 0; i < weeklyWorkoutDays.length; i++) {
+            if (!weeklyWorkoutDays[i]) continue;
+            final int dayIndex = i;
+            boolean active = activeScheduleDay == i;
+            Button day = action(scheduleDayLabel(i) + "\n" + focusSummary(weeklyDayTargets.get(i)), active ? mint : Color.rgb(234, 240, 246), active ? navy : ink);
+            day.setTextSize(10);
+            day.setOnClickListener(view -> { activeScheduleDay = dayIndex; syncPrimaryTarget(); refreshCurrentPageKeepingScroll(this::showPlanSchedule); });
+            LinearLayout.LayoutParams dayParams = new LinearLayout.LayoutParams(dp(116), dp(54));
+            dayParams.rightMargin = dp(7);
+            dayRow.addView(day, dayParams);
+        }
+        dayScroll.addView(dayRow, new HorizontalScrollView.LayoutParams(-2, -2));
+        LinearLayout.LayoutParams scrollParams = new LinearLayout.LayoutParams(-1, dp(58)); scrollParams.topMargin = dp(10);
+        assignment.addView(dayScroll, scrollParams);
+
+        List<String> choices = selectedTargets.isEmpty() ? java.util.Collections.singletonList(target) : selectedTargets;
+        LinearLayout choicesRow = new LinearLayout(this);
+        choicesRow.setGravity(Gravity.CENTER_VERTICAL);
+        List<String> assigned = weeklyDayTargets.get(activeScheduleDay);
+        for (String choice : choices) {
+            boolean selected = assigned.contains(choice);
+            Button choiceButton = action((selected ? "✓  " : "") + targetLabel(choice), selected ? mint : navyPanel, selected ? navy : mint);
+            choiceButton.setTextSize(11);
+            choiceButton.setOnClickListener(view -> {
+                List<String> today = weeklyDayTargets.get(activeScheduleDay);
+                if (today.contains(choice)) {
+                    if (today.size() == 1) { toast("Keep one training area on a workout day."); return; }
+                    today.remove(choice);
+                } else if (today.size() < 2) today.add(choice);
+                else { toast("Choose up to two areas for one training day."); return; }
+                syncPrimaryTarget(); persistCurrentWeekSchedule(); refreshCurrentPageKeepingScroll(this::showPlanSchedule);
+            });
+            LinearLayout.LayoutParams choiceParams = new LinearLayout.LayoutParams(0, dp(44), 1);
+            if (choicesRow.getChildCount() > 0) choiceParams.leftMargin = dp(7);
+            choicesRow.addView(choiceButton, choiceParams);
+        }
+        assignment.addView(choicesRow, new LinearLayout.LayoutParams(-1, dp(44)));
+        content.addView(assignment);
     }
 
     /** Retained only as a reference while the remaining legacy wizard screens are migrated. */
@@ -2951,7 +2999,9 @@ public final class MainActivity extends FragmentActivity {
     private void showPlanTarget() {
         initialisePlanSelections();
         final boolean weekly = "Weekly".equals(planMode);
-        final List<String> focuses = activeTargets();
+        // Weekly chooses an overall pool first. Each training day receives its own
+        // assignment on the next calendar page, rather than copying one area to every day.
+        final List<String> focuses = weekly ? selectedTargets : activeTargets();
         beginNewPage();
         setSystemBars();
         ScrollView scroll = new ScrollView(this);
@@ -2992,12 +3042,7 @@ public final class MainActivity extends FragmentActivity {
                 String choice = WIZARD_TARGETS[index + offset];
                 LinearLayout tile = targetTile(choice, focuses.contains(choice));
                 tile.setOnClickListener(view -> {
-                    toggleActiveTarget(choice);
-                    if (weekly) {
-                        List<String> template = new ArrayList<>(activeTargets());
-                        for (int day = 0; day < weeklyWorkoutDays.length; day++) if (weeklyWorkoutDays[day]) { weeklyDayTargets.get(day).clear(); weeklyDayTargets.get(day).addAll(template); }
-                        persistCurrentWeekSchedule();
-                    }
+                    if (weekly) toggleWeeklyTrainingPool(choice); else toggleActiveTarget(choice);
                     session.clear(); resetExerciseSelection(); refreshCurrentPageKeepingScroll(this::showPlanTarget);
                 });
                 LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(151), 1); if (offset == 0) params.rightMargin = dp(9); row.addView(tile, params);
@@ -3115,6 +3160,19 @@ public final class MainActivity extends FragmentActivity {
             focuses.add(choice);
         }
         syncPrimaryTarget();
+    }
+
+    /** Weekly planning starts with a reusable pool; days are assigned independently afterwards. */
+    private void toggleWeeklyTrainingPool(String choice) {
+        if (selectedTargets.contains(choice)) {
+            selectedTargets.remove(choice);
+        } else if (selectedTargets.size() >= 2) {
+            toast("Choose up to two training areas for this week.");
+            return;
+        } else {
+            selectedTargets.add(choice);
+        }
+        if (!selectedTargets.isEmpty()) target = selectedTargets.get(0);
     }
 
     private String targetLabel(String value) {
@@ -4542,7 +4600,7 @@ public final class MainActivity extends FragmentActivity {
 
         body.addView(settingsGroup("ACCOUNT"));
         LinearLayout accountGroup = settingsPanel();
-        accountGroup.addView(settingsRow("●", "Personal details", "Name, photo, remember me & biometrics", view -> showProfileEditor()));
+        accountGroup.addView(settingsRow("●", "Personal details", "Name, photo, remember me & device lock", view -> showProfileEditor()));
         accountGroup.addView(settingsDivider());
         accountGroup.addView(settingsRow("⌁", "Security", "Password and biometric unlock", view -> showSecuritySettings()));
         accountGroup.addView(settingsDivider());
@@ -4606,9 +4664,11 @@ public final class MainActivity extends FragmentActivity {
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setPadding(dp(14), dp(13), dp(14), dp(13));
         row.setBackgroundColor(Color.TRANSPARENT);
-        TextView icon = heading(symbol, 20, navy);
-        icon.setGravity(Gravity.CENTER);
-        icon.setBackground(surface(mint, 99, 0, Color.TRANSPARENT));
+        ImageView icon = new ImageView(this);
+        icon.setImageResource(settingsIcon(title));
+        icon.setImageTintList(ColorStateList.valueOf(navy));
+        icon.setPadding(dp(9), dp(9), dp(9), dp(9));
+        icon.setBackground(surface(mint, 99, 1, Color.argb(90, 255, 255, 255)));
         row.addView(icon, new LinearLayout.LayoutParams(dp(38), dp(38)));
         LinearLayout words = new LinearLayout(this); words.setOrientation(LinearLayout.VERTICAL);
         TextView name = heading(title, 16, ink); words.addView(name);
@@ -4619,6 +4679,15 @@ public final class MainActivity extends FragmentActivity {
         row.addView(chevron, new LinearLayout.LayoutParams(dp(24), dp(42)));
         if (onClick != null) { row.setClickable(true); row.setFocusable(true); row.setOnClickListener(onClick); applyPressMotion(row); }
         return row;
+    }
+
+    /** Replace text glyphs with one premium, device-consistent vector icon language. */
+    private int settingsIcon(String title) {
+        if ("Personal details".equals(title)) return R.drawable.ic_nav_account;
+        if ("Security".equals(title) || "Appearance".equals(title) || "Updates".equals(title)) return R.drawable.ic_nav_settings;
+        if ("Privacy".equals(title)) return R.drawable.ic_nav_body;
+        if ("Customize your Coach".equals(title)) return R.drawable.ic_nav_workouts;
+        return R.drawable.ic_nav_settings;
     }
 
     private View settingsDivider() {
@@ -4822,6 +4891,16 @@ public final class MainActivity extends FragmentActivity {
         LinearLayout body = appPage("Settings");
         title(body, "COACH SETTINGS", "Customize your Coach", "Choose who guides you, how much they speak, and whether the screen stays awake during training.");
 
+        LinearLayout profiles = darkCard();
+        profiles.addView(heading("Coach profile cards", 20, Color.WHITE));
+        profiles.addView(text("Explore every coach as a portrait training card before you select who guides your sessions.", 14, Color.rgb(211, 225, 233)));
+        gap(profiles, 10);
+        Button browseProfiles = action("Browse coach cards", mint, navy);
+        browseProfiles.setOnClickListener(view -> showCoachProfiles());
+        addButton(profiles, browseProfiles);
+        body.addView(profiles);
+        gap(body, 15);
+
         body.addView(heading("Female coaches", 21, Color.WHITE));
         gap(body, 8);
         for (CoachPreferences.CoachOption option : CoachPreferences.coaches()) {
@@ -4893,6 +4972,85 @@ public final class MainActivity extends FragmentActivity {
         back.setOnClickListener(view -> showProfile());
         addButton(body, back);
     }
+
+    /** Collectible-style coach cards use the same coach artwork and palette as the rest of the app. */
+    private void showCoachProfiles() {
+        AccountStore.Profile profile = profile();
+        LinearLayout body = appPage("Settings");
+        title(body, "COACH PROFILES", "Choose your coach card", "Your coach, your training style. Pick any card to make that coach active.");
+        for (CoachPreferences.CoachOption option : CoachPreferences.coaches()) {
+            boolean selected = option.name.equals(profile.coachName);
+            FrameLayout card = new FrameLayout(this);
+            card.setClipChildren(true);
+            card.setClickable(true);
+            card.setFocusable(true);
+            card.setContentDescription("Coach " + option.name + ", " + coachCardSpecialty(option.name) + (selected ? ", selected" : ""));
+            card.setBackground(surface(navyPanel, 22, selected ? 3 : 1, selected ? coral : Color.rgb(47, 91, 111)));
+            applyPremiumTileDepth(card, selected);
+            ImageView portrait = new ImageView(this);
+            portrait.setImageResource(coachHeroBackground(option.name));
+            portrait.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            portrait.setAlpha(.93f);
+            card.addView(portrait, new FrameLayout.LayoutParams(-1, -1));
+            View veil = new View(this);
+            veil.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                    new int[]{Color.argb(22, 7, 24, 45), Color.argb(230, 7, 24, 45), Color.rgb(7, 24, 45)}));
+            card.addView(veil, new FrameLayout.LayoutParams(-1, -1));
+            LinearLayout copy = new LinearLayout(this);
+            copy.setOrientation(LinearLayout.VERTICAL);
+            copy.setPadding(dp(16), dp(14), dp(16), dp(14));
+            TextView coach = heading("Coach " + option.name, 24, Color.WHITE);
+            copy.addView(coach);
+            TextView specialty = heading(coachCardSpecialty(option.name), 16, mint);
+            copy.addView(specialty);
+            copy.addView(text(option.accent + " · " + option.gender, 12, Color.rgb(219, 234, 244)));
+            LinearLayout stats = new LinearLayout(this);
+            stats.setGravity(Gravity.CENTER_VERTICAL);
+            String[] labels = {coachCardSession(option.name), coachCardFocus(option.name), coachCardPace(option.name)};
+            for (String label : labels) {
+                TextView chip = text(label, 11, Color.WHITE);
+                chip.setGravity(Gravity.CENTER);
+                chip.setPadding(dp(9), dp(6), dp(9), dp(6));
+                chip.setBackground(surface(Color.argb(174, 18, 49, 72), 99, 1, Color.argb(125, 119, 224, 196)));
+                LinearLayout.LayoutParams chipParams = new LinearLayout.LayoutParams(0, dp(34), 1);
+                chipParams.rightMargin = dp(6);
+                stats.addView(chip, chipParams);
+            }
+            LinearLayout.LayoutParams statsParams = new LinearLayout.LayoutParams(-1, -2);
+            statsParams.topMargin = dp(10);
+            copy.addView(stats, statsParams);
+            TextView selectedLabel = heading(selected ? "✓  Active coach" : "Tap to train with " + option.name, 12, selected ? coral : Color.WHITE);
+            LinearLayout.LayoutParams selectedParams = new LinearLayout.LayoutParams(-1, -2);
+            selectedParams.topMargin = dp(10);
+            copy.addView(selectedLabel, selectedParams);
+            card.addView(copy, new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM));
+            card.setOnClickListener(view -> {
+                AccountStore.updateCoachPreferences(this, option.name, profile().dialogueMode, profile().keepPhoneAwake);
+                LauncherIconManager.apply(this, option.name);
+                configureSpeechVoices();
+                refreshCurrentPageKeepingScroll(this::showCoachProfiles);
+            });
+            applyPressMotion(card);
+            body.addView(card, new LinearLayout.LayoutParams(-1, dp(242)));
+            gap(body, 12);
+        }
+        Button back = secondary("Back to coach settings");
+        back.setOnClickListener(view -> showCoachCustomization());
+        addButton(body, back);
+    }
+
+    private String coachCardSpecialty(String coach) {
+        if ("Amy".equals(coach)) return "Balanced fitness";
+        if ("Claudia".equals(coach)) return "Form & mobility";
+        if ("Leo".equals(coach)) return "Strength coach";
+        if ("Mark".equals(coach)) return "Performance coach";
+        if ("Stephen".equals(coach)) return "Steady progress";
+        return "Spanish strength guide";
+    }
+
+    private String coachCardSession(String coach) { return "Leo".equals(coach) || "Mark".equals(coach) ? "40 min" : "30 min"; }
+    private String coachCardFocus(String coach) { return "Claudia".equals(coach) ? "Mobility" : "Amy".equals(coach) || "Stephen".equals(coach) ? "Balance" : "Strength"; }
+    private String coachCardPace(String coach) { return "Claudia".equals(coach) || "Stephen".equals(coach) ? "Gentle pace" : "Steady pace"; }
 
     private void addCoachChoice(LinearLayout body, CoachPreferences.CoachOption option, boolean selected) {
         LinearLayout choice = new LinearLayout(this);
@@ -6483,6 +6641,7 @@ public final class MainActivity extends FragmentActivity {
         start.setOnClickListener(view -> {
             try {
                 EndurancePlanStore.save(this, enduranceWizardMode, enduranceWizardName, enduranceWizardOrigin, enduranceWizardDestination, enduranceWizardDistanceKm, enduranceWizardMinutes, enduranceWizardEffort);
+                publishEnduranceWizardSchedule();
                 startGuidedEndurance(enduranceWizardMode);
             } catch (IllegalArgumentException error) { toast(error.getMessage()); }
         }); addPlanButton(body, start); gap(body, 8);
@@ -6490,15 +6649,28 @@ public final class MainActivity extends FragmentActivity {
         live.setOnClickListener(view -> {
             try {
                 EndurancePlanStore.save(this, enduranceWizardMode, enduranceWizardName, enduranceWizardOrigin, enduranceWizardDestination, enduranceWizardDistanceKm, enduranceWizardMinutes, enduranceWizardEffort);
+                publishEnduranceWizardSchedule();
                 requestLiveTracking(enduranceWizardMode);
             } catch (IllegalArgumentException error) { toast(error.getMessage()); }
         }); addPlanButton(body, live); gap(body, 8);
         Button save = planPrimary("Save endurance plan");
         save.setOnClickListener(view -> {
-            try { EndurancePlanStore.save(this, enduranceWizardMode, enduranceWizardName, enduranceWizardOrigin, enduranceWizardDestination, enduranceWizardDistanceKm, enduranceWizardMinutes, enduranceWizardEffort); toast("Endurance plan saved."); showEndurance(); }
+            try { EndurancePlanStore.save(this, enduranceWizardMode, enduranceWizardName, enduranceWizardOrigin, enduranceWizardDestination, enduranceWizardDistanceKm, enduranceWizardMinutes, enduranceWizardEffort); publishEnduranceWizardSchedule(); toast("Endurance plan saved."); showEndurance(); }
             catch (IllegalArgumentException error) { toast(error.getMessage()); }
         }); addPlanButton(body, save); gap(body, 8);
         Button back = planBack(); back.setOnClickListener(view -> showEnduranceWizardRoute()); addPlanBack(body, back);
+    }
+
+    /** Mirrors saved Endurance wizard choices into the shared Home/Scheduler calendar. */
+    private void publishEnduranceWizardSchedule() {
+        boolean weekly = "Weekly".equals(endurancePlanMode);
+        if (weekly) {
+            for (int day = 0; day < enduranceWorkoutDays.length; day++) {
+                if (enduranceWorkoutDays[day]) SchedulerStore.saveIfMissing(this, enduranceWizardMode, selectedWeekDate(day), enduranceWizardMinutes);
+            }
+        } else {
+            SchedulerStore.saveIfMissing(this, enduranceWizardMode, selectedWeekDate(enduranceDailyDay), enduranceWizardMinutes);
+        }
     }
 
     /** Guided endurance shares the Coach 5-to-1 ritual with the strength workout flow. */
@@ -6615,6 +6787,7 @@ public final class MainActivity extends FragmentActivity {
         gap(body, 10);
 
         LinearLayout calendarCard = card();
+        calendarCard.addView(heading("MONTH VIEW", 11, muted));
         calendarCard.addView(text("Mint = work plan  •  Coral = endurance appointment  •  Slate = rest day", 12, muted));
         // Use weighted rows rather than fixed-width grid cells. The sidebar changes available
         // width on phones and tablets, so fixed 39dp cells could crop the last calendar days.
@@ -6670,12 +6843,13 @@ public final class MainActivity extends FragmentActivity {
         List<SchedulerStore.Appointment> appointments = SchedulerStore.onDate(this, date);
         boolean planned = isMonthWorkoutDay(date);
         boolean selected = sameSchedulerDate(date, schedulerSelectedDate);
-        String state = !appointments.isEmpty() ? appointmentAbbreviation(appointments.get(0).mode) : planned ? "Plan" : "Rest";
+        String state = !appointments.isEmpty() ? appointmentAbbreviation(appointments.get(0).mode) : planned ? schedulerStrengthSummary(date) : "Rest";
+        if (state.length() > 8) state = state.substring(0, 8);
         int fill = !appointments.isEmpty() ? coral : planned ? mint : Color.rgb(232, 236, 244);
         TextView cell = text(date.get(Calendar.DAY_OF_MONTH) + "\n" + state, 10, selected ? navy : (planned || !appointments.isEmpty() ? navy : muted));
         cell.setGravity(Gravity.CENTER);
         cell.setTypeface(Typeface.create("sans-serif", selected ? Typeface.BOLD : Typeface.NORMAL));
-        cell.setBackground(surface(fill, 9, selected ? 2 : 0, selected ? navy : Color.TRANSPARENT));
+        cell.setBackground(surface(fill, 11, selected ? 3 : 0, selected ? coral : Color.TRANSPARENT));
         cell.setContentDescription(new SimpleDateFormat("EEEE, MMMM d", Locale.getDefault()).format(date.getTime()) + ", " + state);
         cell.setClickable(true);
         cell.setOnClickListener(view -> { schedulerSelectedDate = (Calendar) date.clone(); refreshCurrentPageKeepingScroll(this::showScheduler); });

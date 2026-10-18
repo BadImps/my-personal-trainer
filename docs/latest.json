@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 48,
-  "versionName": "5.7",
-  "publishedAt": "2026-10-18T03:24:44Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.7/app-release.apk",
-  "sha256": "0f0935aaecdc07cf8aaaa9933c6fdcd9e6336caab5453ba599c699e2f314a92a",
-  "sizeBytes": 61481223,
-  "notes": "Makes every selected navigation item use a clear 3dp coral-orange premium outline."
+  "versionCode": 49,
+  "versionName": "5.8",
+  "publishedAt": "2026-10-18T03:50:43Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.8/app-release.apk",
+  "sha256": "b4f9a90b5bd6754ba13acb1aaca33cd4dd8f234afc74518002f4aeb6ef7a94be",
+  "sizeBytes": 61484391,
+  "notes": "Adds the current-theme Scheduler month-and-agenda view, shared workout/endurance calendar data, per-day weekly training assignments, launch security, Coach Profile Cards, and navigation position retention."
 }

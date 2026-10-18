@@ -42,6 +42,16 @@ public final class SchedulerStore {
         write(context, values);
     }
 
+    /** Adds a wizard-planned session once, so Home and Scheduler can share the same calendar data. */
+    public static void saveIfMissing(Context context, String mode, Calendar when, int durationMinutes) {
+        String day = dateKey(when);
+        String normalized = normalizeMode(mode);
+        for (Appointment item : all(context)) {
+            if (normalized.equals(item.mode) && day.equals(dateKey(item.when)) && item.durationMinutes == durationMinutes) return;
+        }
+        save(context, normalized, when, durationMinutes);
+    }
+
     public static void remove(Context context, String id) {
         List<Appointment> values = all(context);
         values.removeIf(value -> value.id.equals(id));
