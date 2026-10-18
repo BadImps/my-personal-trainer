@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 52,
-  "versionName": "5.11",
-  "publishedAt": "2026-10-18T09:04:43Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.11/app-release.apk",
-  "sha256": "2f7133879845e6036ed99c92295dd7a97e2701e35589ac20c16beaed1a0c6fbc",
-  "sizeBytes": 61484211,
-  "notes": "Fixes dashboard navigation so Home and every tab retain their own scroll position when switching sections."
+  "versionCode": 53,
+  "versionName": "5.12",
+  "publishedAt": "2026-10-18T10:28:27Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.12/app-release.apk",
+  "sha256": "883869e3bc447fc1f3b870571148717e7993db2bf655935201d6dd60baa0f85c",
+  "sizeBytes": 61484387,
+  "notes": "Stabilizes Coach Hero screens: removes full-window redraws during page changes, restores scroll before first draw, and corrects Home coach-image cropping."
 }

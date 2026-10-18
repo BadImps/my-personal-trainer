@@ -30,6 +30,7 @@ import android.text.method.PasswordTransformationMethod;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewTreeObserver;
 import android.view.WindowInsets;
 import android.view.WindowManager;
 import android.widget.Button;
@@ -153,6 +154,8 @@ public final class MainActivity extends FragmentActivity {
     private Runnable workoutRemainingUpdate;
     /** The active scroll surface is retained so in-place option changes do not throw a user to the top. */
     private ScrollView activeScrollView;
+    /** Permanent activity host: page changes replace its child, never the entire Android window. */
+    private FrameLayout screenHost;
     private int pendingScrollRestore = -1;
     /** Each dashboard tab owns its reading position; bottom navigation must never throw it away. */
     private final Map<String, Integer> dashboardScrollPositions = new HashMap<>();
@@ -602,7 +605,7 @@ public final class MainActivity extends FragmentActivity {
         scroll.setBackgroundColor(navy);
         LinearLayout body = column();
         scroll.addView(body, new ScrollView.LayoutParams(-1, -2));
-        setContentView(scroll);
+        mountScreen(scroll);
         activateScroll(scroll);
         animatePage(scroll);
         return body;
@@ -644,7 +647,7 @@ public final class MainActivity extends FragmentActivity {
         }
         shell.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
         shell.addView(coachHeroBottomNavigation(activeScreen), new LinearLayout.LayoutParams(-1, dp(76)));
-        setContentView(shell);
+        mountScreen(shell);
         activeDashboardScrollKey = activeScreen;
         activateScroll(scroll);
         animatePage(shell);
@@ -797,7 +800,7 @@ public final class MainActivity extends FragmentActivity {
         }
         shell.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
         shell.addView(coachHeroBottomNavigation(activeScreen), new LinearLayout.LayoutParams(-1, dp(76)));
-        setContentView(shell);
+        mountScreen(shell);
         activeDashboardScrollKey = activeScreen;
         activateScroll(scroll);
         animatePage(scroll);
@@ -818,7 +821,7 @@ public final class MainActivity extends FragmentActivity {
         }
         shell.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
         shell.addView(coachHeroBottomNavigation(activeScreen), new LinearLayout.LayoutParams(-1, dp(76)));
-        setContentView(shell);
+        mountScreen(shell);
         activeDashboardScrollKey = activeScreen;
         activateScroll(scroll);
         animatePage(shell);
@@ -830,13 +833,33 @@ public final class MainActivity extends FragmentActivity {
         if (pendingScrollRestore < 0) return;
         int restore = pendingScrollRestore;
         pendingScrollRestore = -1;
-        // Do not expose the default top-of-page layout for a frame before restoring the saved
-        // position. That was perceived as a flicker during category changes.
-        scroll.setAlpha(0f);
-        scroll.post(() -> {
-            scroll.scrollTo(0, restore);
-            scroll.setAlpha(1f);
+        // Restore on the first pre-draw. The old alpha hide/show was itself visible as a
+        // flicker on physical devices when a choice rebuilt a selector page.
+        scroll.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener() {
+            @Override public boolean onPreDraw() {
+                if (scroll.getViewTreeObserver().isAlive()) {
+                    scroll.getViewTreeObserver().removeOnPreDrawListener(this);
+                }
+                scroll.scrollTo(0, restore);
+                return true;
+            }
         });
+    }
+
+    /**
+     * Keeps the Android window, system-bar relationship, and navigation surface stable. Before
+     * this host existed every selection called setContentView(), which caused a visible flash and
+     * discarded view-level state while the replacement page measured.
+     */
+    private void mountScreen(View screen) {
+        if (screenHost == null) {
+            screenHost = new FrameLayout(this);
+            screenHost.setBackgroundColor(navy);
+            setContentView(screenHost);
+        }
+        screenHost.removeAllViews();
+        screenHost.addView(screen, new FrameLayout.LayoutParams(-1, -1));
+        screenHost.requestApplyInsets();
     }
 
     private void preserveScrollForRefresh() {
@@ -1667,7 +1690,7 @@ public final class MainActivity extends FragmentActivity {
         }
         shell.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
         shell.addView(coachHeroBottomNavigation("Home"), new LinearLayout.LayoutParams(-1, dp(76)));
-        setContentView(shell);
+        mountScreen(shell);
         // Home owns a custom Coach Hero shell rather than appPage(), so it must bind its
         // dashboard key here. Without this, Home scroll position was stored under whichever
         // tab was open previously and returning to a tab appeared to reset it to the top.
@@ -1675,7 +1698,6 @@ public final class MainActivity extends FragmentActivity {
         activateScroll(scroll);
         animatePage(shell);
 
-        int screenHeight = getResources().getDisplayMetrics().heightPixels;
         FrameLayout hero = new FrameLayout(this);
         hero.setClipChildren(true);
         hero.setBackgroundColor(navy);
@@ -1685,9 +1707,11 @@ public final class MainActivity extends FragmentActivity {
         // creates a full-bleed close portrait without squeezing or distorting the coach.
         ImageView heroCoach = new ImageView(this);
         heroCoach.setImageResource(coachHeroBackground(coachName()));
-        heroCoach.setScaleType(ImageView.ScaleType.FIT_XY);
+        // The source artwork is portrait photography. CENTER_CROP preserves the coach's
+        // proportions and matches every other Coach Hero header; FIT_XY stretched this screen.
+        heroCoach.setScaleType(ImageView.ScaleType.CENTER_CROP);
         heroCoach.setContentDescription("Coach " + coachName() + " home hero");
-        hero.addView(heroCoach, new FrameLayout.LayoutParams(-1, screenHeight, Gravity.TOP));
+        hero.addView(heroCoach, new FrameLayout.LayoutParams(-1, -1, Gravity.TOP));
 
         LinearLayout heroCopy = new LinearLayout(this);
         heroCopy.setOrientation(LinearLayout.VERTICAL);
