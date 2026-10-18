@@ -154,6 +154,9 @@ public final class MainActivity extends FragmentActivity {
     /** The active scroll surface is retained so in-place option changes do not throw a user to the top. */
     private ScrollView activeScrollView;
     private int pendingScrollRestore = -1;
+    /** Each dashboard tab owns its reading position; bottom navigation must never throw it away. */
+    private final Map<String, Integer> dashboardScrollPositions = new HashMap<>();
+    private String activeDashboardScrollKey = "";
     /** True only while a selector redraws its current page; full navigation still receives its entrance motion. */
     private boolean suppressNextPageEntrance;
     private boolean guidedSessionRecorded;
@@ -200,6 +203,9 @@ public final class MainActivity extends FragmentActivity {
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
         applyAppearance();
+        // Once Android has started the newly installed package, the old verified APK is no
+        // longer useful. Remove only our app-private update artifact and its DownloadManager row.
+        UpdateManager.cleanUpInstalledUpdate(this);
         voice = new TextToSpeech(this, result -> {
             if (result == TextToSpeech.SUCCESS) {
                 voice.setLanguage(Locale.US);
@@ -319,7 +325,7 @@ public final class MainActivity extends FragmentActivity {
         // The approved six login canvases are rendered intact by coachLoginArtwork().
         // Small identity surfaces use the approved app mark until individual source portraits
         // are supplied; this avoids displaying fragments of old or baked UI art.
-        return R.drawable.trainer_launcher_premium_v2;
+        return R.drawable.trainer_launcher_premium_v3;
     }
 
     /** Exact full login references supplied by the user; coach selection changes only this artwork. */
@@ -516,8 +522,15 @@ public final class MainActivity extends FragmentActivity {
     private int planBackHeight() { return hasTallPlanViewport() ? 40 : 34; }
 
     private void elevatePlanSurface(View view, boolean selected) {
-        view.setElevation(dp(selected ? 5 : 3));
-        view.setTranslationZ(dp(selected ? 1 : 0));
+        applyPremiumTileDepth(view, selected);
+    }
+
+    /** Shared physical depth for tiles, cards, and actions across the Coach Hero suite. */
+    private void applyPremiumTileDepth(View view, boolean selected) {
+        view.setElevation(dp(selected ? 8 : 5));
+        view.setTranslationZ(dp(selected ? 2 : 1));
+        view.setOutlineProvider(android.view.ViewOutlineProvider.BACKGROUND);
+        view.setClipToOutline(false);
     }
 
     private GradientDrawable surface(int fill, int radius, int stroke, int strokeColor) {
@@ -598,6 +611,7 @@ public final class MainActivity extends FragmentActivity {
         // Signed-in pages use the same full Coach Hero composition as the workout
         // flow.  Individual renderers keep their own content cards beneath it.
         body.setPadding(dp(CoachHeroDesign.GUTTER_DP), 0, dp(CoachHeroDesign.GUTTER_DP), dp(28));
+        body.setClipChildren(false);
         body.addView(coachHeroHeader(activeScreen), new LinearLayout.LayoutParams(-1, dp(218)));
         gap(body, 18);
         scroll.addView(body, new ScrollView.LayoutParams(-1, -2));
@@ -615,6 +629,7 @@ public final class MainActivity extends FragmentActivity {
         shell.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
         shell.addView(coachHeroBottomNavigation(activeScreen), new LinearLayout.LayoutParams(-1, dp(76)));
         setContentView(shell);
+        activeDashboardScrollKey = activeScreen;
         activateScroll(scroll);
         animatePage(shell);
         return body;
@@ -675,14 +690,14 @@ public final class MainActivity extends FragmentActivity {
         LinearLayout row = new LinearLayout(this);
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setPadding(dp(8), dp(7), dp(8), dp(8));
-        addCoachHeroNavItem(row, "Home", R.drawable.ic_nav_home, activeScreen, view -> { stopGuidedRuntime(); showHome(); });
-        addCoachHeroNavItem(row, "Workouts", R.drawable.ic_nav_workouts, activeScreen, view -> { stopGuidedRuntime(); showPlans(); });
-        addCoachHeroNavItem(row, "Progress", R.drawable.ic_nav_progress, activeScreen, view -> { stopGuidedRuntime(); showProgress(); });
-        addCoachHeroNavItem(row, "Nutrition", R.drawable.ic_nav_nutrition, activeScreen, view -> { stopGuidedRuntime(); showMeals(); });
-        addCoachHeroNavItem(row, "Endurance", R.drawable.ic_nav_endurance, activeScreen, view -> { stopGuidedRuntime(); showEndurance(); });
-        addCoachHeroNavItem(row, "Scheduler", R.drawable.ic_nav_plan, activeScreen, view -> { stopGuidedRuntime(); showScheduler(); });
-        addCoachHeroNavItem(row, "Body", R.drawable.ic_nav_body, activeScreen, view -> { stopGuidedRuntime(); showBodyContext(); });
-        addCoachHeroNavItem(row, "Settings", R.drawable.ic_nav_settings, activeScreen, view -> { stopGuidedRuntime(); showProfile(); });
+        addCoachHeroNavItem(row, "Home", R.drawable.ic_nav_home, activeScreen, view -> navigateDashboard("Home", this::showHome));
+        addCoachHeroNavItem(row, "Workouts", R.drawable.ic_nav_workouts, activeScreen, view -> navigateDashboard("Workouts", this::showPlans));
+        addCoachHeroNavItem(row, "Progress", R.drawable.ic_nav_progress, activeScreen, view -> navigateDashboard("Progress", this::showProgress));
+        addCoachHeroNavItem(row, "Nutrition", R.drawable.ic_nav_nutrition, activeScreen, view -> navigateDashboard("Nutrition", this::showMeals));
+        addCoachHeroNavItem(row, "Endurance", R.drawable.ic_nav_endurance, activeScreen, view -> navigateDashboard("Endurance", this::showEndurance));
+        addCoachHeroNavItem(row, "Scheduler", R.drawable.ic_nav_plan, activeScreen, view -> navigateDashboard("Scheduler", this::showScheduler));
+        addCoachHeroNavItem(row, "Body", R.drawable.ic_nav_body, activeScreen, view -> navigateDashboard("Body", this::showBodyContext));
+        addCoachHeroNavItem(row, "Settings", R.drawable.ic_nav_settings, activeScreen, view -> navigateDashboard("Settings", this::showProfile));
         scroll.addView(row, new HorizontalScrollView.LayoutParams(-2, -1));
         return scroll;
     }
@@ -696,7 +711,7 @@ public final class MainActivity extends FragmentActivity {
         item.setClickable(true);
         item.setFocusable(true);
         item.setContentDescription(selected ? label + ", current page" : "Open " + label);
-        item.setBackground(surface(selected ? mint : Color.TRANSPARENT, 14, 0, Color.TRANSPARENT));
+        item.setBackground(surface(selected ? mint : Color.rgb(20, 43, 66), 16, 1, selected ? coral : Color.rgb(38, 69, 95)));
         item.setOnClickListener(listener);
         ImageView glyph = new ImageView(this);
         glyph.setImageResource(icon);
@@ -711,7 +726,20 @@ public final class MainActivity extends FragmentActivity {
         LinearLayout.LayoutParams itemParams = new LinearLayout.LayoutParams(dp(76), dp(60));
         itemParams.rightMargin = dp(4);
         row.addView(item, itemParams);
+        applyPremiumTileDepth(item, selected);
         applyPressMotion(item);
+    }
+
+    /** Switch tabs without losing the vertical position the member intentionally reached. */
+    private void navigateDashboard(String target, Runnable destination) {
+        if (target.equals(activeDashboardScrollKey)) return;
+        if (activeScrollView != null && !activeDashboardScrollKey.isEmpty()) {
+            dashboardScrollPositions.put(activeDashboardScrollKey, activeScrollView.getScrollY());
+        }
+        Integer restore = dashboardScrollPositions.get(target);
+        pendingScrollRestore = restore == null ? -1 : restore;
+        stopGuidedRuntime();
+        destination.run();
     }
 
     /**
@@ -735,6 +763,7 @@ public final class MainActivity extends FragmentActivity {
         body.setOrientation(LinearLayout.VERTICAL);
         body.setBackgroundColor(navy);
         body.setPadding(dp(CoachHeroDesign.GUTTER_DP), 0, dp(CoachHeroDesign.GUTTER_DP), dp(28));
+        body.setClipChildren(false);
         body.addView(coachHeroHeader(activeScreen), new LinearLayout.LayoutParams(-1, dp(218)));
         gap(body, 16);
         scroll.addView(body, new ScrollView.LayoutParams(-1, -2));
@@ -753,6 +782,7 @@ public final class MainActivity extends FragmentActivity {
         shell.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
         shell.addView(coachHeroBottomNavigation(activeScreen), new LinearLayout.LayoutParams(-1, dp(76)));
         setContentView(shell);
+        activeDashboardScrollKey = activeScreen;
         activateScroll(scroll);
         animatePage(scroll);
         return body;
@@ -773,6 +803,7 @@ public final class MainActivity extends FragmentActivity {
         shell.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
         shell.addView(coachHeroBottomNavigation(activeScreen), new LinearLayout.LayoutParams(-1, dp(76)));
         setContentView(shell);
+        activeDashboardScrollKey = activeScreen;
         activateScroll(scroll);
         animatePage(shell);
     }
@@ -783,7 +814,13 @@ public final class MainActivity extends FragmentActivity {
         if (pendingScrollRestore < 0) return;
         int restore = pendingScrollRestore;
         pendingScrollRestore = -1;
-        scroll.post(() -> scroll.scrollTo(0, restore));
+        // Do not expose the default top-of-page layout for a frame before restoring the saved
+        // position. That was perceived as a flicker during category changes.
+        scroll.setAlpha(0f);
+        scroll.post(() -> {
+            scroll.scrollTo(0, restore);
+            scroll.setAlpha(1f);
+        });
     }
 
     private void preserveScrollForRefresh() {
@@ -1027,7 +1064,7 @@ public final class MainActivity extends FragmentActivity {
         view.setOrientation(LinearLayout.VERTICAL);
         view.setPadding(dp(14), dp(14), dp(14), dp(14));
         view.setBackground(surface(paper, 18, 1, cardLine));
-        view.setElevation(dp(2));
+        applyPremiumTileDepth(view, false);
         return view;
     }
 
@@ -1098,7 +1135,7 @@ public final class MainActivity extends FragmentActivity {
         view.setOrientation(LinearLayout.VERTICAL);
         view.setPadding(dp(16), dp(16), dp(16), dp(16));
         view.setBackground(surface(paper, CoachHeroDesign.CARD_RADIUS_DP, 1, cardLine));
-        view.setElevation(dp(2));
+        applyPremiumTileDepth(view, false);
         return view;
     }
 
@@ -1108,7 +1145,7 @@ public final class MainActivity extends FragmentActivity {
         view.setOrientation(LinearLayout.VERTICAL);
         view.setPadding(dp(15), dp(14), dp(15), dp(14));
         view.setBackground(surface(Color.rgb(20, 38, 66), CoachHeroDesign.COMPACT_RADIUS_DP, 1, Color.rgb(35, 58, 91)));
-        view.setElevation(dp(3));
+        applyPremiumTileDepth(view, false);
         return view;
     }
 
@@ -1131,7 +1168,7 @@ public final class MainActivity extends FragmentActivity {
         button.setGravity(Gravity.CENTER);
         button.setPadding(dp(12), dp(9), dp(12), dp(9));
         button.setBackground(surface(fill, 15, 0, Color.TRANSPARENT));
-        button.setElevation(dp(2));
+        applyPremiumTileDepth(button, false);
         button.setMinHeight(dp(48));
         applyPressMotion(button);
         return button;
@@ -1147,6 +1184,7 @@ public final class MainActivity extends FragmentActivity {
         if (video != 0) {
             FrameLayout mediaCard = new FrameLayout(this);
             mediaCard.setBackground(surface(navyPanel, 18, 1, mint));
+            applyPremiumTileDepth(mediaCard, false);
             mediaCard.setClipToOutline(true);
             mediaCard.setClipChildren(true);
             mediaCard.setContentDescription("Coach " + coachName() + " demonstrating " + exercise.name);
@@ -1156,6 +1194,7 @@ public final class MainActivity extends FragmentActivity {
         }
         ExerciseAnimationView fallback = new ExerciseAnimationView(this, coachName(), exercise);
         fallback.setBackground(surface(navyPanel, 18, 1, mint));
+        applyPremiumTileDepth(fallback, false);
         return fallback;
     }
 
@@ -5218,25 +5257,15 @@ public final class MainActivity extends FragmentActivity {
         String phrase = newExercise
                 ? "Let's start our new exercise in 5, 4, 3, 2, 1."
                 : setOpenings[openingPhraseIndex++ % setOpenings.length];
-        String trainerName = coachName();
         String dialogueMode = profile().dialogueMode;
         boolean audioCountdown = CoachPreferences.usesVoice(dialogueMode);
         LinearLayout body = appPage("Workouts");
         addWorkoutRemainingHeader(body);
-        String countdownTitle = CoachPreferences.NO_DIALOGUE.equals(dialogueMode) ? "Audio countdown is ready"
-                : CoachPreferences.NO_SOUND.equals(dialogueMode) ? "Silent countdown is ready"
-                : "Coach " + trainerName + " is counting you in";
-        title(body, newExercise ? "NEW EXERCISE" : "NEXT SET", countdownTitle, "Your set timer begins only after the count-in is complete.");
+        title(body, newExercise ? "NEW EXERCISE" : "NEXT SET", "Visual countdown", "Your set timer begins when the countdown finishes.");
         LinearLayout countCard = card();
         TextView count = heading(audioCountdown ? "5" : "3", 46, ink);
         count.setGravity(Gravity.CENTER);
         countCard.addView(count, new LinearLayout.LayoutParams(-1, dp(96)));
-        String dialogueCopy = CoachPreferences.NO_DIALOGUE.equals(dialogueMode) ? "Low · low · low · high start beep"
-                : CoachPreferences.NO_SOUND.equals(dialogueMode) ? "Silent visual count-in"
-                : "“" + phrase + "”";
-        TextView dialogue = text(dialogueCopy, 17, muted);
-        dialogue.setGravity(Gravity.CENTER);
-        countCard.addView(dialogue);
         body.addView(countCard);
         gap(body, 12);
         LinearLayout note = card();
@@ -5657,7 +5686,7 @@ public final class MainActivity extends FragmentActivity {
         stopSetClock();
         LinearLayout body = appPage("Workouts");
         addWorkoutRemainingHeader(body);
-        title(body, betweenExercises ? "COOLDOWN TIMER" : "REST TIMER", betweenExercises ? "Cooldown before next exercise" : "Set complete · recover", betweenExercises ? "Your " + restChoiceLabel(planCooldownSeconds) + " exercise cooldown is separate from set rest. The next exercise begins after Coach " + coachName() + " gives your count-in." : "Your custom set rest is " + restChoiceLabel(secondsRemaining) + ". Your next set begins after the count-in.");
+        title(body, betweenExercises ? "COOLDOWN TIMER" : "REST TIMER", betweenExercises ? "Cooldown before next exercise" : "Set complete · recover", betweenExercises ? "Your " + restChoiceLabel(planCooldownSeconds) + " exercise cooldown is separate from set rest. The next exercise begins after its visual count-in." : "Your custom set rest is " + restChoiceLabel(secondsRemaining) + ". Your next set begins after the visual count-in.");
         LinearLayout timerCard = card();
         TextView timer = heading(format(secondsRemaining), 52, ink);
         timer.setGravity(Gravity.CENTER);
@@ -6413,15 +6442,18 @@ public final class MainActivity extends FragmentActivity {
 
     private void showEnduranceWizardRoute() {
         LinearLayout body = planPage("Endurance");
-        planTitle(body, "PLAN YOUR " + enduranceAction(enduranceWizardMode).toUpperCase(Locale.ROOT), "Set your route\nand time", "A destination is optional for an indoor session. Use a landmark or route name when you want map directions.");
+        planTitle(body, "PLAN YOUR " + enduranceAction(enduranceWizardMode).toUpperCase(Locale.ROOT), "Set your route\nand time", "Google Maps opens your planned route from the starting point you choose. Keep this route blank only for an indoor session.");
         addEnduranceWizardProgress(body, 4);
         EditText name = input("Session name", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES); name.setText(enduranceWizardName); body.addView(name); gap(body, 8);
-        EditText origin = input("Starting point (optional)", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES); origin.setText(enduranceWizardOrigin); body.addView(origin); gap(body, 8);
-        EditText destination = input("Destination or loop landmark (optional)", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES); destination.setText(enduranceWizardDestination); body.addView(destination); gap(body, 8);
+        EditText origin = input("Google Maps starting point (leave blank for current location)", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES); origin.setText(enduranceWizardOrigin); body.addView(origin); gap(body, 8);
+        EditText destination = input("Google Maps destination or loop landmark", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES); destination.setText(enduranceWizardDestination); body.addView(destination); gap(body, 8);
         EditText distance = input("Target distance in km", InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL); distance.setText(String.valueOf(enduranceWizardDistanceKm)); body.addView(distance); gap(body, 8);
         EditText minutes = input("Target minutes", InputType.TYPE_CLASS_NUMBER); minutes.setText(String.valueOf(enduranceWizardMinutes)); body.addView(minutes); gap(body, 10);
         body.addView(heading("Effort", 17, Color.WHITE));
         RadioGroup effort = new RadioGroup(this); effort.setOrientation(RadioGroup.HORIZONTAL); addEnduranceEffort(effort, "Relaxed", enduranceWizardEffort); addEnduranceEffort(effort, "Steady", enduranceWizardEffort); addEnduranceEffort(effort, "Challenging", enduranceWizardEffort); body.addView(effort); gap(body, 13);
+        Button maps = secondary("Open walking route in Google Maps");
+        maps.setOnClickListener(view -> openEnduranceMap(enduranceWizardMode, origin.getText().toString(), destination.getText().toString()));
+        addPlanButton(body, maps); gap(body, 8);
         Button next = planPrimary("Next: review plan");
         next.setOnClickListener(view -> {
             try {
@@ -6438,12 +6470,15 @@ public final class MainActivity extends FragmentActivity {
 
     private void showEnduranceWizardReview() {
         LinearLayout body = planPage("Endurance");
-        planTitle(body, "PLAN YOUR ENDURANCE", "Review your\n" + enduranceAction(enduranceWizardMode), "This plan can start with live tracking, an external map, or a timer-only session.");
+        planTitle(body, "PLAN YOUR ENDURANCE", "Review your\n" + enduranceAction(enduranceWizardMode), "Use Google Maps for your route, then start the in-app guided timer when you are ready.");
         addEnduranceWizardProgress(body, 5);
         LinearLayout review = card();
         review.addView(heading(appointmentAbbreviation(enduranceWizardMode) + " · " + enduranceWizardName, 20, ink));
         review.addView(text(formatDistance(enduranceWizardDistanceKm) + "  •  " + enduranceWizardMinutes + " min  •  " + enduranceWizardEffort, 14, muted));
         review.addView(text(enduranceWizardDestination.isEmpty() ? "Indoor or open route" : "Destination: " + enduranceWizardDestination, 13, muted)); body.addView(review); gap(body, 13);
+        Button maps = secondary("Open route in Google Maps");
+        maps.setOnClickListener(view -> openEnduranceMap(enduranceWizardMode, enduranceWizardOrigin, enduranceWizardDestination));
+        addPlanButton(body, maps); gap(body, 8);
         Button start = planPrimary("Start " + appointmentAbbreviation(enduranceWizardMode));
         start.setOnClickListener(view -> {
             try {
@@ -6451,6 +6486,13 @@ public final class MainActivity extends FragmentActivity {
                 startGuidedEndurance(enduranceWizardMode);
             } catch (IllegalArgumentException error) { toast(error.getMessage()); }
         }); addPlanButton(body, start); gap(body, 8);
+        Button live = secondary("Start " + appointmentAbbreviation(enduranceWizardMode) + " with live tracking");
+        live.setOnClickListener(view -> {
+            try {
+                EndurancePlanStore.save(this, enduranceWizardMode, enduranceWizardName, enduranceWizardOrigin, enduranceWizardDestination, enduranceWizardDistanceKm, enduranceWizardMinutes, enduranceWizardEffort);
+                requestLiveTracking(enduranceWizardMode);
+            } catch (IllegalArgumentException error) { toast(error.getMessage()); }
+        }); addPlanButton(body, live); gap(body, 8);
         Button save = planPrimary("Save endurance plan");
         save.setOnClickListener(view -> {
             try { EndurancePlanStore.save(this, enduranceWizardMode, enduranceWizardName, enduranceWizardOrigin, enduranceWizardDestination, enduranceWizardDistanceKm, enduranceWizardMinutes, enduranceWizardEffort); toast("Endurance plan saved."); showEndurance(); }
@@ -6471,10 +6513,9 @@ public final class MainActivity extends FragmentActivity {
         if (guidedEnduranceMode == null) return;
         LinearLayout body = appPage("Endurance");
         String action = enduranceAction(guidedEnduranceMode);
-        title(body, "GUIDED ENDURANCE", "Start " + action, "Coach " + coachName() + " will count you in before the timer starts.");
+        title(body, "GUIDED ENDURANCE", "Start " + action, "Your timer begins when the visual countdown finishes.");
         LinearLayout countCard = card();
         TextView count = heading("5", 58, ink); count.setGravity(Gravity.CENTER); countCard.addView(count, new LinearLayout.LayoutParams(-1, dp(98)));
-        TextView cue = text("Let’s begin in 5, 4, 3, 2, 1.", 17, muted); cue.setGravity(Gravity.CENTER); countCard.addView(cue);
         body.addView(countCard);
         runWorkoutCountIn("Let’s begin in 5, 4, 3, 2, 1.", count, () -> {
             if (guidedEnduranceMode != null) {
@@ -7060,18 +7101,57 @@ public final class MainActivity extends FragmentActivity {
         openEnduranceMap(plan.mode, plan.origin, plan.destination);
     }
 
-    /** Google Maps directions supports walking and cycling; walking is the honest fallback for runs. */
+    /** Route planning is deliberately Google Maps-only; no alternate map app is offered. */
     private void openEnduranceMap(String mode, String origin, String destination) {
+        String safeDestination = destination == null ? "" : destination.trim();
+        if (safeDestination.isEmpty()) {
+            toast("Add a Google Maps destination or loop landmark first.");
+            return;
+        }
+        if (!isGoogleMapsInstalled()) {
+            showGoogleMapsInstallPrompt();
+            return;
+        }
         Uri.Builder route = new Uri.Builder().scheme("https").authority("www.google.com")
                 .appendPath("maps").appendPath("dir")
                 .appendQueryParameter("api", "1")
-                .appendQueryParameter("destination", destination.trim())
+                .appendQueryParameter("destination", safeDestination)
                 .appendQueryParameter("travelmode", EndurancePlanStore.CYCLING.equals(mode) ? "bicycling" : "walking");
         if (origin != null && !origin.trim().isEmpty()) route.appendQueryParameter("origin", origin.trim());
         try {
-            startActivity(Intent.createChooser(new Intent(Intent.ACTION_VIEW, route.build()), "Map route with"));
+            Intent googleMaps = new Intent(Intent.ACTION_VIEW, route.build());
+            googleMaps.setPackage("com.google.android.apps.maps");
+            startActivity(googleMaps);
         } catch (RuntimeException e) {
-            toast("No map app is available to open this route.");
+            showGoogleMapsInstallPrompt();
+        }
+    }
+
+    private boolean isGoogleMapsInstalled() {
+        try {
+            getPackageManager().getPackageInfo("com.google.android.apps.maps", 0);
+            return true;
+        } catch (PackageManager.NameNotFoundException ignored) {
+            return false;
+        }
+    }
+
+    private void showGoogleMapsInstallPrompt() {
+        new AlertDialog.Builder(this)
+                .setTitle("Google Maps required")
+                .setMessage("Walking, running, and cycling routes open only in Google Maps. Install Google Maps from the Play Store, then return here to continue.")
+                .setNegativeButton("Not now", null)
+                .setPositiveButton("Install Google Maps", (dialog, which) -> openGoogleMapsPlayStore())
+                .show();
+    }
+
+    private void openGoogleMapsPlayStore() {
+        Intent store = new Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=com.google.android.apps.maps"));
+        store.setPackage("com.android.vending");
+        try {
+            startActivity(store);
+        } catch (RuntimeException unavailable) {
+            toast("Open Google Play and install Google Maps to plan routes.");
         }
     }
 

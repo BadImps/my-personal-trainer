@@ -4,6 +4,9 @@
         <item name="android:colorAccent">@color/coral</item>
         <item name="android:navigationBarColor">@color/navy</item>
         <item name="android:statusBarColor">@color/navy</item>
+        <!-- Prevent a light window from appearing for a frame while a selector redraws. -->
+        <item name="android:windowBackground">@color/navy</item>
+        <item name="android:windowDisablePreview">true</item>
         <item name="android:windowLightStatusBar">false</item>
     </style>
 </resources>

@@ -114,6 +114,6 @@ public final class WorkoutReminderActivity extends Activity {
     private int portrait(String coach) {
         // A compact reminder has no approved standalone coach portrait. Use the selected
         // premium app mark rather than a fragment cropped out of the login composition.
-        return R.drawable.trainer_launcher_premium_v2;
+        return R.drawable.trainer_launcher_premium_v3;
     }
 }

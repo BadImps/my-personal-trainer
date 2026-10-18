@@ -191,6 +191,17 @@ public final class UpdateManager {
         return savedInfo(context);
     }
 
+    /** Clears only an OTA APK that has successfully become the running app version. */
+    public static void cleanUpInstalledUpdate(Context context) {
+        Info info = savedInfo(context);
+        if (info == null || info.code > BuildConfig.VERSION_CODE) return;
+        long id = savedId(context);
+        if (id > 0L) downloads(context).remove(id);
+        File apk = downloadFile(context, info);
+        if (apk.exists()) apk.delete();
+        preferences(context).edit().clear().apply();
+    }
+
     /** Returns persisted platform-download state so the screen can be restored after a relaunch. */
     public static DownloadStatus status(Context context, Info info) {
         if (!matchesSavedInfo(context, info)) return new DownloadStatus(STATE_NONE, 0L, info.sizeBytes, "");
