@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 47,
-  "versionName": "5.6",
-  "publishedAt": "2026-10-18T02:53:08Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.6/app-release.apk",
-  "sha256": "c411cbe8e420799f0d86b5bbbc453784b13c07df941d4339f459c1b85eac4165",
-  "sizeBytes": 61481283,
-  "notes": "Adds Google Maps-only endurance routes, live route tracing, visual-only count-ins, retained dashboard positions, premium 3D tile depth, and the full-bleed 3D launcher icon."
+  "versionCode": 48,
+  "versionName": "5.7",
+  "publishedAt": "2026-10-18T03:24:44Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.7/app-release.apk",
+  "sha256": "0f0935aaecdc07cf8aaaa9933c6fdcd9e6336caab5453ba599c699e2f314a92a",
+  "sizeBytes": 61481223,
+  "notes": "Makes every selected navigation item use a clear 3dp coral-orange premium outline."
 }

@@ -711,7 +711,7 @@ public final class MainActivity extends FragmentActivity {
         item.setClickable(true);
         item.setFocusable(true);
         item.setContentDescription(selected ? label + ", current page" : "Open " + label);
-        item.setBackground(surface(selected ? mint : Color.rgb(20, 43, 66), 16, 1, selected ? coral : Color.rgb(38, 69, 95)));
+        item.setBackground(surface(selected ? mint : Color.rgb(20, 43, 66), 16, selected ? 3 : 1, selected ? coral : Color.rgb(38, 69, 95)));
         item.setOnClickListener(listener);
         ImageView glyph = new ImageView(this);
         glyph.setImageResource(icon);
@@ -932,7 +932,7 @@ public final class MainActivity extends FragmentActivity {
         item.setFocusable(true);
         item.setContentDescription(selected ? label + ", current screen" : "Open " + label);
         item.setOnClickListener(listener);
-        item.setBackground(surface(selected ? mint : navyPanel, 14, selected ? 2 : 1, selected ? coral : Color.rgb(31, 76, 91)));
+        item.setBackground(surface(selected ? mint : navyPanel, 14, selected ? 3 : 1, selected ? coral : Color.rgb(31, 76, 91)));
         elevatePlanSurface(item, selected);
         ImageView symbol = new ImageView(this);
         symbol.setImageResource(icon);
@@ -997,7 +997,7 @@ public final class MainActivity extends FragmentActivity {
         LinearLayout item = new LinearLayout(this);
         item.setOrientation(LinearLayout.VERTICAL);
         item.setGravity(Gravity.CENTER);
-        item.setBackground(surface(selected ? mint : navyPanel, 15, selected ? 2 : 1, selected ? coral : Color.rgb(35, 53, 78)));
+        item.setBackground(surface(selected ? mint : navyPanel, 15, selected ? 3 : 1, selected ? coral : Color.rgb(35, 53, 78)));
         item.setContentDescription(selected ? label + ", current screen" : "Open " + label);
         item.setTooltipText(label);
         item.setClickable(true);
