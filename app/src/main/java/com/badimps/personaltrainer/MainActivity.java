@@ -655,21 +655,33 @@ public final class MainActivity extends FragmentActivity {
     }
 
     /** A dynamic hero uses the saved coach selection rather than a hard-coded portrait. */
-    private FrameLayout coachHeroHeader(String activeScreen) {
+    private FrameLayout coachHeroBackdrop(String surfaceName) {
         FrameLayout hero = new FrameLayout(this);
         hero.setClipChildren(true);
         hero.setBackgroundColor(navy);
-        hero.setContentDescription("Coach " + coachName() + " dashboard header");
+        hero.setContentDescription("Coach " + coachName() + " " + surfaceName + " background");
+
+        // Every Coach Hero surface deliberately uses the same tall, top-anchored source frame.
+        // Individual pages may reveal different amounts of it, but never a different crop, scale,
+        // or image treatment. This is the visual rule behind the Coach Hero design lock.
         ImageView coach = new ImageView(this);
         coach.setImageResource(coachHeroBackground(coachName()));
         coach.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        coach.setAlpha(.98f);
         coach.setContentDescription("Coach " + coachName());
-        hero.addView(coach, new FrameLayout.LayoutParams(-1, -1, Gravity.TOP));
+        int anchoredArtworkHeight = Math.max(dp(720), getResources().getDisplayMetrics().heightPixels);
+        hero.addView(coach, new FrameLayout.LayoutParams(-1, anchoredArtworkHeight, Gravity.TOP));
+
         View shade = new View(this);
         GradientDrawable shadeBackground = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
                 new int[]{Color.rgb(7, 24, 45), Color.argb(216, 7, 24, 45), Color.argb(22, 7, 24, 45)});
         shade.setBackground(shadeBackground);
         hero.addView(shade, new FrameLayout.LayoutParams(-1, -1));
+        return hero;
+    }
+
+    private FrameLayout coachHeroHeader(String activeScreen) {
+        FrameLayout hero = coachHeroBackdrop(activeScreen + " dashboard header");
 
         LinearLayout copy = new LinearLayout(this);
         copy.setOrientation(LinearLayout.VERTICAL);
@@ -1698,20 +1710,8 @@ public final class MainActivity extends FragmentActivity {
         activateScroll(scroll);
         animatePage(shell);
 
-        FrameLayout hero = new FrameLayout(this);
-        hero.setClipChildren(true);
-        hero.setBackgroundColor(navy);
+        FrameLayout hero = coachHeroBackdrop("Home");
         root.addView(hero, new LinearLayout.LayoutParams(-1, dp(518)));
-
-        // The image retains its phone aspect ratio and is clipped at the hero boundary; this
-        // creates a full-bleed close portrait without squeezing or distorting the coach.
-        ImageView heroCoach = new ImageView(this);
-        heroCoach.setImageResource(coachHeroBackground(coachName()));
-        // The source artwork is portrait photography. CENTER_CROP preserves the coach's
-        // proportions and matches every other Coach Hero header; FIT_XY stretched this screen.
-        heroCoach.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        heroCoach.setContentDescription("Coach " + coachName() + " home hero");
-        hero.addView(heroCoach, new FrameLayout.LayoutParams(-1, -1, Gravity.TOP));
 
         LinearLayout heroCopy = new LinearLayout(this);
         heroCopy.setOrientation(LinearLayout.VERTICAL);
@@ -2439,19 +2439,8 @@ public final class MainActivity extends FragmentActivity {
         scroll.addView(root, new ScrollView.LayoutParams(-1, -2));
         setCoachHeroWizardShell(scroll, "Workouts");
 
-        FrameLayout hero = new FrameLayout(this);
-        hero.setClipChildren(true);
-        hero.setBackgroundColor(navy);
+        FrameLayout hero = coachHeroBackdrop("Workouts");
         root.addView(hero, new LinearLayout.LayoutParams(-1, dp(388)));
-        // Match the login treatment: the coach asset keeps its portrait composition at full
-        // screen height and the workout hero simply crops it at a deliberate boundary.
-        int workoutHeroImageHeight = Math.max(dp(720), getResources().getDisplayMetrics().heightPixels);
-        ImageView portrait = new ImageView(this);
-        portrait.setImageResource(coachHeroBackground(coachName()));
-        portrait.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        portrait.setAlpha(.98f);
-        portrait.setContentDescription("Coach " + coachName() + " workout planner");
-        hero.addView(portrait, new FrameLayout.LayoutParams(-1, workoutHeroImageHeight, Gravity.TOP));
 
         LinearLayout steps = new LinearLayout(this);
         steps.setGravity(Gravity.CENTER_VERTICAL);
@@ -2708,16 +2697,8 @@ public final class MainActivity extends FragmentActivity {
         scroll.addView(root, new ScrollView.LayoutParams(-1, -2));
         setCoachHeroWizardShell(scroll, "Workouts");
 
-        FrameLayout hero = new FrameLayout(this);
-        hero.setBackgroundColor(navy);
-        hero.setClipChildren(true);
+        FrameLayout hero = coachHeroBackdrop("Workouts schedule");
         root.addView(hero, new LinearLayout.LayoutParams(-1, dp(265)));
-        ImageView coach = new ImageView(this);
-        coach.setImageResource(coachHeroBackground(coachName()));
-        coach.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        coach.setAlpha(.97f);
-        hero.addView(coach, new FrameLayout.LayoutParams(-1,
-                Math.max(dp(720), getResources().getDisplayMetrics().heightPixels), Gravity.TOP));
 
         LinearLayout heroCopy = new LinearLayout(this);
         heroCopy.setOrientation(LinearLayout.VERTICAL);
@@ -3064,10 +3045,8 @@ public final class MainActivity extends FragmentActivity {
         scroll.addView(root, new ScrollView.LayoutParams(-1, -2));
         setCoachHeroWizardShell(scroll, "Workouts");
 
-        FrameLayout hero = new FrameLayout(this); hero.setClipChildren(true); hero.setBackgroundColor(navy);
+        FrameLayout hero = coachHeroBackdrop("Workouts training areas");
         root.addView(hero, new LinearLayout.LayoutParams(-1, dp(250)));
-        ImageView coach = new ImageView(this); coach.setImageResource(coachHeroBackground(coachName())); coach.setScaleType(ImageView.ScaleType.CENTER_CROP); coach.setAlpha(.97f);
-        hero.addView(coach, new FrameLayout.LayoutParams(-1, Math.max(dp(690), getResources().getDisplayMetrics().heightPixels), Gravity.TOP));
         LinearLayout copy = new LinearLayout(this); copy.setOrientation(LinearLayout.VERTICAL);
         TextView eyebrow = heading(weekly ? "WEEKLY PLAN · STEP 2" : "Custom".equals(planMode) ? "CUSTOM PLAN · STEP 2" : "DAILY PLAN · STEP 2", 10, mint); eyebrow.setLetterSpacing(.14f); copy.addView(eyebrow);
         TextView title = heading("What do you want\nto train?", 28, Color.WHITE); title.setLineSpacing(0, .93f); copy.addView(title);
@@ -3360,9 +3339,7 @@ public final class MainActivity extends FragmentActivity {
         LinearLayout root = new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL); root.setBackgroundColor(navy);
         scroll.addView(root, new ScrollView.LayoutParams(-1, -2)); setCoachHeroWizardShell(scroll, "Workouts");
 
-        FrameLayout hero = new FrameLayout(this); hero.setClipChildren(true); hero.setBackgroundColor(navy); root.addView(hero, new LinearLayout.LayoutParams(-1, dp(260)));
-        ImageView coach = new ImageView(this); coach.setImageResource(coachHeroBackground(coachName())); coach.setScaleType(ImageView.ScaleType.CENTER_CROP); coach.setAlpha(.97f);
-        hero.addView(coach, new FrameLayout.LayoutParams(-1, Math.max(dp(700), getResources().getDisplayMetrics().heightPixels), Gravity.TOP));
+        FrameLayout hero = coachHeroBackdrop("Workouts equipment"); root.addView(hero, new LinearLayout.LayoutParams(-1, dp(260)));
         LinearLayout copy = new LinearLayout(this); copy.setOrientation(LinearLayout.VERTICAL);
         TextView eyebrow = heading("PLAN YOUR WORKOUT · STEP 4", 10, mint); eyebrow.setLetterSpacing(.14f); copy.addView(eyebrow);
         TextView title = heading("Choose your\nequipment", 29, Color.WHITE); title.setLineSpacing(0, .93f); copy.addView(title);
@@ -3722,9 +3699,7 @@ public final class MainActivity extends FragmentActivity {
         LinearLayout root = new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL); root.setBackgroundColor(navy);
         scroll.addView(root, new ScrollView.LayoutParams(-1, -2)); setCoachHeroWizardShell(scroll, "Workouts");
 
-        FrameLayout hero = new FrameLayout(this); hero.setClipChildren(true); hero.setBackgroundColor(navy); root.addView(hero, new LinearLayout.LayoutParams(-1, dp(266)));
-        ImageView coach = new ImageView(this); coach.setImageResource(coachHeroBackground(coachName())); coach.setScaleType(ImageView.ScaleType.CENTER_CROP); coach.setAlpha(.97f);
-        hero.addView(coach, new FrameLayout.LayoutParams(-1, Math.max(dp(710), getResources().getDisplayMetrics().heightPixels), Gravity.TOP));
+        FrameLayout hero = coachHeroBackdrop("Workouts exercises"); root.addView(hero, new LinearLayout.LayoutParams(-1, dp(266)));
         LinearLayout copy = new LinearLayout(this); copy.setOrientation(LinearLayout.VERTICAL);
         TextView eyebrow = heading(planMode.toUpperCase(Locale.ROOT) + " PLAN · STEP 5", 10, mint); eyebrow.setLetterSpacing(.14f); copy.addView(eyebrow);
         TextView title = heading("Choose your\nexercises", 29, Color.WHITE); title.setLineSpacing(0, .93f); copy.addView(title);
@@ -6536,8 +6511,7 @@ public final class MainActivity extends FragmentActivity {
         beginNewPage(); setSystemBars();
         ScrollView scroll = new ScrollView(this); scroll.setFillViewport(true); scroll.setBackgroundColor(navy);
         LinearLayout root = new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL); root.setBackgroundColor(navy); scroll.addView(root, new ScrollView.LayoutParams(-1, -2)); setCoachHeroWizardShell(scroll, "Endurance");
-        FrameLayout hero = new FrameLayout(this); hero.setClipChildren(true); root.addView(hero, new LinearLayout.LayoutParams(-1, dp(258)));
-        ImageView coach = new ImageView(this); coach.setImageResource(coachHeroBackground(coachName())); coach.setScaleType(ImageView.ScaleType.CENTER_CROP); hero.addView(coach, new FrameLayout.LayoutParams(-1, Math.max(dp(700), getResources().getDisplayMetrics().heightPixels), Gravity.TOP));
+        FrameLayout hero = coachHeroBackdrop("Endurance"); root.addView(hero, new LinearLayout.LayoutParams(-1, dp(258)));
         LinearLayout copy = new LinearLayout(this); copy.setOrientation(LinearLayout.VERTICAL); TextView eyebrow = heading("PLAN YOUR ENDURANCE", 10, mint); eyebrow.setLetterSpacing(.14f); copy.addView(eyebrow); copy.addView(heading("How do you\nwant to plan?", 29, Color.WHITE)); TextView intro = text("Start with a plan type. Next you’ll select walking, running, or cycling.", 13, Color.rgb(226,236,247)); LinearLayout.LayoutParams introParams = new LinearLayout.LayoutParams(dp(265), -2); introParams.topMargin = dp(8); copy.addView(intro, introParams); FrameLayout.LayoutParams copyParams = new FrameLayout.LayoutParams(dp(278), -2, Gravity.LEFT | Gravity.TOP); copyParams.leftMargin = dp(20); copyParams.topMargin = dp(38); hero.addView(copy, copyParams);
         LinearLayout markers = new LinearLayout(this); markers.setGravity(Gravity.CENTER_VERTICAL); for (int i = 0; i < 5; i++) { TextView marker = heading(i == 0 ? "1" : String.valueOf(i + 1), 11, i == 0 ? navy : Color.WHITE); marker.setGravity(Gravity.CENTER); marker.setBackground(surface(i == 0 ? mint : Color.TRANSPARENT, 99, i == 0 ? 0 : 1, Color.rgb(171,193,220))); markers.addView(marker, new LinearLayout.LayoutParams(dp(26), dp(26))); if (i < 4) { View line = new View(this); line.setBackgroundColor(Color.rgb(130,151,183)); LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, dp(2), 1); p.leftMargin=dp(7); p.rightMargin=dp(7); markers.addView(line,p); } } FrameLayout.LayoutParams markParams = new FrameLayout.LayoutParams(dp(332), dp(26), Gravity.LEFT|Gravity.BOTTOM); markParams.leftMargin=dp(20); markParams.bottomMargin=dp(17); hero.addView(markers,markParams);
         LinearLayout content = new LinearLayout(this); content.setOrientation(LinearLayout.VERTICAL); content.setPadding(dp(16),dp(20),dp(16),dp(36)); content.setMinimumHeight(Math.max(dp(520), getResources().getDisplayMetrics().heightPixels - dp(258))); content.setBackgroundColor(paper); root.addView(content,new LinearLayout.LayoutParams(-1,-2)); TextView section=heading("01  ·  PLAN TYPE",11,muted); section.setLetterSpacing(.12f); content.addView(section); content.addView(heading("Choose a plan type",23,ink)); content.addView(text("Weekly plans place several sessions. Daily plans focus on one date. Custom is flexible.",13,muted)); gap(content,14);
