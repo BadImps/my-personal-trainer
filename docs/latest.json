@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 51,
-  "versionName": "5.10",
-  "publishedAt": "2026-10-18T04:07:57Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.10/app-release.apk",
-  "sha256": "e1e53ec0669ef14a5793ce330443c7b48eed614b9cca9ac056dd61bf79fb7368",
-  "sizeBytes": 61484179,
-  "notes": "Fixes the Daily planner flow: choose training areas before selecting a date, with no carried-over body-area assignments."
+  "versionCode": 52,
+  "versionName": "5.11",
+  "publishedAt": "2026-10-18T09:04:43Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.11/app-release.apk",
+  "sha256": "2f7133879845e6036ed99c92295dd7a97e2701e35589ac20c16beaed1a0c6fbc",
+  "sizeBytes": 61484211,
+  "notes": "Fixes dashboard navigation so Home and every tab retain their own scroll position when switching sections."
 }

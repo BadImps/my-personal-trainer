@@ -1668,6 +1668,10 @@ public final class MainActivity extends FragmentActivity {
         shell.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
         shell.addView(coachHeroBottomNavigation("Home"), new LinearLayout.LayoutParams(-1, dp(76)));
         setContentView(shell);
+        // Home owns a custom Coach Hero shell rather than appPage(), so it must bind its
+        // dashboard key here. Without this, Home scroll position was stored under whichever
+        // tab was open previously and returning to a tab appeared to reset it to the top.
+        activeDashboardScrollKey = "Home";
         activateScroll(scroll);
         animatePage(shell);
 
