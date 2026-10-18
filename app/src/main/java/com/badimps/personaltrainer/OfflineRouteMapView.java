@@ -10,6 +10,7 @@ import org.mapsforge.map.android.graphics.AndroidGraphicFactory;
 import org.mapsforge.map.android.util.AndroidUtil;
 import org.mapsforge.map.android.view.MapView;
 import org.mapsforge.map.layer.cache.TileCache;
+import org.mapsforge.map.layer.cache.InMemoryTileCache;
 import org.mapsforge.map.layer.overlay.Polyline;
 import org.mapsforge.map.reader.MapFile;
 import org.mapsforge.map.rendertheme.internal.MapsforgeThemes;
@@ -33,12 +34,9 @@ public final class OfflineRouteMapView extends FrameLayout {
         mapView.setBuiltInZoomControls(false);
         mapView.getMapScaleBar().setVisible(true);
         mapView.getModel().displayModel.setBackgroundColor(0xff0b1930);
-        // Cache keys must identify the country file. Reusing an old empty/mismatched cache can
-        // make a valid newly downloaded map look blank until Android eventually evicts it.
-        String cacheId = "mpt-country-" + Integer.toHexString((map.getName() + map.length() + map.lastModified()).hashCode());
-        TileCache cache = AndroidUtil.createTileCache(context, cacheId,
-                mapView.getModel().displayModel.getTileSize(), 1f,
-                mapView.getModel().frameBufferModel.getOverdrawFactor());
+        // Keep the small route preview cache in app memory. A file-backed cache can be denied or
+        // return stale blank tiles on individual Android devices, even when the country file is valid.
+        TileCache cache = new InMemoryTileCache(64);
         MapFile data = new MapFile(map);
         mapZoomMinimum = data.getMapFileInfo().zoomLevelMin;
         mapZoomMaximum = data.getMapFileInfo().zoomLevelMax;

@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 61,
-  "versionName": "5.20",
-  "publishedAt": "2026-10-18T17:35:00Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.20/app-release.apk",
-  "sha256": "aaf20a7047d5bf849d3cc49533be4f603a968a2f95f94d9d92474d9894bf3ccc",
-  "sizeBytes": 61981928,
-  "notes": "Fixes offline country-map rendering by isolating map caches, respecting the map zoom range, and forcing the first street redraw."
+  "versionCode": 62,
+  "versionName": "5.21",
+  "publishedAt": "2026-10-18T17:50:00Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.21/app-release.apk",
+  "sha256": "8b0574ee67ff1fad97ee91a803a04f5a9f23a6808648efd5a24b8109d0de5208",
+  "sizeBytes": 61981940,
+  "notes": "Makes offline country-map previews use a reliable in-memory renderer cache, avoiding device cache failures and stale blank map tiles."
 }
