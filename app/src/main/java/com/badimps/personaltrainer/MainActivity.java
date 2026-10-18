@@ -351,15 +351,27 @@ public final class MainActivity extends FragmentActivity {
     }
 
     private void initialisePlanSelections() {
-        if (selectedTargets.isEmpty()) selectedTargets.add(target);
+        // A fresh draft deliberately has no focus until the member chooses one. Do not
+        // silently reapply the focus from an earlier plan when a date is tapped.
+        if (selectedTargets.isEmpty() && target != null && !target.isEmpty()) selectedTargets.add(target);
         if (selectedEquipmentTypes.isEmpty()) selectedEquipmentTypes.add(equipmentType);
         while (weeklyDayTargets.size() < 7) weeklyDayTargets.add(new ArrayList<>());
         while (weeklySessions.size() < 7) weeklySessions.add(new ArrayList<>());
         for (int i = 0; i < weeklyWorkoutDays.length; i++) {
-            if (weeklyWorkoutDays[i] && weeklyDayTargets.get(i).isEmpty()) {
+            if (weeklyWorkoutDays[i] && weeklyDayTargets.get(i).isEmpty() && target != null && !target.isEmpty()) {
                 weeklyDayTargets.get(i).add(target);
             }
         }
+    }
+
+    /** Opens a genuinely blank workout draft so prior plan choices cannot leak into it. */
+    private void beginWorkoutPlanDraft(String mode) {
+        planMode = mode;
+        target = "";
+        selectedTargets.clear();
+        weeklyDayTargets.clear();
+        weeklySessions.clear();
+        resetExerciseSelection();
     }
 
     private List<String> activeTargets() {
@@ -2489,7 +2501,7 @@ public final class MainActivity extends FragmentActivity {
         continueButton.setOnClickListener(view -> {
             if ("Daily".equals(planMode)) {
                 if (sessionMinutes < 45) { sessionMinutes = 60; customDuration = false; }
-                showPlanSchedule();
+                showPlanTarget();
             } else if ("Weekly".equals(planMode)) {
                 if (sessionMinutes < 45) { sessionMinutes = 45; customDuration = false; }
                 showPlanTarget();
@@ -2509,7 +2521,12 @@ public final class MainActivity extends FragmentActivity {
         tile.addView(icon, new LinearLayout.LayoutParams(dp(30), dp(30)));
         TextView title = heading(mode, 13, ink); title.setGravity(Gravity.CENTER); tile.addView(title, new LinearLayout.LayoutParams(-1, dp(20)));
         TextView caption = text(detail, 9, muted); caption.setGravity(Gravity.CENTER); caption.setMaxLines(2); tile.addView(caption, new LinearLayout.LayoutParams(-1, dp(24)));
-        tile.setOnClickListener(view -> { planMode = mode; refreshCurrentPageKeepingScroll(this::showCoachHeroWorkout); });
+        tile.setOnClickListener(view -> {
+            // Explicitly tapping a plan type starts a new draft, even if it is the
+            // currently highlighted type. This prevents a prior Daily draft leaking in.
+            beginWorkoutPlanDraft(mode);
+            refreshCurrentPageKeepingScroll(this::showCoachHeroWorkout);
+        });
         applyPressMotion(tile);
         return tile;
     }
@@ -2773,7 +2790,8 @@ public final class MainActivity extends FragmentActivity {
             final int dayIndex = i;
             boolean selected = weekly ? weeklyWorkoutDays[i] : dailyScheduledDay == i;
             String scheduledFocus = selected && weekly && !weeklyDayTargets.get(i).isEmpty()
-                    ? targetLabel(weeklyDayTargets.get(i).get(0)) : selected ? targetLabel(target) : "Rest";
+                    ? focusSummary(weeklyDayTargets.get(i)) : selected
+                    ? focusSummary(selectedTargets) : "Rest";
             LinearLayout detail = new LinearLayout(this); detail.setOrientation(LinearLayout.VERTICAL); detail.setGravity(Gravity.CENTER); detail.setClickable(true);
             detail.setPadding(dp(2), dp(8), dp(2), dp(7));
             detail.setBackground(surface(selected ? Color.rgb(18, 63, 81) : Color.rgb(20, 46, 72), 10, selected ? 1 : 0, selected ? mint : Color.TRANSPARENT));

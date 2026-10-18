@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 50,
-  "versionName": "5.9",
-  "publishedAt": "2026-10-18T04:01:49Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.9/app-release.apk",
-  "sha256": "3d5244481897c574c01f1d81009dafadaa20f3775fb2d237e3b28c90ccc3ceea",
-  "sizeBytes": 61484195,
-  "notes": "Fixes Home so Your Week and Next Workout use only the plans, rest days, and endurance sessions you saved."
+  "versionCode": 51,
+  "versionName": "5.10",
+  "publishedAt": "2026-10-18T04:07:57Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.10/app-release.apk",
+  "sha256": "e1e53ec0669ef14a5793ce330443c7b48eed614b9cca9ac056dd61bf79fb7368",
+  "sizeBytes": 61484179,
+  "notes": "Fixes the Daily planner flow: choose training areas before selecting a date, with no carried-over body-area assignments."
 }
