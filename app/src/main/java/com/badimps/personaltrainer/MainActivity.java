@@ -10,7 +10,9 @@ import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
+import android.graphics.Matrix;
 import android.graphics.Typeface;
+import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Build;
@@ -28,6 +30,7 @@ import android.speech.tts.Voice;
 import android.text.InputType;
 import android.text.method.PasswordTransformationMethod;
 import android.view.Gravity;
+import android.view.HapticFeedbackConstants;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewTreeObserver;
@@ -80,6 +83,10 @@ public final class MainActivity extends FragmentActivity {
     private int muted = CoachHeroDesign.MUTED;
     private int cardLine = CoachHeroDesign.CARD_LINE;
     private boolean reducedMotion;
+    /** Only one collectible card may be open at once, keeping the grid readable. */
+    private FrameLayout flippedCoachCard;
+    private View flippedCoachFront;
+    private View flippedCoachBack;
     /** Image-led focuses for the approved plan-flow. Core includes trunk work; there is no Abs category. */
     private static final String[] WIZARD_TARGETS = {"Upper", "Lower", "Arms", "Chest", "Legs", "Full Body", "Back", "Shoulders", "Core", "Endurance"};
 
@@ -235,6 +242,20 @@ public final class MainActivity extends FragmentActivity {
         }
         initialisePlanSelections();
         restoreSavedPlan();
+        // Local AVD-only visual QA entry point. This branch is excluded from release builds
+        // and avoids weakening the protected sign-in flow just to inspect a composition.
+        if (BuildConfig.DEBUG && "com.badimps.personaltrainer.DEBUG_COACH_COLLECTION".equals(getIntent().getAction())) {
+            showCoachProfiles();
+            return;
+        }
+        if (BuildConfig.DEBUG && "com.badimps.personaltrainer.DEBUG_COACH_HUB".equals(getIntent().getAction())) {
+            showCoachHub();
+            return;
+        }
+        if (BuildConfig.DEBUG && "com.badimps.personaltrainer.DEBUG_COACH_PREFERENCES".equals(getIntent().getAction())) {
+            showCoachPreferences();
+            return;
+        }
         if (hasLocalAccount) {
             AccountStore.Profile profile = AccountStore.get(this);
             // A saved account is always protected at launch. Android presents enrolled
@@ -355,6 +376,35 @@ public final class MainActivity extends FragmentActivity {
         if ("Mark".equals(name)) return R.drawable.coach_hero_background_mark;
         if ("Stephen".equals(name)) return R.drawable.coach_hero_background_stephen;
         return R.drawable.coach_hero_background_mia;
+    }
+
+    /**
+     * Extract the coach's face from the approved Coach Hero login canvas for compact identity
+     * surfaces.  The Hero artwork is intentionally a full-body composition, so CENTER_CROP
+     * would land on a shoulder in a circular avatar.  This fixed focal crop keeps the genuine
+     * supplied face — it does not generate or substitute another portrait.
+     */
+    private void setCoachHeroFace(ImageView view, String name) {
+        view.setImageResource(coachLoginArtwork(name));
+        view.setScaleType(ImageView.ScaleType.MATRIX);
+        view.addOnLayoutChangeListener((changed, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
+            Drawable artwork = view.getDrawable();
+            if (artwork == null || view.getWidth() == 0 || view.getHeight() == 0) return;
+            float sourceWidth = artwork.getIntrinsicWidth();
+            float sourceHeight = artwork.getIntrinsicHeight();
+            if (sourceWidth <= 0 || sourceHeight <= 0) return;
+
+            // Every approved Coach Hero login composition uses the same right-side face frame.
+            // Frame a square around that face and scale it to the circular avatar.
+            float scale = Math.max(view.getWidth(), view.getHeight()) / (sourceWidth * .43f);
+            float faceCenterX = sourceWidth * .77f;
+            float faceCenterY = sourceHeight * .27f;
+            Matrix crop = new Matrix();
+            crop.setScale(scale, scale);
+            crop.postTranslate(view.getWidth() * .5f - faceCenterX * scale,
+                    view.getHeight() * .5f - faceCenterY * scale);
+            view.setImageMatrix(crop);
+        });
     }
 
     private void applyKeepPhoneAwake(boolean keepAwake) {
@@ -629,6 +679,11 @@ public final class MainActivity extends FragmentActivity {
      * screen owns its visible header, artwork, and content rhythm.
      */
     private LinearLayout appPage(String activeScreen) {
+        return appPage(activeScreen, activeScreen);
+    }
+
+    /** Allows a dedicated hub title while retaining the owning navigation section as selected. */
+    private LinearLayout appPage(String heroTitle, String activeScreen) {
         beginNewPage();
         setSystemBars();
         ScrollView scroll = new ScrollView(this);
@@ -642,7 +697,7 @@ public final class MainActivity extends FragmentActivity {
         page.setOrientation(LinearLayout.VERTICAL);
         page.setBackgroundColor(navy);
         page.setClipChildren(false);
-        page.addView(coachHeroHeader(activeScreen), new LinearLayout.LayoutParams(-1, dp(250)));
+        page.addView(coachHeroHeader(heroTitle), new LinearLayout.LayoutParams(-1, dp(250)));
 
         LinearLayout body = column();
         body.setPadding(dp(CoachHeroDesign.GUTTER_DP), dp(18), dp(CoachHeroDesign.GUTTER_DP), dp(28));
@@ -664,6 +719,54 @@ public final class MainActivity extends FragmentActivity {
         shell.addView(coachHeroBottomNavigation(activeScreen), new LinearLayout.LayoutParams(-1, dp(76)));
         mountScreen(shell);
         activeDashboardScrollKey = activeScreen;
+        activateScroll(scroll);
+        animatePage(shell);
+        return body;
+    }
+
+    /** A focused collector screen uses one compact Coach Hero header instead of nesting it under Settings. */
+    private LinearLayout coachCollectionPage() {
+        beginNewPage();
+        setSystemBars();
+        ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(true);
+        scroll.setClipToPadding(false);
+        scroll.setBackgroundColor(navy);
+        LinearLayout page = new LinearLayout(this);
+        page.setOrientation(LinearLayout.VERTICAL);
+        page.setBackgroundColor(navy);
+        FrameLayout hero = coachHeroBackdrop("Coach Collection");
+        LinearLayout copy = new LinearLayout(this);
+        copy.setOrientation(LinearLayout.VERTICAL);
+        TextView eyebrow = heading("COACH COLLECTION", 12, mint);
+        eyebrow.setLetterSpacing(.10f);
+        copy.addView(eyebrow);
+        copy.addView(heading("Choose your coach", 30, Color.WHITE));
+        copy.addView(text("Your coach shapes the way you train.", 14, Color.rgb(221, 235, 246)));
+        FrameLayout.LayoutParams copyParams = new FrameLayout.LayoutParams(dp(260), -2, Gravity.LEFT | Gravity.BOTTOM);
+        copyParams.leftMargin = dp(22); copyParams.bottomMargin = dp(18);
+        hero.addView(copy, copyParams);
+        page.addView(hero, new LinearLayout.LayoutParams(-1, dp(190)));
+        LinearLayout body = new LinearLayout(this);
+        body.setOrientation(LinearLayout.VERTICAL);
+        body.setPadding(dp(18), dp(14), dp(18), dp(28));
+        body.setClipChildren(false);
+        page.addView(body, new LinearLayout.LayoutParams(-1, -2));
+        scroll.addView(page, new ScrollView.LayoutParams(-1, -2));
+        LinearLayout shell = new LinearLayout(this);
+        shell.setOrientation(LinearLayout.VERTICAL);
+        shell.setBackgroundColor(navy);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            shell.setOnApplyWindowInsetsListener((view, insets) -> {
+                android.graphics.Insets bars = insets.getInsets(WindowInsets.Type.systemBars());
+                view.setPadding(0, bars.top, 0, bars.bottom);
+                return insets;
+            });
+        }
+        shell.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+        shell.addView(coachHeroBottomNavigation("Settings"), new LinearLayout.LayoutParams(-1, dp(76)));
+        mountScreen(shell);
+        activeDashboardScrollKey = "CoachCollection";
         activateScroll(scroll);
         animatePage(shell);
         return body;
@@ -4836,7 +4939,7 @@ public final class MainActivity extends FragmentActivity {
 
         body.addView(settingsGroup("PREFERENCES"));
         LinearLayout preferencesGroup = settingsPanel();
-        preferencesGroup.addView(settingsRow("★", "Customize your Coach", profile.coachName + " · " + profile.dialogueMode, view -> showCoachCustomization()));
+        preferencesGroup.addView(settingsRow("★", "Coach Hub", profile.coachName + " · " + profile.dialogueMode, view -> showCoachCustomization()));
         preferencesGroup.addView(settingsDivider());
         preferencesGroup.addView(settingsRow("◐", "Appearance", AppearanceStore.theme(this) + " theme · " + (reducedMotion ? "Reduced motion" : "Expressive motion"), view -> showAppearanceOptions()));
         body.addView(preferencesGroup);
@@ -5118,20 +5221,65 @@ public final class MainActivity extends FragmentActivity {
         addButton(body, skip);
     }
 
-    private void showCoachCustomization() {
+    /** Coach Hub is the dedicated home for everything that belongs to the coach system. */
+    private void showCoachCustomization() { showCoachHub(); }
+
+    private void showCoachHub() {
+        AccountStore.Profile profile = profile();
+        LinearLayout body = appPage("Coach Hub", "Settings");
+        title(body, "COACH HUB", "Your training partner", "Choose your coach, explore their card, and tailor how they guide every session.");
+
+        LinearLayout active = darkCard();
+        active.setOrientation(LinearLayout.HORIZONTAL);
+        active.setGravity(Gravity.CENTER_VERTICAL);
+        ImageView portrait = new ImageView(this);
+        // Keep the hub consistent with Customize Your Coach: show the actual Coach Hero face.
+        setCoachHeroFace(portrait, profile.coachName);
+        portrait.setBackground(surface(navyPanel, 99, 1, mint));
+        portrait.setClipToOutline(true);
+        active.addView(portrait, new LinearLayout.LayoutParams(dp(76), dp(76)));
+        LinearLayout activeCopy = new LinearLayout(this);
+        activeCopy.setOrientation(LinearLayout.VERTICAL);
+        TextView eyebrow = heading("ACTIVE COACH", 10, mint);
+        eyebrow.setLetterSpacing(.13f);
+        activeCopy.addView(eyebrow);
+        activeCopy.addView(heading("Coach " + profile.coachName, 23, Color.WHITE));
+        activeCopy.addView(text(CoachPreferences.coach(profile.coachName).accent + " · " + profile.dialogueMode, 13, Color.rgb(211, 225, 233)));
+        LinearLayout.LayoutParams activeCopyParams = new LinearLayout.LayoutParams(0, -2, 1f);
+        activeCopyParams.leftMargin = dp(14);
+        active.addView(activeCopy, activeCopyParams);
+        body.addView(active);
+        gap(body, 14);
+
+        LinearLayout collection = darkCard();
+        collection.addView(heading("Coach Collection", 20, Color.WHITE));
+        collection.addView(text("Explore Mint Foil cards, unlock new coaching styles, and choose an available coach.", 14, Color.rgb(211, 225, 233)));
+        gap(collection, 10);
+        Button browse = action("Open coach collection", mint, navy);
+        browse.setOnClickListener(view -> showCoachProfiles());
+        addButton(collection, browse);
+        body.addView(collection);
+        gap(body, 12);
+
+        LinearLayout experience = darkCard();
+        experience.addView(heading("Customize Your Coach", 20, Color.WHITE));
+        experience.addView(text("Choose a coach, set voice dialogue, and decide whether the screen stays awake while you train.", 14, Color.rgb(211, 225, 233)));
+        gap(experience, 10);
+        Button preferences = secondary("Open Customize Your Coach");
+        preferences.setOnClickListener(view -> showCoachPreferences());
+        addButton(experience, preferences);
+        body.addView(experience);
+        gap(body, 12);
+        Button back = secondary("Back to account");
+        back.setOnClickListener(view -> showProfile());
+        addButton(body, back);
+    }
+
+    /** Detailed controls reached from Coach Hub, rather than crowding the Settings page. */
+    private void showCoachPreferences() {
         AccountStore.Profile profile = profile();
         LinearLayout body = appPage("Settings");
-        title(body, "COACH SETTINGS", "Customize your Coach", "Choose who guides you, how much they speak, and whether the screen stays awake during training.");
-
-        LinearLayout profiles = darkCard();
-        profiles.addView(heading("Coach profile cards", 20, Color.WHITE));
-        profiles.addView(text("Explore every coach as a portrait training card before you select who guides your sessions.", 14, Color.rgb(211, 225, 233)));
-        gap(profiles, 10);
-        Button browseProfiles = action("Browse coach cards", mint, navy);
-        browseProfiles.setOnClickListener(view -> showCoachProfiles());
-        addButton(profiles, browseProfiles);
-        body.addView(profiles);
-        gap(body, 15);
+        title(body, "COACH HUB", "Customize Your Coach", "Choose who guides you, then fine-tune dialogue, voice, and wake behavior.");
 
         body.addView(heading("Female coaches", 21, Color.WHITE));
         gap(body, 8);
@@ -5200,75 +5348,337 @@ public final class MainActivity extends FragmentActivity {
         addButton(note, voiceSettings);
         body.addView(note);
         gap(body, 12);
-        Button back = secondary("Back to account");
-        back.setOnClickListener(view -> showProfile());
+        Button back = secondary("Back to Coach Hub");
+        back.setOnClickListener(view -> showCoachHub());
         addButton(body, back);
     }
 
-    /** Collectible-style coach cards use the same coach artwork and palette as the rest of the app. */
+    /**
+     * Design-lock Coach Collection: a deliberately simple, scrollable set of tall Mint Foil
+     * cards. Details live behind a long-press so selection remains a clean collectible grid.
+     */
     private void showCoachProfiles() {
         AccountStore.Profile profile = profile();
-        LinearLayout body = appPage("Settings");
-        title(body, "COACH PROFILES", "Choose your coach card", "Your coach, your training style. Pick any card to make that coach active.");
-        for (CoachPreferences.CoachOption option : CoachPreferences.coaches()) {
-            boolean selected = option.name.equals(profile.coachName);
-            FrameLayout card = new FrameLayout(this);
-            card.setClipChildren(true);
-            card.setClickable(true);
-            card.setFocusable(true);
-            card.setContentDescription("Coach " + option.name + ", " + coachCardSpecialty(option.name) + (selected ? ", selected" : ""));
-            card.setBackground(surface(navyPanel, 22, selected ? 3 : 1, selected ? coral : Color.rgb(47, 91, 111)));
-            applyPremiumTileDepth(card, selected);
-            ImageView portrait = new ImageView(this);
-            portrait.setImageResource(coachHeroBackground(option.name));
-            portrait.setScaleType(ImageView.ScaleType.CENTER_CROP);
-            portrait.setAlpha(.93f);
-            card.addView(portrait, new FrameLayout.LayoutParams(-1, -1));
-            View veil = new View(this);
-            veil.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                    new int[]{Color.argb(22, 7, 24, 45), Color.argb(230, 7, 24, 45), Color.rgb(7, 24, 45)}));
-            card.addView(veil, new FrameLayout.LayoutParams(-1, -1));
-            LinearLayout copy = new LinearLayout(this);
-            copy.setOrientation(LinearLayout.VERTICAL);
-            copy.setPadding(dp(16), dp(14), dp(16), dp(14));
-            TextView coach = heading("Coach " + option.name, 24, Color.WHITE);
-            copy.addView(coach);
-            TextView specialty = heading(coachCardSpecialty(option.name), 16, mint);
-            copy.addView(specialty);
-            copy.addView(text(option.accent + " · " + option.gender, 12, Color.rgb(219, 234, 244)));
-            LinearLayout stats = new LinearLayout(this);
-            stats.setGravity(Gravity.CENTER_VERTICAL);
-            String[] labels = {coachCardSession(option.name), coachCardFocus(option.name), coachCardPace(option.name)};
-            for (String label : labels) {
-                TextView chip = text(label, 11, Color.WHITE);
-                chip.setGravity(Gravity.CENTER);
-                chip.setPadding(dp(9), dp(6), dp(9), dp(6));
-                chip.setBackground(surface(Color.argb(174, 18, 49, 72), 99, 1, Color.argb(125, 119, 224, 196)));
-                LinearLayout.LayoutParams chipParams = new LinearLayout.LayoutParams(0, dp(34), 1);
-                chipParams.rightMargin = dp(6);
-                stats.addView(chip, chipParams);
+        LinearLayout body = coachCollectionPage();
+        TextView hint = text("Press and hold a card to explore.", 13, mint);
+        hint.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_nav_account, 0, 0, 0);
+        hint.setCompoundDrawablePadding(dp(7));
+        body.addView(hint);
+        gap(body, 14);
+
+        List<CoachPreferences.CoachOption> roster = new ArrayList<>();
+        for (String name : new String[]{"Mia", "Leo", "Amy", "Mark", "Claudia", "Stephen"}) roster.add(CoachPreferences.coach(name));
+        for (int index = 0; index < roster.size(); index += 2) {
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            CoachPreferences.CoachOption first = roster.get(index);
+            row.addView(mintFoilCoachCard(first, first.name.equals(profile.coachName)), coachCardGridParams(false));
+            if (index + 1 < roster.size()) {
+                CoachPreferences.CoachOption second = roster.get(index + 1);
+                row.addView(mintFoilCoachCard(second, second.name.equals(profile.coachName)), coachCardGridParams(true));
             }
-            LinearLayout.LayoutParams statsParams = new LinearLayout.LayoutParams(-1, -2);
-            statsParams.topMargin = dp(10);
-            copy.addView(stats, statsParams);
-            TextView selectedLabel = heading(selected ? "✓  Active coach" : "Tap to train with " + option.name, 12, selected ? coral : Color.WHITE);
-            LinearLayout.LayoutParams selectedParams = new LinearLayout.LayoutParams(-1, -2);
-            selectedParams.topMargin = dp(10);
-            copy.addView(selectedLabel, selectedParams);
-            card.addView(copy, new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM));
-            card.setOnClickListener(view -> {
-                AccountStore.updateCoachPreferences(this, option.name, profile().dialogueMode, profile().keepPhoneAwake);
-                LauncherIconManager.apply(this, option.name);
-                configureSpeechVoices();
-                refreshCurrentPageKeepingScroll(this::showCoachProfiles);
-            });
-            applyPressMotion(card);
-            body.addView(card, new LinearLayout.LayoutParams(-1, dp(242)));
+            body.addView(row, new LinearLayout.LayoutParams(-1, coachCardArtworkHeight()));
             gap(body, 12);
         }
         Button back = secondary("Back to coach settings");
         back.setOnClickListener(view -> showCoachCustomization());
         addButton(body, back);
+    }
+
+    private LinearLayout.LayoutParams coachCardGridParams(boolean second) {
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, -1, 1f);
+        if (second) params.leftMargin = dp(10); else params.rightMargin = dp(10);
+        return params;
+    }
+
+    /** Keeps the grid at the same 1030:1527 portrait ratio as the approved Mint Foil artwork. */
+    private int coachCardArtworkHeight() {
+        float screenWidthDp = getResources().getDisplayMetrics().widthPixels / getResources().getDisplayMetrics().density;
+        float cardWidthDp = Math.max(140f, (screenWidthDp - 36f - 10f) / 2f);
+        return dp(Math.round(cardWidthDp / (1030f / 1527f)));
+    }
+
+    /** The only tier variance on the grid is the compact upper-right category emblem. */
+    private int coachTierIcon(String coach) {
+        if ("Amy".equals(coach) || "Mark".equals(coach)) return R.drawable.ic_coach_momentum;
+        if ("Claudia".equals(coach) || "Stephen".equals(coach)) return R.drawable.ic_coach_performance;
+        return R.drawable.ic_coach_foundation;
+    }
+
+    private String coachTier(String coach) {
+        if ("Amy".equals(coach) || "Mark".equals(coach)) return "MOMENTUM";
+        if ("Claudia".equals(coach) || "Stephen".equals(coach)) return "PERFORMANCE";
+        return "FOUNDATION";
+    }
+
+    private String coachUnlockRequirement(String coach) {
+        if ("Amy".equals(coach) || "Mark".equals(coach)) return "LEVEL 4 · 8 SESSIONS";
+        if ("Claudia".equals(coach) || "Stephen".equals(coach)) return "LEVEL 8 · 20 SESSIONS";
+        return "UNLOCKED";
+    }
+
+    private boolean coachIsFoundation(String coach) { return "Mia".equals(coach) || "Leo".equals(coach); }
+
+    /**
+     * The collection is design-locked to the approved Mint Foil artwork.  It is intentionally
+     * rendered as complete card art rather than reconstructed out of generic Android surfaces:
+     * that keeps the double frame, corner foils, nameplate and status ribbon exactly consistent.
+     */
+    private int coachCardArtwork(String coach) {
+        if ("Leo".equals(coach)) return R.drawable.coach_card_leo;
+        if ("Amy".equals(coach)) return R.drawable.coach_card_amy;
+        if ("Mark".equals(coach)) return R.drawable.coach_card_mark;
+        if ("Claudia".equals(coach)) return R.drawable.coach_card_claudia;
+        if ("Stephen".equals(coach)) return R.drawable.coach_card_stephen;
+        return R.drawable.coach_card_mia;
+    }
+
+    private int premiumCoachTierIcon(String coach) {
+        if ("Amy".equals(coach) || "Mark".equals(coach)) return R.drawable.ic_coach_momentum_solid;
+        if ("Claudia".equals(coach) || "Stephen".equals(coach)) return R.drawable.ic_coach_performance_solid;
+        return R.drawable.ic_coach_foundation_solid;
+    }
+
+    private FrameLayout mintFoilCoachCard(CoachPreferences.CoachOption option, boolean selected) {
+        FrameLayout card = new FrameLayout(this);
+        card.setClickable(true);
+        card.setFocusable(true);
+        card.setClipChildren(false);
+        card.setClipToPadding(false);
+        card.setContentDescription("Coach " + option.name + ", " + coachTier(option.name) + ", " + coachUnlockRequirement(option.name));
+        card.setBackgroundColor(Color.TRANSPARENT);
+
+        FrameLayout frontFace = new FrameLayout(this);
+        ImageView artwork = new ImageView(this);
+        artwork.setImageResource(coachCardArtwork(option.name));
+        // The approved artwork includes its own border, bevels, title plate and status strip.
+        // Stretch only into the intentionally taller card slot requested for the collection.
+        artwork.setScaleType(ImageView.ScaleType.FIT_XY);
+        artwork.setAdjustViewBounds(false);
+        artwork.setContentDescription(card.getContentDescription());
+        frontFace.addView(artwork, new FrameLayout.LayoutParams(-1, -1));
+
+        // A solid, mounted tier emblem intentionally covers the thin artwork glyph beneath it.
+        FrameLayout emblem = new FrameLayout(this);
+        // The emblem is mounted on an unoutlined navy lozenge: premium contrast, no boxed border.
+        emblem.setBackground(surface(Color.argb(238, 4, 31, 50), 12, 0, Color.TRANSPARENT));
+        emblem.setElevation(dp(3));
+        ImageView emblemIcon = new ImageView(this);
+        emblemIcon.setImageResource(premiumCoachTierIcon(option.name));
+        emblemIcon.setContentDescription(coachTier(option.name) + " tier");
+        emblem.addView(emblemIcon, new FrameLayout.LayoutParams(dp(21), dp(21), Gravity.CENTER));
+        FrameLayout.LayoutParams emblemParams = new FrameLayout.LayoutParams(dp(32), dp(32), Gravity.TOP | Gravity.RIGHT);
+        emblemParams.topMargin = dp(14); emblemParams.rightMargin = dp(13);
+        frontFace.addView(emblem, emblemParams);
+        card.addView(frontFace, new FrameLayout.LayoutParams(-1, -1));
+
+        FrameLayout statsBack = coachStatsCardBack(option);
+        statsBack.setVisibility(View.GONE);
+        card.addView(statsBack, new FrameLayout.LayoutParams(-1, -1));
+        card.setTag(Boolean.FALSE);
+        card.setCameraDistance(dp(12000));
+
+        card.setOnClickListener(view -> {
+            if (Boolean.TRUE.equals(card.getTag())) {
+                flipCoachCard(card, frontFace, statsBack, false);
+                return;
+            }
+            if (!coachIsUnlocked(option.name)) {
+                lockedCoachFeedback(card, option.name);
+                return;
+            }
+            AccountStore.updateCoachPreferences(this, option.name, profile().dialogueMode, profile().keepPhoneAwake);
+            LauncherIconManager.apply(this, option.name);
+            configureSpeechVoices();
+            refreshCurrentPageKeepingScroll(this::showCoachProfiles);
+        });
+        card.setOnLongClickListener(view -> {
+            flipCoachCard(card, frontFace, statsBack, !Boolean.TRUE.equals(card.getTag()));
+            return true;
+        });
+        applyPressMotion(card);
+        return card;
+    }
+
+    /** Back of a card uses the same mint, navy and foil language while revealing coach stats. */
+    private FrameLayout coachStatsCardBack(CoachPreferences.CoachOption option) {
+        FrameLayout back = new FrameLayout(this);
+        back.setBackground(surface(Color.rgb(5, 27, 48), 20, 2, mint));
+
+        View innerFrame = new View(this);
+        innerFrame.setBackground(surface(Color.TRANSPARENT, 15, 1, Color.rgb(59, 154, 164)));
+        FrameLayout.LayoutParams innerFrameParams = new FrameLayout.LayoutParams(-1, -1);
+        innerFrameParams.setMargins(dp(7), dp(7), dp(7), dp(7));
+        back.addView(innerFrame, innerFrameParams);
+
+        View topFoil = new View(this);
+        topFoil.setRotation(-42f);
+        topFoil.setBackground(surface(Color.argb(230, 119, 224, 196), 2, 0, Color.TRANSPARENT));
+        FrameLayout.LayoutParams foilParams = new FrameLayout.LayoutParams(dp(56), dp(9), Gravity.TOP | Gravity.LEFT);
+        foilParams.leftMargin = dp(-8); foilParams.topMargin = dp(11);
+        back.addView(topFoil, foilParams);
+        View bottomFoil = new View(this);
+        bottomFoil.setRotation(-42f);
+        bottomFoil.setBackground(surface(Color.argb(205, 119, 224, 196), 2, 0, Color.TRANSPARENT));
+        FrameLayout.LayoutParams lowerFoilParams = new FrameLayout.LayoutParams(dp(56), dp(9), Gravity.BOTTOM | Gravity.RIGHT);
+        lowerFoilParams.rightMargin = dp(-8); lowerFoilParams.bottomMargin = dp(11);
+        back.addView(bottomFoil, lowerFoilParams);
+
+        LinearLayout copy = new LinearLayout(this);
+        copy.setOrientation(LinearLayout.VERTICAL);
+        copy.setPadding(dp(17), dp(14), dp(17), dp(10));
+        TextView eyebrow = heading("COACH STATS", 10, mint);
+        eyebrow.setLetterSpacing(.16f);
+        copy.addView(eyebrow);
+        TextView title = heading("COACH " + option.name.toUpperCase(Locale.ROOT), 17, Color.WHITE);
+        title.setLetterSpacing(.03f);
+        LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(-1, -2);
+        titleParams.topMargin = dp(5);
+        copy.addView(title, titleParams);
+        TextView tier = heading(coachTier(option.name), 10, mint);
+        tier.setLetterSpacing(.14f);
+        LinearLayout.LayoutParams tierParams = new LinearLayout.LayoutParams(-1, -2);
+        tierParams.topMargin = dp(2);
+        copy.addView(tier, tierParams);
+
+        String ability;
+        String bestFor;
+        String perk;
+        if ("Mia".equals(option.name)) { ability = "FORM FOCUS"; bestFor = "Confident technique"; perk = "+1 Form Streak point"; }
+        else if ("Leo".equals(option.name)) { ability = "STRENGTH BUILDER"; bestFor = "Steady strength"; perk = "Progression plans"; }
+        else if ("Amy".equals(option.name)) { ability = "CONSISTENCY STREAK"; bestFor = "Efficient weekly habits"; perk = "Streak challenges"; }
+        else if ("Mark".equals(option.name)) { ability = "POWER PROGRESSION"; bestFor = "Load, volume & tempo"; perk = "Progression plans"; }
+        else if ("Claudia".equals(option.name)) { ability = "PRECISION PERFORMANCE"; bestFor = "Balanced progression"; perk = "Split variety"; }
+        else { ability = "ENDURANCE DRIVE"; bestFor = "Conditioning intervals"; perk = "Endurance challenges"; }
+
+        TextView abilityView = heading(ability, 12, Color.WHITE);
+        abilityView.setPadding(dp(11), dp(10), dp(11), dp(10));
+        abilityView.setBackground(surface(Color.rgb(10, 46, 69), 12, 1, Color.rgb(43, 109, 127)));
+        LinearLayout.LayoutParams abilityParams = new LinearLayout.LayoutParams(-1, -2);
+        abilityParams.topMargin = dp(9);
+        copy.addView(abilityView, abilityParams);
+        TextView best = text("BEST FOR\n" + bestFor, 10, Color.rgb(222, 236, 243));
+        best.setLineSpacing(dp(1), 1f);
+        LinearLayout.LayoutParams bestParams = new LinearLayout.LayoutParams(-1, -2);
+        bestParams.topMargin = dp(8);
+        copy.addView(best, bestParams);
+        TextView perkView = text("COACH PERK\n" + perk, 10, Color.rgb(222, 236, 243));
+        perkView.setLineSpacing(dp(1), 1f);
+        LinearLayout.LayoutParams perkParams = new LinearLayout.LayoutParams(-1, -2);
+        perkParams.topMargin = dp(5);
+        copy.addView(perkView, perkParams);
+
+        if (!coachIsUnlocked(option.name)) {
+            int complete = completedCoachSessions();
+            int required = coachSessionRequirement(option.name);
+            int percent = Math.min(100, Math.round(100f * complete / Math.max(1, required)));
+            TextView unlock = heading("UNLOCK PROGRESS · " + percent + "%", 9, mint);
+            unlock.setLetterSpacing(.08f);
+            LinearLayout.LayoutParams unlockParams = new LinearLayout.LayoutParams(-1, -2);
+            unlockParams.topMargin = dp(7);
+            copy.addView(unlock, unlockParams);
+            LinearLayout track = new LinearLayout(this);
+            track.setOrientation(LinearLayout.HORIZONTAL);
+            track.setBackground(surface(Color.rgb(13, 49, 70), 5, 0, Color.TRANSPARENT));
+            View fill = new View(this);
+            fill.setBackground(surface(mint, 5, 0, Color.TRANSPARENT));
+            View remainder = new View(this);
+            track.addView(fill, new LinearLayout.LayoutParams(0, dp(6), Math.max(.01f, percent)));
+            track.addView(remainder, new LinearLayout.LayoutParams(0, dp(6), Math.max(.01f, 100 - percent)));
+            LinearLayout.LayoutParams trackParams = new LinearLayout.LayoutParams(-1, dp(6));
+            trackParams.topMargin = dp(4);
+            copy.addView(track, trackParams);
+            TextView progress = text(complete + " / " + required + " sessions · Level " + coachLevel() + " / " + coachLevelRequirement(option.name), 8, Color.rgb(202, 222, 231));
+            LinearLayout.LayoutParams progressParams = new LinearLayout.LayoutParams(-1, -2);
+            progressParams.topMargin = dp(2);
+            copy.addView(progress, progressParams);
+        } else {
+            TextView flipHint = heading("TAP TO FLIP BACK", 9, mint);
+            flipHint.setLetterSpacing(.12f);
+            LinearLayout.LayoutParams hintParams = new LinearLayout.LayoutParams(-1, -2);
+            hintParams.topMargin = dp(10);
+            copy.addView(flipHint, hintParams);
+        }
+        back.addView(copy, new FrameLayout.LayoutParams(-1, -2, Gravity.CENTER_VERTICAL));
+        return back;
+    }
+
+    private void flipCoachCard(FrameLayout card, View front, View back, boolean showBack) {
+        if (showBack && flippedCoachCard != null && flippedCoachCard != card && Boolean.TRUE.equals(flippedCoachCard.getTag())) {
+            flipCoachCard(flippedCoachCard, flippedCoachFront, flippedCoachBack, false);
+        }
+        card.animate().cancel();
+        card.animate().rotationY(90f).setDuration(reducedMotion ? 0 : 150).withEndAction(() -> {
+            front.setVisibility(showBack ? View.GONE : View.VISIBLE);
+            back.setVisibility(showBack ? View.VISIBLE : View.GONE);
+            card.setTag(showBack);
+            if (showBack) {
+                flippedCoachCard = card;
+                flippedCoachFront = front;
+                flippedCoachBack = back;
+            } else if (flippedCoachCard == card) {
+                flippedCoachCard = null;
+                flippedCoachFront = null;
+                flippedCoachBack = null;
+            }
+            card.setRotationY(-90f);
+            card.animate().rotationY(0f).setDuration(reducedMotion ? 0 : 150).start();
+        }).start();
+    }
+
+    private int completedCoachSessions() { return JourneyStore.workouts(this).size(); }
+
+    private int coachSessionRequirement(String coach) {
+        if ("Amy".equals(coach) || "Mark".equals(coach)) return 8;
+        if ("Claudia".equals(coach) || "Stephen".equals(coach)) return 20;
+        return 0;
+    }
+
+    private int coachLevelRequirement(String coach) {
+        if ("Amy".equals(coach) || "Mark".equals(coach)) return 4;
+        if ("Claudia".equals(coach) || "Stephen".equals(coach)) return 8;
+        return 1;
+    }
+
+    private int coachLevel() { return Math.max(1, 1 + completedCoachSessions() / 2); }
+
+    private boolean coachIsUnlocked(String coach) {
+        return coachIsFoundation(coach) || (completedCoachSessions() >= coachSessionRequirement(coach)
+                && coachLevel() >= coachLevelRequirement(coach));
+    }
+
+    private void lockedCoachFeedback(View card, String coach) {
+        card.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
+        float offset = dp(6);
+        card.animate().cancel();
+        card.animate().translationX(offset).setDuration(reducedMotion ? 0 : 45).withEndAction(() ->
+                card.animate().translationX(-offset).setDuration(reducedMotion ? 0 : 55).withEndAction(() ->
+                        card.animate().translationX(offset / 2f).setDuration(reducedMotion ? 0 : 45).withEndAction(() ->
+                                card.animate().translationX(0f).setDuration(reducedMotion ? 0 : 45).start()).start()).start()).start();
+        Toast.makeText(this, "Locked — " + Math.max(0, coachSessionRequirement(coach) - completedCoachSessions()) + " more completed sessions needed", Toast.LENGTH_SHORT).show();
+    }
+
+    private void showCoachCardDetails(CoachPreferences.CoachOption option) {
+        String ability;
+        String bestFor;
+        String perk;
+        if ("Mia".equals(option.name)) { ability = "Form Focus"; bestFor = "Confident technique"; perk = "+1 Form Streak point"; }
+        else if ("Leo".equals(option.name)) { ability = "Strength Builder"; bestFor = "Steady strength"; perk = "Progression plans"; }
+        else if ("Amy".equals(option.name)) { ability = "Consistency Streak"; bestFor = "Efficient weekly habits"; perk = "Streak challenges"; }
+        else if ("Mark".equals(option.name)) { ability = "Power Progression"; bestFor = "Load, volume & tempo"; perk = "Progression plans"; }
+        else if ("Claudia".equals(option.name)) { ability = "Precision Performance"; bestFor = "Balanced progression"; perk = "Split variety"; }
+        else { ability = "Endurance Drive"; bestFor = "Conditioning intervals"; perk = "Endurance challenges"; }
+        new AlertDialog.Builder(this)
+                .setTitle("Coach " + option.name + " · " + coachTier(option.name))
+                .setMessage(ability + "\n\nBest for: " + bestFor + "\nCoach perk: " + perk + "\n\nEvery plan stays adjustable to your pace and recovery.")
+                .setPositiveButton("Choose Coach " + option.name, (dialog, which) -> {
+                    AccountStore.updateCoachPreferences(this, option.name, profile().dialogueMode, profile().keepPhoneAwake);
+                    LauncherIconManager.apply(this, option.name);
+                    configureSpeechVoices();
+                    refreshCurrentPageKeepingScroll(this::showCoachProfiles);
+                })
+                .setNegativeButton("Close", null)
+                .show();
     }
 
     private String coachCardSpecialty(String coach) {
@@ -5285,32 +5695,43 @@ public final class MainActivity extends FragmentActivity {
     private String coachCardPace(String coach) { return "Claudia".equals(coach) || "Stephen".equals(coach) ? "Gentle pace" : "Steady pace"; }
 
     private void addCoachChoice(LinearLayout body, CoachPreferences.CoachOption option, boolean selected) {
+        boolean unlocked = coachIsUnlocked(option.name);
         LinearLayout choice = new LinearLayout(this);
         choice.setOrientation(LinearLayout.HORIZONTAL);
         choice.setGravity(Gravity.CENTER_VERTICAL);
         choice.setPadding(dp(12), dp(10), dp(12), dp(10));
-        choice.setBackground(surface(paper, 19, selected ? 2 : 1, selected ? mint : cardLine));
-        choice.setElevation(dp(selected ? 5 : 2));
+        choice.setBackground(surface(unlocked ? paper : Color.rgb(224, 230, 235), 19, selected && unlocked ? 2 : 1, selected && unlocked ? mint : cardLine));
+        choice.setElevation(dp(selected && unlocked ? 5 : 1));
+        choice.setAlpha(unlocked ? 1f : .52f);
         ImageView photo = new ImageView(this);
-        photo.setImageResource(coachPortrait(option.name));
-        photo.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        // Coach Hero imagery is the source of truth: every selection tile shows that coach's face.
+        setCoachHeroFace(photo, option.name);
         photo.setBackground(surface(navyPanel, 99, 1, mint));
         photo.setClipToOutline(true);
         choice.addView(photo, new LinearLayout.LayoutParams(dp(68), dp(68)));
         LinearLayout copy = new LinearLayout(this);
         copy.setOrientation(LinearLayout.VERTICAL);
         copy.setPadding(dp(13), 0, 0, 0);
-        copy.addView(heading("Coach " + option.name, 18, ink));
-        copy.addView(text(option.accent + " · " + option.gender, 14, muted));
+        copy.addView(heading("Coach " + option.name, 18, unlocked ? ink : muted));
+        copy.addView(text(unlocked ? option.accent + " · " + option.gender : "Locked · " + coachUnlockRequirement(option.name), 14, muted));
         choice.addView(copy, new LinearLayout.LayoutParams(0, -2, 1));
-        TextView mark = heading(selected ? "✓" : "○", 19, selected ? navy : muted);
-        mark.setGravity(Gravity.CENTER);
-        mark.setBackground(surface(selected ? mint : Color.TRANSPARENT, 99, selected ? 0 : 1, muted));
-        choice.addView(mark, new LinearLayout.LayoutParams(dp(34), dp(34)));
-        choice.setClickable(true);
-        choice.setFocusable(true);
-        choice.setContentDescription("Coach " + option.name + ", " + option.accent + (selected ? ", selected" : ""));
-        choice.setOnClickListener(view -> updateCoachSettings(option.name, profile().dialogueMode, profile().keepPhoneAwake));
+        if (unlocked) {
+            TextView mark = heading(selected ? "✓" : "○", 19, selected ? navy : muted);
+            mark.setGravity(Gravity.CENTER);
+            mark.setBackground(surface(selected ? mint : Color.TRANSPARENT, 99, selected ? 0 : 1, muted));
+            choice.addView(mark, new LinearLayout.LayoutParams(dp(34), dp(34)));
+            choice.setClickable(true);
+            choice.setFocusable(true);
+            choice.setContentDescription("Coach " + option.name + ", " + option.accent + (selected ? ", selected" : ""));
+            choice.setOnClickListener(view -> updateCoachSettings(option.name, profile().dialogueMode, profile().keepPhoneAwake));
+        } else {
+            ImageView lock = new ImageView(this);
+            lock.setImageResource(R.drawable.ic_coach_lock);
+            lock.setImageTintList(ColorStateList.valueOf(Color.rgb(81, 103, 120)));
+            lock.setContentDescription("Locked");
+            choice.addView(lock, new LinearLayout.LayoutParams(dp(28), dp(28)));
+            choice.setContentDescription("Coach " + option.name + " is locked. " + coachUnlockRequirement(option.name));
+        }
         body.addView(choice);
         gap(body, 8);
     }
@@ -5323,7 +5744,7 @@ public final class MainActivity extends FragmentActivity {
         LauncherIconManager.apply(this, updated.coachName);
         applyKeepPhoneAwake(updated.keepPhoneAwake);
         configureSpeechVoices();
-        refreshCurrentPageKeepingScroll(this::showCoachCustomization);
+        refreshCurrentPageKeepingScroll(this::showCoachPreferences);
     }
 
     private void openVoiceSettings() {

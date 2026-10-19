@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 65,
-  "versionName": "5.24",
-  "publishedAt": "2026-10-19T00:10:00Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.24/app-release.apk",
-  "sha256": "ae478dca13e7b1f950bef5e66854e2552714ef1a3e58d4ea6f2d9e270689afc1",
-  "sizeBytes": 62472828,
-  "notes": "Adds Taskmaster-style OpenStreetMap live map tiles with a private endurance route overlay and normal tile caching."
+  "versionCode": 66,
+  "versionName": "5.25",
+  "publishedAt": "2026-10-19T17:52:45Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.25/app-release.apk",
+  "sha256": "ce656464ac8a88d9b603e3f21c3832c997894a95dc9ebdf64db898a3f9a3fd97",
+  "sizeBytes": 74416125,
+  "notes": "Adds the Coach Hub, Mint Foil coach cards, unlock progress, and Coach Hero face portraits in coach selection."
 }
