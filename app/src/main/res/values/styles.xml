@@ -9,4 +9,10 @@
         <item name="android:windowDisablePreview">true</item>
         <item name="android:windowLightStatusBar">false</item>
     </style>
+
+    <!-- The API 31+ implementation lives in values-v31. This fallback keeps launch
+         surfaces navy on older devices instead of briefly showing a white window. -->
+    <style name="AppTheme.Starting" parent="@style/AppTheme">
+        <item name="android:windowBackground">@color/navy</item>
+    </style>
 </resources>

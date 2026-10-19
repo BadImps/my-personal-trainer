@@ -11,7 +11,8 @@ import java.util.Locale;
 public final class CaribbeanFoodLibrary {
     public static final String[] CATEGORIES = {
             "All", "Staples & grains", "Fruit", "Vegetables", "Beans & plant proteins",
-            "Fish & seafood", "Meat, eggs & dairy", "Cooking basics"
+            "Fish & seafood", "Meat, eggs & dairy", "Prepared Caribbean dishes",
+            "Breads, snacks & treats", "Cooking basics"
     };
 
     public static final class Food {
@@ -35,6 +36,20 @@ public final class CaribbeanFoodLibrary {
     private static Food n(String name, String category, String preparation, int kcal, double protein,
                           double carbs, double fibre, double fat, int sodium, String note) {
         return new Food(name, category, preparation, kcal, protein, carbs, fibre, fat, sodium, note);
+    }
+
+    /** A composite-dish reference: rounded typical recipe values per 100 g, not a recipe guarantee. */
+    private static Food d(String name, String preparation, int kcal, double protein,
+                          double carbs, double fibre, double fat, int sodium) {
+        return n(name, "Prepared Caribbean dishes", preparation, kcal, protein, carbs, fibre, fat, sodium,
+                "Typical prepared-recipe reference per 100 g. Ingredients, oil, portion size, and salt vary by cook and island.");
+    }
+
+    /** Bakery and street-food references are also recipe-dependent and should not replace a package label. */
+    private static Food s(String name, String preparation, int kcal, double protein,
+                          double carbs, double fibre, double fat, int sodium) {
+        return n(name, "Breads, snacks & treats", preparation, kcal, protein, carbs, fibre, fat, sodium,
+                "Typical prepared-recipe reference per 100 g. Frying method, fillings, sugar, and salt can change the value substantially.");
     }
 
     private static final Food[] FOODS = {
@@ -99,6 +114,78 @@ public final class CaribbeanFoodLibrary {
             f("Tofu", "Beans & plant proteins", "firm, plain", 144, 17.3, 2.8, 2.3, 8.7, 14),
             f("Peanut butter", "Beans & plant proteins", "smooth, unsalted reference", 588, 25.1, 20.0, 6.0, 50.4, 17),
 
+            // Prepared dishes — broad regional coverage. Each is intentionally described as a recipe estimate.
+            d("Pelau", "Trinidad-style chicken, rice, pigeon peas and coconut milk", 183, 10.2, 21.6, 2.1, 6.1, 220),
+            d("Cook-up rice", "Guyana-style rice, beans or peas, coconut milk and protein", 176, 8.2, 25.1, 3.0, 4.6, 205),
+            d("Rice and peas", "Jamaican-style rice, kidney beans and coconut milk", 158, 4.1, 27.2, 2.9, 3.7, 155),
+            d("Arroz con gandules", "Puerto Rican-style rice with pigeon peas", 172, 4.6, 29.4, 3.1, 3.8, 240),
+            d("Moros y cristianos", "Cuban-style black beans and rice", 155, 5.6, 27.4, 3.3, 2.3, 175),
+            d("Diri kole ak pwa", "Haitian-style rice and beans", 164, 5.4, 28.1, 3.4, 2.7, 180),
+            d("Roti with curry chicken", "whole-wheat roti with curried chicken filling", 244, 11.7, 27.1, 2.4, 9.5, 380),
+            d("Roti with channa", "whole-wheat roti with curried chickpeas", 226, 8.1, 35.1, 6.1, 5.6, 330),
+            d("Doubles", "bara with curried channa and chutney", 246, 7.2, 35.2, 5.5, 8.7, 360),
+            d("Aloo pie", "fried dough filled with seasoned potato", 286, 4.9, 38.4, 3.1, 12.7, 390),
+            d("Pholourie", "fried split-pea fritters", 276, 8.1, 35.4, 5.0, 11.2, 340),
+            d("Sahina", "fried spinach or dasheen-leaf fritter", 214, 5.1, 22.2, 3.3, 12.0, 370),
+            d("Bake and shark", "fried bake with seasoned fish and sauces", 268, 12.1, 29.8, 2.2, 11.2, 510),
+            d("Callaloo stew", "Trinidad-style greens with coconut milk", 92, 3.4, 7.5, 3.2, 5.9, 210),
+            d("Macaroni pie", "Caribbean baked macaroni and cheese", 221, 9.5, 24.2, 1.1, 10.1, 430),
+            d("Stew chicken", "browned and stewed chicken", 196, 19.5, 8.2, .8, 9.2, 380),
+            d("Curry chicken", "Caribbean curry chicken with sauce", 184, 19.2, 5.5, 1.0, 9.0, 310),
+            d("Curry goat", "Caribbean curried goat stew", 201, 20.7, 5.0, .9, 10.7, 355),
+            d("Brown stew chicken", "Jamaican-style sweet-savory chicken stew", 203, 18.4, 10.6, 1.0, 9.4, 405),
+            d("Jerk chicken", "grilled chicken with jerk seasoning", 191, 24.2, 3.5, .7, 9.1, 430),
+            d("Geera pork", "cumin-seasoned pork", 260, 22.1, 2.7, .7, 17.8, 470),
+            d("Ackee and saltfish", "ackee with salted cod and vegetables", 204, 12.7, 3.6, 1.8, 16.1, 690),
+            d("Saltfish buljol", "Trinidad-style salted-cod salad", 128, 16.8, 4.4, 1.5, 5.1, 760),
+            d("Flying fish and cou-cou", "Barbadian cornmeal and flying-fish plate", 143, 11.6, 16.5, 1.9, 3.6, 290),
+            d("Fish broth", "Caribbean fish soup with ground provisions", 82, 8.6, 8.1, 1.2, 1.9, 255),
+            d("Provision soup", "root-vegetable soup with meat or fish", 91, 6.2, 12.4, 1.8, 2.1, 290),
+            d("Crab and dumpling", "Tobago-style crab with flour dumplings", 179, 11.1, 23.5, 1.4, 4.4, 390),
+            d("Curry crab", "curried crab in sauce", 136, 17.1, 4.2, 1.0, 5.2, 420),
+            d("Conch salad", "Bahamas-style raw conch, citrus and vegetables", 87, 14.2, 5.8, 1.3, 1.0, 310),
+            d("Cracked conch", "breaded and fried conch", 221, 15.6, 19.1, 1.1, 9.4, 480),
+            d("Oil down", "Grenadian breadfruit, greens, coconut milk and salted meat", 176, 8.9, 20.4, 3.0, 7.4, 460),
+            d("Green fig and saltfish", "St Lucian green banana with salted cod", 141, 11.8, 17.9, 2.8, 2.9, 650),
+            d("Metemgee", "Guyana-style coconut-milk root-vegetable stew", 143, 5.6, 21.1, 3.1, 4.8, 265),
+            d("Pepperpot", "Guyana-style cassareep beef stew", 146, 16.7, 6.4, 1.0, 6.1, 520),
+            d("Chicken chow mein", "Caribbean-Chinese noodle stir-fry", 179, 10.2, 23.0, 1.8, 5.4, 460),
+            d("Ital stew", "Jamaican plant-based stew with beans and vegetables", 116, 4.7, 17.6, 4.2, 3.2, 195),
+            d("Mofongo", "Puerto Rican mashed plantain with pork or seafood", 245, 7.3, 35.2, 3.1, 9.2, 440),
+            d("Mangu", "Dominican mashed green plantain", 132, 1.5, 28.8, 2.5, 1.8, 150),
+            d("La bandera", "Dominican rice, beans and stewed meat plate", 174, 10.1, 23.5, 3.0, 4.7, 295),
+            d("Sancocho", "Dominican multi-meat and root-vegetable soup", 105, 9.2, 10.1, 1.7, 3.9, 330),
+            d("Soup joumou", "Haitian pumpkin and beef soup", 96, 7.2, 11.8, 1.5, 2.3, 270),
+            d("Griot", "Haitian citrus-marinated fried pork", 307, 22.4, 3.3, .5, 22.5, 500),
+            d("Tassot", "Haitian fried seasoned beef or goat", 279, 25.1, 4.0, .6, 18.1, 465),
+            d("Ropa vieja", "Cuban shredded beef in tomato-pepper sauce", 165, 19.4, 5.2, 1.2, 7.8, 360),
+            d("Picadillo", "Cuban minced beef with tomato and olives", 194, 15.7, 8.5, 1.4, 11.2, 510),
+            d("Hudut", "Belizean coconut fish stew with mashed plantain", 151, 10.5, 18.6, 2.4, 5.1, 245),
+            d("Rice and stew chicken", "Belizean-style rice with stewed chicken", 183, 10.8, 23.7, 1.6, 5.1, 330),
+            d("Fungee and pepperpot", "Antiguan cornmeal fungus with vegetable stew", 139, 6.0, 22.8, 2.9, 3.2, 280),
+
+            // Common bread, snack, dessert, and market-food references.
+            s("Sada roti", "plain Trinidad-style griddled flatbread", 287, 8.8, 51.7, 3.0, 5.2, 405),
+            s("Dhalpuri", "split-pea filled flatbread", 303, 9.3, 49.1, 5.5, 7.2, 420),
+            s("Paratha (buss up shut)", "layered oil-brushed flatbread", 334, 8.2, 48.5, 2.8, 12.1, 430),
+            s("Fry bake", "fried flour dough", 333, 6.8, 48.2, 1.9, 12.7, 395),
+            s("Coconut bake", "baked coconut bread", 321, 6.1, 49.5, 2.3, 11.0, 360),
+            s("Jamaican beef patty", "seasoned beef-filled pastry", 316, 10.1, 29.2, 1.4, 17.4, 610),
+            s("Jamaican chicken patty", "seasoned chicken-filled pastry", 294, 11.2, 30.1, 1.2, 15.0, 585),
+            s("Saltfish fritter", "salted-cod fried fritter", 242, 12.4, 22.0, 1.5, 11.4, 650),
+            s("Fish cake", "Caribbean fried fish cake", 233, 11.6, 20.8, 1.1, 11.4, 560),
+            s("Festival", "Jamaican fried cornmeal dumpling", 304, 5.2, 49.7, 2.0, 10.0, 315),
+            s("Boiled dumpling", "plain flour dumpling", 170, 4.9, 35.6, 1.5, .6, 250),
+            s("Cassava pone", "baked cassava and coconut pudding", 245, 2.2, 43.7, 2.9, 7.2, 120),
+            s("Sweet potato pudding", "Jamaican-style sweet potato and coconut pudding", 226, 2.0, 40.8, 3.1, 6.1, 115),
+            s("Black cake", "Caribbean fruit cake", 381, 4.2, 48.5, 2.6, 18.3, 205),
+            s("Rum cake", "Caribbean butter-rum cake", 372, 4.6, 49.3, 1.0, 16.5, 290),
+            s("Coconut drops", "coconut and brown-sugar sweet", 389, 2.8, 59.2, 5.1, 16.1, 170),
+            s("Sugar cake", "coconut sugar confection", 420, 2.6, 67.1, 3.7, 16.4, 105),
+            s("Tamarind ball", "tamarind and sugar confection", 336, 1.9, 82.0, 4.3, 1.0, 75),
+            s("Toolum", "molasses and coconut sweet", 365, 2.3, 68.4, 4.9, 10.4, 135),
+            s("Kurma", "spiced fried flour snack", 424, 6.3, 58.1, 1.9, 19.4, 290),
+
             f("Red snapper", "Fish & seafood", "cooked, dry heat", 128, 26.3, 0, 0, 1.6, 60),
             f("Flying fish", "Fish & seafood", "cooked reference", 111, 20.0, 0, 0, 3.0, 65),
             f("Kingfish", "Fish & seafood", "cooked reference", 134, 23.0, 0, 0, 4.3, 75),
@@ -143,7 +230,8 @@ public final class CaribbeanFoodLibrary {
         for (Food food : FOODS) {
             boolean groupMatches = "All".equals(group) || group.equals(food.category);
             boolean queryMatches = needle.isEmpty() || food.name.toLowerCase(Locale.ROOT).contains(needle)
-                    || food.category.toLowerCase(Locale.ROOT).contains(needle);
+                    || food.category.toLowerCase(Locale.ROOT).contains(needle)
+                    || food.preparation.toLowerCase(Locale.ROOT).contains(needle);
             if (groupMatches && queryMatches) result.add(food);
         }
         return result;

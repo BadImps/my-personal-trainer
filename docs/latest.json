@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 66,
-  "versionName": "5.25",
-  "publishedAt": "2026-10-19T17:52:45Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.25/app-release.apk",
-  "sha256": "ce656464ac8a88d9b603e3f21c3832c997894a95dc9ebdf64db898a3f9a3fd97",
-  "sizeBytes": 74416125,
-  "notes": "Adds the Coach Hub, Mint Foil coach cards, unlock progress, and Coach Hero face portraits in coach selection."
+  "versionCode": 67,
+  "versionName": "5.26",
+  "publishedAt": "2026-10-19T22:19:17Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.26/app-release.apk",
+  "sha256": "65f48db5363aba97425da9efceff2ae9da3675e5ec7fffec5c4c19186e6ce26d",
+  "sizeBytes": 137805556,
+  "notes": "Adds generated meal imagery for Trinidad & Tobago and Balanced rotations, plus the Eating Out nutrition guide."
 }

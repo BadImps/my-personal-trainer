@@ -32,7 +32,7 @@ public final class OfflineRouteMapView extends FrameLayout {
         map.setMultiTouchControls(true);
         map.setTilesScaledToDpi(true);
         route = new Polyline();
-        route.getOutlinePaint().setColor(Color.rgb(255, 107, 95));
+        route.getOutlinePaint().setColor(Color.rgb(173, 255, 47));
         route.getOutlinePaint().setStrokeWidth(context.getResources().getDisplayMetrics().density * 5f);
         map.getOverlays().add(route);
         addView(map, new FrameLayout.LayoutParams(-1, -1));
