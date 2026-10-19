@@ -1,6 +1,6 @@
-# Pending Publish List
+# Published List — v5.26
 
-The items below are implemented locally, build-verified, and awaiting the user's explicit publish-list instruction.
+Published to the OTA channel on 2026-10-19. The application package and update manifest were SHA-256 verified before release.
 
 ## Nutrition visual library
 
