@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 67,
-  "versionName": "5.26",
-  "publishedAt": "2026-10-19T22:19:17Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.26/app-release.apk",
-  "sha256": "65f48db5363aba97425da9efceff2ae9da3675e5ec7fffec5c4c19186e6ce26d",
-  "sizeBytes": 137805556,
-  "notes": "Adds generated meal imagery for Trinidad & Tobago and Balanced rotations, plus the Eating Out nutrition guide."
+  "versionCode": 68,
+  "versionName": "5.27",
+  "publishedAt": "2026-10-19T22:41:16Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.27/app-release.apk",
+  "sha256": "77600043f6b64b6af4a0ca623e540f759c8639e63c4b519b4f0de8c758a7c2f3",
+  "sizeBytes": 137807912,
+  "notes": "Adds date-first Scheduler appointments for Workout, Endurance, or both, plus verified password masking, Android credential autofill support, and keyboard-safe text fields."
 }

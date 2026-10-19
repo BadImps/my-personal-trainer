@@ -202,6 +202,10 @@ public final class MainActivity extends FragmentActivity {
     private int schedulerHour = 18;
     private int schedulerMinute;
     private int schedulerDurationMinutes = 45;
+    /** A Scheduler-launched Daily workout keeps the tapped calendar date fixed through its wizard. */
+    private boolean schedulerWorkoutDateLocked;
+    /** When a member chooses Both, the endurance appointment opens after the workout plan is saved. */
+    private boolean schedulerContinueToEndurance;
     private String enduranceWizardMode = EndurancePlanStore.WALKING;
     private String endurancePlanMode = "Weekly";
     private boolean[] enduranceWorkoutDays = {true, false, true, false, true, false, false};
@@ -228,6 +232,9 @@ public final class MainActivity extends FragmentActivity {
         // before content is created.
         setTheme(R.style.AppTheme);
         super.onCreate(state);
+        // Keep editable content inside the resized visible area when the IME is open.
+        // The focused-field helper below also asks nested scroll containers to reveal it.
+        getWindow().setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override public void handleOnBackPressed() {
                 if (!returnToPreviousPage()) confirmExitApplication();
@@ -1617,9 +1624,11 @@ public final class MainActivity extends FragmentActivity {
         field.setTextSize(16);
         field.setTextColor(ink);
         field.setHintTextColor(muted);
+        field.setSingleLine(true);
         field.setInputType(inputType);
         applyPasswordMask(field, inputType);
-        field.setSingleLine(true);
+        configureCredentialAutofill(field, inputType);
+        keepInputVisibleAboveKeyboard(field);
         field.setPadding(dp(15), dp(7), dp(15), dp(7));
         field.setBackground(surface(paper, 14, 1, cardLine));
         field.setLayoutParams(new LinearLayout.LayoutParams(-1, dp(54)));
@@ -1637,9 +1646,11 @@ public final class MainActivity extends FragmentActivity {
         field.setTextSize(14);
         field.setTextColor(Color.WHITE);
         field.setHintTextColor(Color.rgb(196, 210, 226));
+        field.setSingleLine(true);
         field.setInputType(inputType);
         applyPasswordMask(field, inputType);
-        field.setSingleLine(true);
+        configureCredentialAutofill(field, inputType);
+        keepInputVisibleAboveKeyboard(field);
         field.setPadding(dp(13), dp(4), dp(13), dp(4));
         field.setCompoundDrawablePadding(dp(10));
         int icon = (inputType & InputType.TYPE_MASK_CLASS) == InputType.TYPE_CLASS_TEXT
@@ -1660,15 +1671,51 @@ public final class MainActivity extends FragmentActivity {
     /** Enforce masking even when a device-wide "show passwords" preference is enabled. */
     private void applyPasswordMask(EditText field, int inputType) {
         int variation = inputType & InputType.TYPE_MASK_VARIATION;
-        if (variation == InputType.TYPE_TEXT_VARIATION_PASSWORD
-                || variation == InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD) {
+        if (variation == (InputType.TYPE_TEXT_VARIATION_PASSWORD & InputType.TYPE_MASK_VARIATION)
+                || variation == (InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD & InputType.TYPE_MASK_VARIATION)) {
             // Keep every character masked as an asterisk, including while it is being typed.
             field.setTransformationMethod(AsteriskPasswordTransformation.INSTANCE);
         }
     }
 
-    /** A deliberately always-masked password presentation for the local sign-in forms. */
-    private static final class AsteriskPasswordTransformation implements android.text.method.TransformationMethod {
+    /**
+     * Native credential hints let Samsung Pass / the selected Android password manager associate
+     * the two overlay fields as one sign-in form. The app never stores the plaintext password.
+     */
+    private void configureCredentialAutofill(EditText field, int inputType) {
+        int variation = inputType & InputType.TYPE_MASK_VARIATION;
+        field.setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_YES);
+        if (variation == (InputType.TYPE_TEXT_VARIATION_PASSWORD & InputType.TYPE_MASK_VARIATION)
+                || variation == (InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD & InputType.TYPE_MASK_VARIATION)) {
+            field.setAutofillHints(View.AUTOFILL_HINT_PASSWORD);
+        } else if (variation == (InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS & InputType.TYPE_MASK_VARIATION)) {
+            field.setAutofillHints(View.AUTOFILL_HINT_USERNAME, View.AUTOFILL_HINT_EMAIL_ADDRESS);
+        }
+    }
+
+    /** Ends the current Android autofill session after a successful password sign-in. */
+    private void commitCredentialAutofill() {
+        android.view.autofill.AutofillManager manager = getSystemService(android.view.autofill.AutofillManager.class);
+        if (manager != null) manager.commit();
+    }
+
+    /** Reveals an active field above the IME without disturbing the user's current scroll position otherwise. */
+    private void keepInputVisibleAboveKeyboard(EditText field) {
+        field.setOnFocusChangeListener((view, hasFocus) -> {
+            if (!hasFocus) return;
+            field.postDelayed(() -> {
+                android.graphics.Rect bounds = new android.graphics.Rect(0, 0, field.getWidth(), field.getHeight());
+                field.requestRectangleOnScreen(bounds, true);
+            }, 180L);
+        });
+    }
+
+    /**
+     * A deliberately always-masked password presentation for local sign-in forms. Extending
+     * Android's password transform keeps the field classified as a real password for
+     * accessibility and password managers while preserving the approved asterisk appearance.
+     */
+    private static final class AsteriskPasswordTransformation extends android.text.method.PasswordTransformationMethod {
         private static final AsteriskPasswordTransformation INSTANCE = new AsteriskPasswordTransformation();
 
         @Override public CharSequence getTransformation(final CharSequence source, View view) {
@@ -1681,11 +1728,6 @@ public final class MainActivity extends FragmentActivity {
                     return masked;
                 }
             };
-        }
-
-        @Override public void onFocusChanged(View view, CharSequence sourceText, boolean focused,
-                                             int direction, android.graphics.Rect previouslyFocusedRect) {
-            // No temporary reveal: the field remains masked on focus change as well.
         }
     }
 
@@ -1795,6 +1837,7 @@ public final class MainActivity extends FragmentActivity {
             if (AccountStore.authenticate(this, email.getText().toString(), password.getText().toString())) {
                 AccountStore.Profile current = profile();
                 AccountStore.updatePersonalProfile(this, current.username, current.photoUri, remember.isChecked(), current.biometricUnlock, "");
+                commitCredentialAutofill();
                 openSignedInHome();
             } else {
                 toast("That email or password does not match this profile.");
@@ -1870,6 +1913,7 @@ public final class MainActivity extends FragmentActivity {
             if (AccountStore.authenticate(this, email.getText().toString(), password.getText().toString())) {
                 AccountStore.Profile current = profile();
                 AccountStore.updatePersonalProfile(this, current.username, current.photoUri, remember[0], current.biometricUnlock, "");
+                commitCredentialAutofill();
                 openSignedInHome();
             } else {
                 toast("That email or password does not match this profile.");
@@ -1894,6 +1938,8 @@ public final class MainActivity extends FragmentActivity {
         field.setSingleLine(true);
         field.setInputType(inputType);
         applyPasswordMask(field, inputType);
+        configureCredentialAutofill(field, inputType);
+        keepInputVisibleAboveKeyboard(field);
         field.setPadding(0, 0, 0, 0);
         field.setBackgroundColor(Color.TRANSPARENT);
         field.setContentDescription(hint);
@@ -3522,14 +3568,22 @@ public final class MainActivity extends FragmentActivity {
         selected.addView(heading("YOUR FOCUS", 10, Color.rgb(24, 107, 91)));
         selected.addView(text(focusSummary(focuses), 15, ink)); content.addView(selected);
         gap(content, 15);
-        Button next = action((weekly || "Daily".equals(planMode)) ? "Next: choose training week  →" : "Next: choose workout length  →", coral, Color.WHITE);
+        boolean schedulerDaily = schedulerWorkoutDateLocked && "Daily".equals(planMode);
+        Button next = action(schedulerDaily ? "Next: choose equipment  →" : (weekly || "Daily".equals(planMode)) ? "Next: choose training week  →" : "Next: choose workout length  →", coral, Color.WHITE);
         next.setOnClickListener(view -> {
             if (activeTargets().isEmpty()) { toast("Choose at least one training area."); return; }
             syncPrimaryTarget();
-            if (weekly || "Daily".equals(planMode)) showPlanSchedule(); else showPlanDuration();
+            if (schedulerDaily) showPlanEquipment();
+            else if (weekly || "Daily".equals(planMode)) showPlanSchedule(); else showPlanDuration();
         });
         content.addView(next, new LinearLayout.LayoutParams(-1, dp(54)));
-        Button back = new Button(this); back.setText("Back"); back.setTextSize(14); back.setTextColor(mint); back.setAllCaps(false); back.setBackgroundColor(Color.TRANSPARENT); back.setOnClickListener(view -> showCoachHeroWorkout()); content.addView(back, new LinearLayout.LayoutParams(-1, dp(46)));
+        Button back = new Button(this); back.setText("Back"); back.setTextSize(14); back.setTextColor(mint); back.setAllCaps(false); back.setBackgroundColor(Color.TRANSPARENT); back.setOnClickListener(view -> {
+            if (schedulerWorkoutDateLocked) {
+                schedulerWorkoutDateLocked = false;
+                schedulerContinueToEndurance = false;
+                showScheduler();
+            } else showCoachHeroWorkout();
+        }); content.addView(back, new LinearLayout.LayoutParams(-1, dp(46)));
     }
 
     /** Assign one or two focus areas to the single Daily date or the active Weekly date. */
@@ -3818,7 +3872,11 @@ public final class MainActivity extends FragmentActivity {
             machines.addView(heading("MACHINE-ASSISTED OPTIONS", 10, mint)); machines.addView(text(machineOptionsSummary(), 11, Color.rgb(221, 236, 239))); content.addView(machines);
         }
         gap(content, 15); Button next = action("Next: choose exercises  →", coral, Color.WHITE); next.setOnClickListener(view -> showExerciseSelection()); content.addView(next, new LinearLayout.LayoutParams(-1, dp(54)));
-        Button back = new Button(this); back.setText("Back"); back.setTextColor(mint); back.setTextSize(14); back.setAllCaps(false); back.setBackgroundColor(Color.TRANSPARENT); back.setOnClickListener(view -> { if ("Weekly".equals(planMode) || "Daily".equals(planMode)) showPlanSchedule(); else showPlanDuration(); }); content.addView(back, new LinearLayout.LayoutParams(-1, dp(46)));
+        Button back = new Button(this); back.setText("Back"); back.setTextColor(mint); back.setTextSize(14); back.setAllCaps(false); back.setBackgroundColor(Color.TRANSPARENT); back.setOnClickListener(view -> {
+            if (schedulerWorkoutDateLocked && "Daily".equals(planMode)) showPlanTarget();
+            else if ("Weekly".equals(planMode) || "Daily".equals(planMode)) showPlanSchedule();
+            else showPlanDuration();
+        }); content.addView(back, new LinearLayout.LayoutParams(-1, dp(46)));
     }
 
     /** Retained until the legacy wizard shell is removed. */
@@ -4563,7 +4621,20 @@ public final class MainActivity extends FragmentActivity {
         }
         persistCurrentWeekSchedule();
         savePlanWithReminder();
-        showPlanReady();
+        if (schedulerWorkoutDateLocked) {
+            boolean continueToEndurance = schedulerContinueToEndurance;
+            schedulerWorkoutDateLocked = false;
+            schedulerContinueToEndurance = false;
+            if (continueToEndurance) {
+                toast("Workout plan saved. Now add your endurance appointment.");
+                showSchedulerActivity();
+            } else {
+                toast("Workout plan saved to Scheduler.");
+                showScheduler();
+            }
+        } else {
+            showPlanReady();
+        }
     }
 
     private void savePlanWithReminder() {
@@ -8219,8 +8290,8 @@ public final class MainActivity extends FragmentActivity {
         gap(body, 12);
         addSchedulerDayAgenda(body, schedulerSelectedDate);
         gap(body, 10);
-        Button book = primary("Schedule endurance appointment");
-        book.setOnClickListener(view -> showSchedulerActivity());
+        Button book = primary("Schedule appointment");
+        book.setOnClickListener(view -> showSchedulerAppointmentSheet(schedulerSelectedDate));
         addButton(body, book);
     }
 
@@ -8249,8 +8320,90 @@ public final class MainActivity extends FragmentActivity {
         cell.setBackground(surface(fill, 11, selected ? 3 : 0, selected ? coral : Color.TRANSPARENT));
         cell.setContentDescription(new SimpleDateFormat("EEEE, MMMM d", Locale.getDefault()).format(date.getTime()) + ", " + state);
         cell.setClickable(true);
-        cell.setOnClickListener(view -> { schedulerSelectedDate = (Calendar) date.clone(); refreshCurrentPageKeepingScroll(this::showScheduler); });
+        cell.setOnClickListener(view -> showSchedulerAppointmentSheet(date));
         return cell;
+    }
+
+    /** Date-first Scheduler entry point. The panel stays at the bottom so the selected day remains visible behind it. */
+    private void showSchedulerAppointmentSheet(Calendar date) {
+        schedulerSelectedDate = (Calendar) date.clone();
+        final android.app.Dialog sheet = new android.app.Dialog(this);
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dp(20), dp(18), dp(20), dp(20));
+        content.setBackground(surface(navyPanel, 28, 1, Color.rgb(47, 94, 127)));
+
+        TextView handle = new TextView(this);
+        handle.setBackground(surface(Color.rgb(104, 137, 165), 99, 0, Color.TRANSPARENT));
+        LinearLayout.LayoutParams handleParams = new LinearLayout.LayoutParams(dp(42), dp(5));
+        handleParams.gravity = Gravity.CENTER_HORIZONTAL;
+        content.addView(handle, handleParams);
+        gap(content, 14);
+        TextView eyebrow = heading("SCHEDULE APPOINTMENT", 11, mint);
+        eyebrow.setLetterSpacing(.12f);
+        content.addView(eyebrow);
+        content.addView(heading(new SimpleDateFormat("EEEE, MMMM d", Locale.getDefault()).format(date.getTime()), 23, Color.WHITE));
+        content.addView(text("Choose what you want to add to this day. You will only see the setup pages needed for your choice.", 13, Color.rgb(214, 229, 242)));
+        gap(content, 15);
+
+        Button workout = action("Workout\nChoose training areas, equipment, exercises, and sets", Color.WHITE, navy);
+        workout.setGravity(Gravity.LEFT | Gravity.CENTER_VERTICAL);
+        workout.setTextSize(15);
+        workout.setOnClickListener(view -> { sheet.dismiss(); beginSchedulerWorkoutWizard(false); });
+        content.addView(workout, new LinearLayout.LayoutParams(-1, dp(72)));
+        gap(content, 8);
+        Button endurance = action("Endurance\nChoose walking, running, or cycling, then set the time", Color.rgb(225, 255, 246), navy);
+        endurance.setGravity(Gravity.LEFT | Gravity.CENTER_VERTICAL);
+        endurance.setTextSize(15);
+        endurance.setOnClickListener(view -> { sheet.dismiss(); showSchedulerActivity(); });
+        content.addView(endurance, new LinearLayout.LayoutParams(-1, dp(72)));
+        gap(content, 8);
+        Button both = action("Workout + Endurance\nBuild your workout first, then add your activity", coral, Color.WHITE);
+        both.setGravity(Gravity.LEFT | Gravity.CENTER_VERTICAL);
+        both.setTextSize(15);
+        both.setOnClickListener(view -> { sheet.dismiss(); beginSchedulerWorkoutWizard(true); });
+        content.addView(both, new LinearLayout.LayoutParams(-1, dp(72)));
+        gap(content, 8);
+        Button cancel = action("Cancel", Color.TRANSPARENT, mint);
+        cancel.setOnClickListener(view -> sheet.dismiss());
+        content.addView(cancel, new LinearLayout.LayoutParams(-1, dp(44)));
+
+        sheet.setContentView(content);
+        android.view.Window window = sheet.getWindow();
+        if (window != null) {
+            window.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(Color.TRANSPARENT));
+            window.setGravity(Gravity.BOTTOM);
+            window.setLayout(-1, -2);
+        }
+        sheet.show();
+        if (sheet.getWindow() != null) sheet.getWindow().setLayout(-1, -2);
+    }
+
+    /** Starts a one-day workout draft aligned to the Scheduler date instead of a default weekday. */
+    private void beginSchedulerWorkoutWizard(boolean continueToEndurance) {
+        Calendar chosen = (Calendar) schedulerSelectedDate.clone();
+        Calendar todayWeek = Calendar.getInstance();
+        todayWeek.setFirstDayOfWeek(Calendar.MONDAY);
+        todayWeek.set(Calendar.HOUR_OF_DAY, 0); todayWeek.set(Calendar.MINUTE, 0); todayWeek.set(Calendar.SECOND, 0); todayWeek.set(Calendar.MILLISECOND, 0);
+        todayWeek.add(Calendar.DAY_OF_YEAR, -((todayWeek.get(Calendar.DAY_OF_WEEK) - Calendar.MONDAY + 7) % 7));
+        Calendar chosenWeek = (Calendar) chosen.clone();
+        chosenWeek.setFirstDayOfWeek(Calendar.MONDAY);
+        chosenWeek.set(Calendar.HOUR_OF_DAY, 0); chosenWeek.set(Calendar.MINUTE, 0); chosenWeek.set(Calendar.SECOND, 0); chosenWeek.set(Calendar.MILLISECOND, 0);
+        chosenWeek.add(Calendar.DAY_OF_YEAR, -((chosenWeek.get(Calendar.DAY_OF_WEEK) - Calendar.MONDAY + 7) % 7));
+        int weekOffset = (int) ((chosenWeek.getTimeInMillis() - todayWeek.getTimeInMillis()) / (7L * 24L * 60L * 60L * 1000L));
+        if (weekOffset < 0 || weekOffset > maxSelectableWeekOffset()) {
+            toast("Workout plans can be scheduled from this week through the end of the current month.");
+            return;
+        }
+        beginWorkoutPlanDraft("Daily");
+        selectedWeekOffset = weekOffset;
+        dailyScheduledDay = (chosen.get(Calendar.DAY_OF_WEEK) - Calendar.MONDAY + 7) % 7;
+        activeScheduleDay = dailyScheduledDay;
+        sessionMinutes = 60;
+        customDuration = false;
+        schedulerWorkoutDateLocked = true;
+        schedulerContinueToEndurance = continueToEndurance;
+        showPlanTarget();
     }
 
     private void addSchedulerDayAgenda(LinearLayout body, Calendar date) {
@@ -8315,14 +8468,14 @@ public final class MainActivity extends FragmentActivity {
     /** Appointment wizard steps 2 and 3: set timing, then explicitly save. */
     private void showSchedulerDetails() {
         LinearLayout body = appPage("Scheduler");
-        title(body, "SCHEDULE ENDURANCE", "Set the appointment", "Step 2 of 3. Choose when you want to " + enduranceAction(schedulerActivity) + " and how long you plan to be active.");
+        title(body, "SCHEDULE ENDURANCE", "Set the appointment", "Step 2 of 3. Your calendar date is fixed; choose a time and planned duration for your " + enduranceAction(schedulerActivity).toLowerCase(Locale.ROOT) + ".");
         LinearLayout details = card();
         details.addView(heading(appointmentAbbreviation(schedulerActivity), 20, ink));
-        Button date = lightAction("Date · " + new SimpleDateFormat("EEE, MMM d", Locale.getDefault()).format(schedulerSelectedDate.getTime()));
-        date.setOnClickListener(view -> new android.app.DatePickerDialog(this, (picker, year, month, day) -> {
-            schedulerSelectedDate.set(year, month, day); refreshCurrentPageKeepingScroll(this::showSchedulerDetails);
-        }, schedulerSelectedDate.get(Calendar.YEAR), schedulerSelectedDate.get(Calendar.MONTH), schedulerSelectedDate.get(Calendar.DAY_OF_MONTH)).show());
-        addButton(details, date); gap(details, 8);
+        TextView date = text("Date · " + new SimpleDateFormat("EEEE, MMM d", Locale.getDefault()).format(schedulerSelectedDate.getTime()), 14, ink);
+        date.setPadding(dp(14), 0, dp(14), 0);
+        date.setGravity(Gravity.CENTER_VERTICAL);
+        date.setBackground(surface(Color.rgb(232, 255, 247), 14, 1, mint));
+        details.addView(date, new LinearLayout.LayoutParams(-1, dp(48))); gap(details, 8);
         Button time = lightAction("Time · " + String.format(Locale.US, "%02d:%02d", schedulerHour, schedulerMinute));
         time.setOnClickListener(view -> new android.app.TimePickerDialog(this, (picker, hour, minute) -> { schedulerHour = hour; schedulerMinute = minute; refreshCurrentPageKeepingScroll(this::showSchedulerDetails); }, schedulerHour, schedulerMinute, false).show());
         addButton(details, time); gap(details, 8);
