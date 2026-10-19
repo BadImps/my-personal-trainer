@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 64,
-  "versionName": "5.23",
-  "publishedAt": "2026-10-18T18:25:00Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.23/app-release.apk",
-  "sha256": "96186cbe01e5d2cd3dbc629a00558c3a040df1a17c0c5720a42234bedd1d9e66",
-  "sizeBytes": 61982656,
-  "notes": "Replaces the blank offline tile renderer with direct on-device road drawing from the verified country map."
+  "versionCode": 65,
+  "versionName": "5.24",
+  "publishedAt": "2026-10-19T00:10:00Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.24/app-release.apk",
+  "sha256": "ae478dca13e7b1f950bef5e66854e2552714ef1a3e58d4ea6f2d9e270689afc1",
+  "sizeBytes": 62472828,
+  "notes": "Adds Taskmaster-style OpenStreetMap live map tiles with a private endurance route overlay and normal tile caching."
 }
