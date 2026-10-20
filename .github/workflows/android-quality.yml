@@ -33,4 +33,4 @@ jobs:
           distribution: temurin
           java-version: "21"
       - name: Run unit tests, lint, and debug package
-        run: ./gradlew :app:testDebugUnitTest :app:lintRelease :app:assembleDebug --console=plain
+        run: bash ./gradlew :app:testDebugUnitTest :app:lintRelease :app:assembleDebug --console=plain
