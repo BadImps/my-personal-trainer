@@ -1,89 +1,77 @@
 package com.badimps.personaltrainer;
 
 import android.content.Context;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.Typeface;
 import android.view.View;
 
-/** Lightweight, coach-branded illustrated movement guide for exercises without exact filmed loops. */
+/** Premium non-video fallback: no stick figures, only the Coach Mia or Coach Leo visual. */
 public final class ExerciseAnimationView extends View {
     private static final int NAVY = Color.rgb(16, 23, 42);
-    private static final int TEAL = Color.rgb(20, 69, 83);
     private static final int MINT = Color.rgb(119, 224, 196);
     private static final int CORAL = Color.rgb(255, 107, 95);
     private static final int WHITE = Color.rgb(244, 248, 252);
-    private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
     private final String coach;
     private final Coach.Exercise exercise;
     private final boolean reduceMotion;
     private final long startedAt = android.os.SystemClock.uptimeMillis();
+    private final Bitmap portrait;
 
     public ExerciseAnimationView(Context context, String coach, Coach.Exercise exercise) {
         super(context);
-        this.coach = coach;
+        this.coach = displayCoach(coach);
         this.exercise = exercise;
         this.reduceMotion = AppearanceStore.reducedMotion(context);
-        paint.setStrokeCap(Paint.Cap.ROUND);
-        setContentDescription("Animated movement guide for " + exercise.name + ". Coach " + coach + ". " + exercise.cue);
+        portrait = BitmapFactory.decodeResource(getResources(), portraitFor(coach));
+        setContentDescription("Coach " + this.coach + " movement preview for " + exercise.name + ". " + exercise.cue);
     }
 
     @Override protected void onDraw(Canvas canvas) {
         float width = getWidth(), height = getHeight();
         canvas.drawColor(NAVY);
-        paint.setStyle(Paint.Style.FILL); paint.setColor(TEAL);
-        canvas.drawRoundRect(new RectF(width * .05f, height * .07f, width * .95f, height * .86f), height * .065f, height * .065f, paint);
-        String pattern = patternFor(exercise.name);
-        float cycle = reduceMotion ? .45f : ((android.os.SystemClock.uptimeMillis() - startedAt) % 2400L) / 2400f;
-        float eased = (float) ((1d - Math.cos(cycle * Math.PI * 2d)) * .5d);
-        drawPath(canvas, width, height, pattern);
-        drawFigure(canvas, width * .36f, height * .58f, height * .30f, pose(pattern, .05f), Color.argb(45, 196, 235, 230), false);
-        drawFigure(canvas, width * .64f, height * .58f, height * .30f, pose(pattern, .95f), Color.argb(45, 196, 235, 230), false);
-        drawFigure(canvas, width * .50f, height * .58f, height * .34f, pose(pattern, eased), WHITE, true);
-        paint.setTypeface(Typeface.create("sans-serif", Typeface.BOLD)); paint.setTextSize(dp(12)); paint.setColor(MINT);
-        canvas.drawText("COACH " + coach.toUpperCase() + " · MOTION GUIDE", width * .10f, height * .16f, paint);
-        paint.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL)); paint.setTextSize(dp(11)); paint.setColor(Color.rgb(210, 226, 234));
-        canvas.drawText("Illustrated form path · 30 fps", width * .10f, height * .94f, paint);
+        if (width <= 0 || height <= 0 || portrait == null) return;
+        float phase = reduceMotion ? .5f : ((android.os.SystemClock.uptimeMillis() - startedAt) % 3000L) / 3000f;
+        float breathe = (float) Math.sin(phase * Math.PI * 2d);
+        float zoom = 1.035f + .025f * breathe;
+        float sourceWidth = portrait.getWidth() / zoom, sourceHeight = portrait.getHeight() / zoom;
+        float sourceLeft = (portrait.getWidth() - sourceWidth) * .5f + breathe * portrait.getWidth() * .018f;
+        float sourceTop = (portrait.getHeight() - sourceHeight) * .5f - breathe * portrait.getHeight() * .012f;
+        Rect source = new Rect(Math.max(0, Math.round(sourceLeft)), Math.max(0, Math.round(sourceTop)),
+                Math.min(portrait.getWidth(), Math.round(sourceLeft + sourceWidth)), Math.min(portrait.getHeight(), Math.round(sourceTop + sourceHeight)));
+        RectF destination = new RectF(width * .04f, height * .06f, width * .96f, height * .88f);
+        canvas.drawBitmap(portrait, source, destination, paint);
+
+        paint.setShader(new android.graphics.LinearGradient(0, height * .46f, 0, height * .91f,
+                new int[]{Color.TRANSPARENT, Color.argb(220, 9, 23, 42), NAVY}, new float[]{0f, .56f, 1f}, android.graphics.Shader.TileMode.CLAMP));
+        canvas.drawRoundRect(destination, height * .06f, height * .06f, paint);
+        paint.setShader(null);
+        paint.setStyle(Paint.Style.STROKE); paint.setStrokeWidth(dp(1)); paint.setColor(MINT);
+        canvas.drawRoundRect(destination, height * .06f, height * .06f, paint);
+        paint.setStyle(Paint.Style.FILL);
+        paint.setTypeface(Typeface.create("sans-serif", Typeface.BOLD)); paint.setTextSize(dp(11)); paint.setColor(MINT);
+        canvas.drawText("COACH " + coach.toUpperCase() + " · MOTION PREVIEW", width * .10f, height * .16f, paint);
+        paint.setTextSize(dp(20)); paint.setColor(WHITE); canvas.drawText(exercise.name, width * .10f, height * .69f, paint);
+        paint.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL)); paint.setTextSize(dp(12)); paint.setColor(Color.rgb(218, 230, 239));
+        drawTrimmed(canvas, exercise.cue, width * .10f, height * .77f, width * .78f);
+        paint.setColor(CORAL); canvas.drawCircle(width * .12f, height * .835f, dp(4), paint);
+        paint.setColor(WHITE); paint.setTextSize(dp(11)); canvas.drawText("Download the Coach Motion pack for the full exercise loop", width * .16f, height * .85f, paint);
         if (!reduceMotion) postInvalidateDelayed(33L);
     }
 
-    private String patternFor(String name) {
-        String value = name.toLowerCase();
-        if (value.contains("squat") || value.contains("lunge") || value.contains("leg press") || value.contains("step-up") || value.contains("wall sit")) return "squat";
-        if (value.contains("push") || value.contains("press") || value.contains("dip") || value.contains("fly")) return "press";
-        if (value.contains("row") || value.contains("pull") || value.contains("curl") || value.contains("face")) return "pull";
-        if (value.contains("plank") || value.contains("dead bug") || value.contains("bird dog") || value.contains("climber") || value.contains("pallof")) return "core";
-        if (value.contains("march") || value.contains("jack") || value.contains("burpee") || value.contains("bike") || value.contains("treadmill") || value.contains("elliptical")) return "cardio";
-        return "squat";
+    private void drawTrimmed(Canvas canvas, String value, float left, float baseline, float maxWidth) {
+        String copy = value == null ? "" : value;
+        while (paint.measureText(copy) > maxWidth && copy.length() > 4) copy = copy.substring(0, copy.length() - 2);
+        canvas.drawText(copy.equals(value) ? copy : copy + "…", left, baseline, paint);
     }
-
-    private float pose(String pattern, float progress) { return "press".equals(pattern) ? 1f - progress : "core".equals(pattern) ? progress * .55f : progress; }
-
-    private void drawPath(Canvas canvas, float width, float height, String pattern) {
-        paint.setStyle(Paint.Style.STROKE); paint.setStrokeWidth(dp(3)); paint.setColor(MINT);
-        RectF bounds = "press".equals(pattern) ? new RectF(width * .67f, height * .26f, width * .82f, height * .66f)
-                : "pull".equals(pattern) ? new RectF(width * .20f, height * .34f, width * .38f, height * .67f)
-                : "core".equals(pattern) ? new RectF(width * .62f, height * .51f, width * .84f, height * .68f)
-                : new RectF(width * .67f, height * .44f, width * .83f, height * .72f);
-        canvas.drawArc(bounds, 215f, 225f, false, paint);
-        paint.setStyle(Paint.Style.FILL); canvas.drawCircle(bounds.centerX(), bounds.bottom, dp(5), paint); canvas.drawCircle(bounds.right, bounds.centerY(), dp(5), paint);
-    }
-
-    private void drawFigure(Canvas canvas, float x, float y, float size, float movement, int color, boolean active) {
-        float head = size * .12f, shoulderY = y - size * .22f;
-        float hipY = y + size * .10f + (movement * size * .16f), kneeY = y + size * .34f + (movement * size * .04f), footY = y + size * .55f;
-        float spread = size * (.18f + movement * .09f);
-        paint.setColor(color); paint.setStyle(Paint.Style.FILL); canvas.drawCircle(x, shoulderY - head * 1.35f, head, paint);
-        paint.setStyle(Paint.Style.STROKE); paint.setStrokeWidth(size * .09f);
-        canvas.drawLine(x, shoulderY, x, hipY, paint);
-        canvas.drawLine(x, shoulderY, x - size * .23f, shoulderY + size * (.12f + movement * .18f), paint);
-        canvas.drawLine(x, shoulderY, x + size * .23f, shoulderY + size * (.12f + movement * .18f), paint);
-        canvas.drawLine(x, hipY, x - spread, kneeY, paint); canvas.drawLine(x, hipY, x + spread, kneeY, paint);
-        canvas.drawLine(x - spread, kneeY, x - size * .20f, footY, paint); canvas.drawLine(x + spread, kneeY, x + size * .20f, footY, paint);
-        if (active) { paint.setStyle(Paint.Style.FILL); paint.setColor(CORAL); canvas.drawRoundRect(new RectF(x - size * .17f, shoulderY + size * .10f, x + size * .17f, shoulderY + size * .21f), size * .05f, size * .05f, paint); }
-    }
-
+    private int portraitFor(String value) { return isMale(value) ? R.drawable.coach_hero_background_leo : R.drawable.coach_hero_background_mia; }
+    private String displayCoach(String value) { return isMale(value) ? "Leo" : "Mia"; }
+    private boolean isMale(String value) { return "Leo".equals(value) || "Mark".equals(value) || "Stephen".equals(value) || "Male".equals(value); }
     private int dp(int value) { return (int) (value * getResources().getDisplayMetrics().density + .5f); }
 }
