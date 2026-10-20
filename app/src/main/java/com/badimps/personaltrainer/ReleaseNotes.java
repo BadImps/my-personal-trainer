@@ -15,6 +15,7 @@ public final class ReleaseNotes {
     }
 
     public static final Entry[] HISTORY = {
+            new Entry("5.36", "Canvas Mintfoil & coach-audio fix", "Achievement badges now use the approved Mintfoil artwork directly, and coach dialogue no longer goes silent when Android has no manually labelled voice."),
             new Entry("5.31", "Smaller updates & clearer release history", "Adds optional coach-motion downloads, update prompts that name the available version, and this complete in-app patch-note history."),
             new Entry("5.30", "Apex accuracy & maintenance safeguards", "Apex tiers now require their stated recent-session window. Added quality checks and stronger on-device backup rules."),
             new Entry("5.29", "Smooth exercise loops", "Refined the local coach exercise-loop playback path and presentation sizing."),

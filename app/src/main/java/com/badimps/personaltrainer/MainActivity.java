@@ -6140,11 +6140,8 @@ public final class MainActivity extends FragmentActivity {
         note.addView(heading("Coach voice", 17, ink));
         note.addView(text(coachVoiceStatus, 13, muted));
         gap(note, 9);
-        Button previewVoice = primary(coachVoiceVerified ? "Preview Coach " + profile.coachName + "’s voice" : "Assign a voice to Coach " + profile.coachName);
-        previewVoice.setOnClickListener(view -> {
-            if (coachVoiceVerified) speakCoach("Hi, I’m " + profile.coachName + ". Let’s get ready for your workout.", TextToSpeech.QUEUE_FLUSH, null);
-            else showVoiceOrganizer();
-        });
+        Button previewVoice = primary("Preview Coach " + profile.coachName + "’s voice");
+        previewVoice.setOnClickListener(view -> speakCoach("Hi, I’m " + profile.coachName + ". Let’s get ready for your workout.", TextToSpeech.QUEUE_FLUSH, null));
         addButton(note, previewVoice);
         gap(note, 7);
         Button organizeVoices = secondary("Preview & label installed voices");
@@ -7538,11 +7535,14 @@ public final class MainActivity extends FragmentActivity {
         coachSpeechRate = "Spanish accent".equals(option.accent) ? .90f : "US accent".equals(option.accent) ? .95f : .92f;
         boolean male = "Male".equals(option.gender);
         coachSpeechPitch = male ? .86f : 1.08f;
+        // Android's default engine remains a working, audible fallback.  A missing manual
+        // gender label must never silently disable all coach dialogue.
         coachTtsVoice = voice.getVoice();
-        coachVoiceVerified = false;
+        coachVoiceVerified = coachTtsVoice != null;
         if (installed.isEmpty()) {
-            coachTtsVoice = null;
-            coachVoiceStatus = "No offline English voice is installed. Open Android voice settings and install a " + option.gender.toLowerCase(Locale.ROOT) + " " + option.accent.replace(" accent", "") + " voice.";
+            coachVoiceStatus = coachVoiceVerified
+                    ? "Coach " + option.name + " is using your Android default voice. Add an offline coach voice in Android settings for a closer accent match."
+                    : "Android text-to-speech is unavailable. Install or enable a system text-to-speech voice in Android settings.";
             return;
         }
         ArrayList<CoachVoiceSelector.Candidate> candidates = new ArrayList<>();
@@ -7554,12 +7554,13 @@ public final class MainActivity extends FragmentActivity {
         }
         CoachVoiceSelector.Selection selection = CoachVoiceSelector.select(candidates, option);
         if (selection == null) {
-            coachTtsVoice = null;
-            coachVoiceStatus = "No installed voice is labelled " + option.gender + ". Use Preview & label installed voices to assign one; the wrong-gender voice will never be substituted.";
+            coachVoiceStatus = coachVoiceVerified
+                    ? "Coach " + option.name + " is using your Android default voice. Label an installed " + option.gender.toLowerCase(Locale.ROOT) + " voice for a closer coach match."
+                    : "No usable Android voice was found. Enable text-to-speech in Android settings.";
             return;
         }
         coachTtsVoice = voicesByName.get(selection.candidate.id);
-        coachVoiceVerified = selection.genderMatched;
+        coachVoiceVerified = coachTtsVoice != null;
         if (coachVoiceVerified) coachSpeechPitch = 1f;
         String gender = option.gender.toLowerCase(Locale.ROOT);
         String accent = option.accent.replace(" accent", "");
@@ -7568,8 +7569,7 @@ public final class MainActivity extends FragmentActivity {
         } else if (selection.genderMatched) {
             coachVoiceStatus = "Coach " + option.name + " is using an installed " + gender + " English voice. Install a " + gender + " " + accent + " voice for an exact accent match.";
         } else {
-            coachTtsVoice = null;
-            coachVoiceStatus = "Coach " + option.name + " has no verified " + gender + " voice yet. Use Preview & label installed voices; coach speech stays off until a matching voice is confirmed.";
+            coachVoiceStatus = "Coach " + option.name + " is using an installed Android voice. Label a " + gender + " voice for an exact coach match.";
         }
     }
 
@@ -7580,7 +7580,7 @@ public final class MainActivity extends FragmentActivity {
     }
 
     private void speakCoach(String words, int queueMode, Runnable done) {
-        if (!coachVoiceVerified || coachTtsVoice == null) {
+        if (!ttsReady || voice == null) {
             final long generation = speechGeneration;
             if (done != null) workoutHandler.postDelayed(() -> {
                 if (generation == speechGeneration) done.run();
@@ -7592,7 +7592,7 @@ public final class MainActivity extends FragmentActivity {
 
     /** Speaks an utterance and runs {@code started} at the exact audio start event. */
     private void speakCoachWithStart(String words, int queueMode, Runnable started, Runnable done) {
-        if (!coachVoiceVerified || coachTtsVoice == null) {
+        if (!ttsReady || voice == null) {
             final long generation = speechGeneration;
             workoutHandler.post(() -> {
                 if (generation == speechGeneration && started != null) started.run();

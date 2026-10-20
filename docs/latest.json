@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 77,
-  "versionName": "5.35",
-  "publishedAt": "2026-10-20T17:04:41Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.35/app-release.apk",
-  "sha256": "4878d1515b13f3e18e87b9e55c02facca9660bd5c6befd0e68b5de8ef9f3bdff",
-  "sizeBytes": 126001292,
-  "notes": "Mintfoil Apex rewards: premium achievement medals, collectible badge grids, and offline unlock animation."
+  "versionCode": 78,
+  "versionName": "5.36",
+  "publishedAt": "2026-10-20T20:00:00Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.36/app-release.apk",
+  "sha256": "9a69ef00abc6c5375c2c7e25b4f6063428da689ce73d90c0ef6ec22232ece5a6",
+  "sizeBytes": 127161247,
+  "notes": "Canvas-locked Mintfoil badge art and restored audible coach dialogue with Android text-to-speech fallback."
 }
