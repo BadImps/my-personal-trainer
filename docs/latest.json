@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 75,
-  "versionName": "5.33",
-  "publishedAt": "2026-10-20T13:40:57Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.33/app-release.apk",
-  "sha256": "9acb0d53268d028e058dbd99ad1ce5402f39a32a443413507945046b53e0c95a",
-  "sizeBytes": 125997680,
-  "notes": "Canvas-locked Home and reminder polish: direct Next Workout shortcut, schedule markers, complete selected borders, and selected Coach Hero reminder actions."
+  "versionCode": 76,
+  "versionName": "5.34",
+  "publishedAt": "2026-10-20T14:18:15Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.34/app-release.apk",
+  "sha256": "a8a8c4ea0a62ebb4da8d8e1c6dd764b5456392afec23b83e11d76d4530e7e114",
+  "sizeBytes": 125997856,
+  "notes": "Calendar selection hotfix: full-day scheduled borders on Home and explicit Scheduler wizard entry."
 }
