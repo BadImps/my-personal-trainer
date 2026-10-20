@@ -1,0 +1,22 @@
+{
+  "packs": [
+    {
+      "id": "mia-motion-v1",
+      "label": "Coach Mia motion library",
+      "coach": "Mia and female coach profiles",
+      "version": "1",
+      "url": "https://badimps.github.io/my-personal-trainer/media/mia-motion-v1.zip",
+      "sha256": "6efd38fa12fbc4ca8768364763b973a99c063e94aa1ba185f83d343546458133",
+      "sizeBytes": 9660492
+    },
+    {
+      "id": "leo-motion-v1",
+      "label": "Coach Leo motion library",
+      "coach": "Leo and male coach profiles",
+      "version": "1",
+      "url": "https://badimps.github.io/my-personal-trainer/media/leo-motion-v1.zip",
+      "sha256": "9cc396b1e6228a0f3d6f69924744524eb4422436a63327ded2d39acddbec09a0",
+      "sizeBytes": 10022312
+    }
+  ]
+}

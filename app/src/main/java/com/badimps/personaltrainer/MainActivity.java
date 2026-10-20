@@ -189,6 +189,7 @@ public final class MainActivity extends FragmentActivity {
     private int pageGeneration;
     private int otaPageGeneration = -1;
     private boolean showingUpdatePage;
+    private boolean updatePromptInFlight;
     private static final int REQUEST_LIVE_LOCATION = 4102;
     private static final int REQUEST_PROFILE_PHOTO = 4103;
     private static final int REQUEST_OFFLINE_MAP = 4104;
@@ -934,6 +935,7 @@ public final class MainActivity extends FragmentActivity {
         if ("Endurance".equals(screen)) return "Plan your distance. Own your pace.";
         if ("Scheduler".equals(screen)) return "Every session, one clear calendar.";
         if ("Body".equals(screen)) return "Your numbers, clearly and privately.";
+        if ("Apex".equals(screen)) return "Celebrate progress. Choose your next challenge.";
         if ("Settings".equals(screen)) return "Make your coach experience yours.";
         return "Your personal training dashboard.";
     }
@@ -957,6 +959,7 @@ public final class MainActivity extends FragmentActivity {
         addCoachHeroNavItem(row, "Endurance", R.drawable.ic_nav_endurance, activeScreen, view -> navigateDashboard("Endurance", this::showEndurance));
         addCoachHeroNavItem(row, "Scheduler", R.drawable.ic_nav_plan, activeScreen, view -> navigateDashboard("Scheduler", this::showScheduler));
         addCoachHeroNavItem(row, "Body", R.drawable.ic_nav_body, activeScreen, view -> navigateDashboard("Body", this::showBodyContext));
+        addCoachHeroNavItem(row, "Apex", R.drawable.ic_nav_apex, activeScreen, view -> navigateDashboard("Apex", this::showApex));
         addCoachHeroNavItem(row, "Settings", R.drawable.ic_nav_settings, activeScreen, view -> navigateDashboard("Settings", this::showProfile));
         scroll.addView(row, new HorizontalScrollView.LayoutParams(-2, -1));
         scroll.setOnScrollChangeListener((view, scrollX, scrollY, oldScrollX, oldScrollY) ->
@@ -975,7 +978,7 @@ public final class MainActivity extends FragmentActivity {
     }
 
     private int coachHeroNavigationIndex(String screen) {
-        String[] screens = {"Home", "Workouts", "Progress", "Nutrition", "Endurance", "Scheduler", "Body", "Settings"};
+        String[] screens = {"Home", "Workouts", "Progress", "Nutrition", "Endurance", "Scheduler", "Body", "Apex", "Settings"};
         for (int index = 0; index < screens.length; index++) {
             if (screens[index].equals(screen)) return index;
         }
@@ -1323,6 +1326,7 @@ public final class MainActivity extends FragmentActivity {
         addPlanRailItem(rail, "Endurance", R.drawable.ic_nav_endurance, false, view -> navigateDashboard("Endurance", this::showEndurance));
         addPlanRailItem(rail, "Scheduler", R.drawable.ic_nav_plan, false, view -> navigateDashboard("Scheduler", this::showScheduler));
         addPlanRailItem(rail, "Body", R.drawable.ic_nav_body, false, view -> navigateDashboard("Body", this::showBodyContext));
+        addPlanRailItem(rail, "Apex", R.drawable.ic_nav_apex, false, view -> navigateDashboard("Apex", this::showApex));
         addPlanRailItem(rail, "Settings", R.drawable.ic_nav_settings, false, view -> navigateDashboard("Settings", this::showProfile));
         return rail;
     }
@@ -1391,6 +1395,7 @@ public final class MainActivity extends FragmentActivity {
         addRailItem(rail, "Endurance", R.drawable.ic_nav_endurance, activeScreen, view -> navigateDashboard("Endurance", this::showEndurance));
         addRailItem(rail, "Scheduler", R.drawable.ic_nav_plan, activeScreen, view -> navigateDashboard("Scheduler", this::showScheduler));
         addRailItem(rail, "Body", R.drawable.ic_nav_body, activeScreen, view -> navigateDashboard("Body", this::showBodyContext));
+        addRailItem(rail, "Apex", R.drawable.ic_nav_apex, activeScreen, view -> navigateDashboard("Apex", this::showApex));
         addRailItem(rail, "Settings", R.drawable.ic_nav_settings, activeScreen, view -> navigateDashboard("Settings", this::showProfile));
         return rail;
     }
@@ -1583,15 +1588,15 @@ public final class MainActivity extends FragmentActivity {
 
     /** One stable video component for every in-app exercise demonstration. */
     private View exerciseMedia(String trainer, Coach.Exercise exercise, int height) {
-        int video = ExerciseVideos.forExercise(this, trainer, exercise.name);
-        if (video != 0) {
+        File downloadedVideo = MediaPackManager.localLoop(this, trainer, exercise.name);
+        if (downloadedVideo != null) {
             FrameLayout mediaCard = new FrameLayout(this);
             mediaCard.setBackground(surface(navyPanel, 18, 1, mint));
             applyPremiumTileDepth(mediaCard, false);
             mediaCard.setClipToOutline(true);
             mediaCard.setClipChildren(true);
             mediaCard.setContentDescription("Coach " + coachName() + " demonstrating " + exercise.name);
-            LoopingExerciseVideoView demonstration = new LoopingExerciseVideoView(this, video);
+            LoopingExerciseVideoView demonstration = new LoopingExerciseVideoView(this, downloadedVideo);
             mediaCard.addView(demonstration, new FrameLayout.LayoutParams(-1, -1));
             return mediaCard;
         }
@@ -2123,6 +2128,8 @@ public final class MainActivity extends FragmentActivity {
         activeDashboardScrollKey = "Home";
         activateScroll(scroll);
         animatePage(shell);
+        // A short delay lets the signed-in dashboard settle before an optional update card appears.
+        root.postDelayed(this::maybePromptForAvailableUpdate, 500L);
 
         FrameLayout hero = coachHeroBackdrop("Home");
         root.addView(hero, new LinearLayout.LayoutParams(-1, dp(518)));
@@ -5368,6 +5375,122 @@ public final class MainActivity extends FragmentActivity {
                 .show();
     }
 
+    /** Dedicated Achievement + Apex hub. It is intentionally a first-class navigation page, before Settings. */
+    private void showApex() {
+        LinearLayout body = appPage("Apex");
+        AchievementStore.Snapshot snapshot = AchievementStore.snapshot(this);
+        title(body, "ACHIEVEMENTS + APEX", "Build your momentum", "Private progress that celebrates completed work, variety, and recovery-aware consistency. Apex is always optional.");
+
+        LinearLayout levelCard = darkCard();
+        levelCard.addView(heading("LEVEL " + snapshot.level, 28, Color.WHITE));
+        levelCard.addView(text(snapshot.xp + " momentum points  •  " + snapshot.xpToNextLevel + " to Level " + (snapshot.level + 1), 14, Color.rgb(211, 225, 233)));
+        gap(levelCard, 10);
+        ProgressBar levelBar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+        levelBar.setMax(500);
+        levelBar.setProgress(snapshot.levelProgress);
+        levelBar.setProgressTintList(ColorStateList.valueOf(mint));
+        levelBar.setProgressBackgroundTintList(ColorStateList.valueOf(Color.rgb(43, 68, 97)));
+        levelCard.addView(levelBar, new LinearLayout.LayoutParams(-1, dp(9)));
+        levelCard.addView(text("Points come from completed sessions and guided minutes. Missing a day never removes points or locks standard training.", 12, Color.rgb(190, 214, 231)));
+        body.addView(levelCard);
+        gap(body, 12);
+
+        AchievementStore.ApexTier current = snapshot.currentApexTier();
+        LinearLayout apexCard = card();
+        apexCard.addView(heading("Your Apex lane", 19, ink));
+        apexCard.addView(heading(current.name, 25, navy));
+        apexCard.addView(text(current.purpose, 14, muted));
+        gap(apexCard, 10);
+        for (AchievementStore.ApexTier tier : snapshot.apexTiers) {
+            boolean unlocked = tier.unlocked(snapshot.level);
+            LinearLayout row = new LinearLayout(this);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setPadding(dp(10), dp(8), dp(10), dp(8));
+            row.setBackground(surface(unlocked ? Color.rgb(221, 248, 239) : Color.rgb(241, 244, 249), 13, 1, unlocked ? mint : cardLine));
+            TextView mark = heading(unlocked ? "✓" : "○", 17, unlocked ? navy : muted);
+            mark.setGravity(Gravity.CENTER);
+            row.addView(mark, new LinearLayout.LayoutParams(dp(28), dp(32)));
+            LinearLayout copy = new LinearLayout(this); copy.setOrientation(LinearLayout.VERTICAL);
+            copy.addView(heading(tier.name, 14, ink));
+            String requirement = tier.sessionsRequired == 0 ? "Available from your first session"
+                    : tier.sessionsInWindow + " / " + tier.sessionsRequired + " sessions in " + tier.daysWindow + " days · Level " + tier.levelRequired;
+            copy.addView(text(requirement, 11, muted));
+            row.addView(copy, new LinearLayout.LayoutParams(0, -2, 1));
+            LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(-1, -2); rowParams.topMargin = dp(7);
+            apexCard.addView(row, rowParams);
+        }
+        body.addView(apexCard);
+        gap(body, 12);
+
+        LinearLayout achievements = card();
+        achievements.addView(heading("Achievement board", 19, ink));
+        achievements.addView(text(snapshot.unlockedBadgeCount() + " of " + snapshot.badges.size() + " badges earned. Achievements record progress; they never judge your body, food, or a rest day.", 14, muted));
+        int displayed = 0;
+        for (AchievementStore.Badge badge : snapshot.badges) {
+            if (!badge.unlocked() && displayed >= 4) continue;
+            achievements.addView(achievementBadgeRow(badge), new LinearLayout.LayoutParams(-1, -2));
+            displayed++;
+            if (displayed >= 5) break;
+        }
+        body.addView(achievements);
+        gap(body, 10);
+        Button catalogue = lightAction("Browse all achievements");
+        catalogue.setOnClickListener(view -> showAchievementCatalogue());
+        addButton(body, catalogue);
+        gap(body, 12);
+
+        LinearLayout coachLink = card();
+        coachLink.addView(heading("Coach unlocks", 19, ink));
+        coachLink.addView(text("Foundation coaches remain available. Momentum and performance coach cards unlock from completed sessions, never from spending or extreme challenges.", 14, muted));
+        gap(coachLink, 9);
+        Button coachHub = secondary("Open Coach Hub");
+        coachHub.setOnClickListener(view -> showCoachHub());
+        addButton(coachLink, coachHub);
+        body.addView(coachLink);
+    }
+
+    private LinearLayout achievementBadgeRow(AchievementStore.Badge badge) {
+        LinearLayout row = new LinearLayout(this);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(dp(10), dp(9), dp(10), dp(9));
+        boolean unlocked = badge.unlocked();
+        row.setBackground(surface(unlocked ? Color.rgb(225, 249, 242) : Color.rgb(243, 246, 250), 13, 1, unlocked ? mint : cardLine));
+        TextView medal = heading(unlocked ? "★" : "◇", 22, unlocked ? coral : Color.rgb(121, 140, 161));
+        medal.setGravity(Gravity.CENTER);
+        row.addView(medal, new LinearLayout.LayoutParams(dp(38), dp(38)));
+        LinearLayout copy = new LinearLayout(this); copy.setOrientation(LinearLayout.VERTICAL);
+        copy.addView(heading(badge.name, 14, ink));
+        copy.addView(text(badge.family + " · " + badge.description, 11, muted));
+        row.addView(copy, new LinearLayout.LayoutParams(0, -2, 1));
+        TextView state = heading(badge.progressLabel(), 11, unlocked ? navy : muted);
+        state.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
+        row.addView(state, new LinearLayout.LayoutParams(dp(62), dp(38)));
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2); params.topMargin = dp(8);
+        row.setLayoutParams(params);
+        return row;
+    }
+
+    private void showAchievementCatalogue() {
+        LinearLayout body = appPage("Apex");
+        AchievementStore.Snapshot snapshot = AchievementStore.snapshot(this);
+        title(body, "ACHIEVEMENT BOARD", "Every milestone", "Your local collection is grouped by the type of progress it recognizes. New badges unlock automatically after a completed session is saved.");
+        String activeFamily = "";
+        for (AchievementStore.Badge badge : snapshot.badges) {
+            if (!badge.family.equals(activeFamily)) {
+                activeFamily = badge.family;
+                TextView family = heading(activeFamily, 12, mint);
+                family.setLetterSpacing(.08f);
+                body.addView(family);
+                gap(body, 5);
+            }
+            body.addView(achievementBadgeRow(badge));
+        }
+        gap(body, 12);
+        Button back = secondary("Back to Apex");
+        back.setOnClickListener(view -> showApex());
+        addButton(body, back);
+    }
+
     private void showProfile() {
         AccountStore.Profile profile = AccountStore.get(this);
         LinearLayout body = appPage("Settings");
@@ -5411,6 +5534,8 @@ public final class MainActivity extends FragmentActivity {
         body.addView(settingsGroup("APP"));
         LinearLayout appGroup = settingsPanel();
         appGroup.addView(settingsRow("⌖", "Offline maps", OfflineMapStore.hasAnyMap(this) ? "Country map ready for routes" : "Download a country for offline routes", view -> showOfflineMapCatalog()));
+        appGroup.addView(settingsDivider());
+        appGroup.addView(settingsRow("▶", "Coach motion packs", "Optional smooth exercise loops · download only what you need", view -> showMediaPacks()));
         appGroup.addView(settingsDivider());
         appGroup.addView(settingsRow("↻", "Updates", "Check for a newer version", view -> showUpdate()));
         body.addView(appGroup);
@@ -8963,6 +9088,125 @@ public final class MainActivity extends FragmentActivity {
         return button;
     }
 
+    /** Checks quietly once per offered version. A failed background check never blocks training. */
+    private void maybePromptForAvailableUpdate() {
+        if (updatePromptInFlight || isFinishing() || showingUpdatePage) return;
+        updatePromptInFlight = true;
+        new Thread(() -> {
+            try {
+                UpdateManager.Info info = UpdateManager.check();
+                runOnUiThread(() -> {
+                    updatePromptInFlight = false;
+                    if (info == null || isFinishing()) return;
+                    android.content.SharedPreferences prefs = getSharedPreferences("update_prompt", MODE_PRIVATE);
+                    if (info.name.equals(prefs.getString("last_seen_version", ""))) return;
+                    prefs.edit().putString("last_seen_version", info.name).apply();
+                    String message = info.notes.isEmpty() ? "A new My Personal Trainer update is ready." : info.notes;
+                    new AlertDialog.Builder(this)
+                            .setTitle("Update " + info.name + " is ready")
+                            .setMessage(message)
+                            .setNegativeButton("Later", null)
+                            .setPositiveButton("View update", (dialog, which) -> showUpdate(info))
+                            .show();
+                });
+            } catch (Exception ignored) {
+                runOnUiThread(() -> updatePromptInFlight = false);
+            }
+        }).start();
+    }
+
+    /** Manage optional coach videos separately from the core OTA package. */
+    private void showMediaPacks() {
+        LinearLayout body = appPage("Settings");
+        title(body, "COACH MOTION", "Smooth exercise loops", "The app remains usable offline with its motion guide. Download only the coach-loop library you want to keep offline.");
+        LinearLayout statusCard = card();
+        TextView status = heading("Checking available packs…", 17, ink);
+        statusCard.addView(status);
+        TextView detail = text("Video packs are SHA-256 verified before they become available to your exercise library.", 13, muted);
+        LinearLayout.LayoutParams detailParams = new LinearLayout.LayoutParams(-1, -2); detailParams.topMargin = dp(5);
+        statusCard.addView(detail, detailParams);
+        body.addView(statusCard);
+        gap(body, 12);
+        LinearLayout packs = new LinearLayout(this); packs.setOrientation(LinearLayout.VERTICAL); body.addView(packs);
+        loadMediaPacks(status, packs);
+    }
+
+    private void loadMediaPacks(TextView status, LinearLayout target) {
+        target.removeAllViews();
+        new Thread(() -> {
+            try {
+                MediaPackManager.Pack[] packs = MediaPackManager.fetchCatalog();
+                runOnUiThread(() -> {
+                    status.setText(packs.length == 0 ? "No coach motion packs are published yet" : "Choose a coach motion library");
+                    for (MediaPackManager.Pack pack : packs) addMediaPackCard(target, pack);
+                });
+            } catch (Exception error) {
+                runOnUiThread(() -> {
+                    status.setText("Coach motion packs are unavailable right now");
+                    Button retry = primary("Check again");
+                    retry.setOnClickListener(view -> loadMediaPacks(status, target));
+                    addButton(target, retry);
+                });
+            }
+        }).start();
+    }
+
+    private void addMediaPackCard(LinearLayout parent, MediaPackManager.Pack pack) {
+        LinearLayout card = card();
+        card.addView(heading(pack.label, 18, ink));
+        card.addView(text("Coach " + pack.coach + " · Pack " + pack.version + " · " + formatDownloadSize(pack.sizeBytes), 13, muted));
+        gap(card, 10);
+        boolean installed = MediaPackManager.isInstalled(this, pack);
+        Button action = installed ? secondary("Remove downloaded pack") : primary("Download for offline use");
+        action.setOnClickListener(view -> {
+            if (installed) {
+                MediaPackManager.remove(this, pack);
+                showMediaPacks();
+                return;
+            }
+            confirmMediaPackDownload(pack);
+        });
+        addButton(card, action);
+        parent.addView(card); gap(parent, 10);
+    }
+
+    private void confirmMediaPackDownload(MediaPackManager.Pack pack) {
+        Runnable download = () -> downloadMediaPack(pack);
+        if (!MediaPackManager.isMetered(this)) { download.run(); return; }
+        new AlertDialog.Builder(this)
+                .setTitle("Use mobile data?")
+                .setMessage(pack.label + " is " + formatDownloadSize(pack.sizeBytes) + ". It will remain on this phone for offline playback.")
+                .setNegativeButton("Wait for Wi‑Fi", null)
+                .setPositiveButton("Download", (dialog, which) -> download.run())
+                .show();
+    }
+
+    private void downloadMediaPack(MediaPackManager.Pack pack) {
+        toast("Downloading " + pack.label + "…");
+        new Thread(() -> {
+            try {
+                MediaPackManager.downloadAndInstall(this, pack, (complete, total) -> { });
+                runOnUiThread(() -> { toast(pack.label + " is ready offline."); showMediaPacks(); });
+            } catch (Exception error) {
+                runOnUiThread(() -> toast("Could not download this coach pack: " + conciseNetworkError(error)));
+            }
+        }).start();
+    }
+
+    private void showPatchNotes() {
+        LinearLayout body = appPage("Settings");
+        title(body, "UPDATE HISTORY", "What changed", "A local record of My Personal Trainer releases. The newest update is always shown first.");
+        for (ReleaseNotes.Entry entry : ReleaseNotes.HISTORY) {
+            LinearLayout note = card();
+            TextView version = heading("v" + entry.version + "  ·  " + entry.title, 17, ink);
+            note.addView(version);
+            TextView description = text(entry.summary, 14, muted); description.setLineSpacing(dp(2), 1f);
+            LinearLayout.LayoutParams descriptionParams = new LinearLayout.LayoutParams(-1, -2); descriptionParams.topMargin = dp(5);
+            note.addView(description, descriptionParams);
+            body.addView(note); gap(body, 9);
+        }
+    }
+
     private void showUpdate() {
         showUpdate(null);
     }
@@ -8973,7 +9217,7 @@ public final class MainActivity extends FragmentActivity {
         final int updatePage = pageGeneration;
         otaPageGeneration = updatePage;
         showingUpdatePage = true;
-        title(body, "UPDATES", "Keep your coach current", "Version " + BuildConfig.VERSION_NAME);
+        title(body, "UPDATES", "Keep your coach current", "Installed version " + BuildConfig.VERSION_NAME);
         LinearLayout statusCard = card();
         TextView status = heading("Ready to check for an update", 18, ink);
         statusCard.addView(status);
@@ -8995,6 +9239,10 @@ public final class MainActivity extends FragmentActivity {
         LinearLayout actions = new LinearLayout(this);
         actions.setOrientation(LinearLayout.VERTICAL);
         body.addView(actions);
+        gap(body, 10);
+        Button history = secondary("View full update history");
+        history.setOnClickListener(view -> showPatchNotes());
+        addButton(body, history);
 
         UpdateManager.Info restored = knownInfo != null ? knownInfo : UpdateManager.savedInfo(this);
         if (hasSavedUpdateState(restored)) {
@@ -9082,8 +9330,12 @@ public final class MainActivity extends FragmentActivity {
         }
 
         if (state.state == UpdateManager.STATE_NONE) {
-            status.setText("Update available");
-            Button download = primary("Download update");
+            status.setText("Version " + info.name + " is available");
+            if (!info.notes.isEmpty()) {
+                progressLabel.setVisibility(View.VISIBLE);
+                progressLabel.setText(info.notes);
+            }
+            Button download = primary("Download v" + info.name);
             download.setOnClickListener(view -> confirmAndStartUpdateDownload(info));
             addButton(actions, download);
         } else if (state.state == UpdateManager.STATE_QUEUED || state.state == UpdateManager.STATE_DOWNLOADING || state.state == UpdateManager.STATE_PAUSED) {

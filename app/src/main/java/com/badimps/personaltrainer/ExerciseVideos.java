@@ -28,6 +28,10 @@ public final class ExerciseVideos {
                 coach + ExerciseVisuals.resourceStem(exerciseName), "raw", context.getPackageName());
     }
 
+    public static boolean hasDedicatedLoop(String exerciseName) {
+        return DEDICATED_LOOPS.contains(exerciseName);
+    }
+
     /** Every named library movement is covered by the native illustrated motion guide when no exact MP4 exists. */
     public static boolean hasMotionGuide(String exerciseName) {
         return exerciseName != null && !exerciseName.trim().isEmpty();

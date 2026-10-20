@@ -2,28 +2,39 @@ plugins {
     id 'com.android.application'
 }
 
+def releaseProperties = new Properties()
+def releasePropertiesFile = rootProject.file('release-signing.properties')
+if (releasePropertiesFile.exists()) {
+    releasePropertiesFile.withInputStream { releaseProperties.load(it) }
+}
+
 android {
     namespace 'com.badimps.personaltrainer'
     compileSdk 36
     signingConfigs {
-        otaCompatibility {
-            storeFile file("${System.getProperty('user.home')}/.android/debug.keystore")
-            storePassword 'android'
-            keyAlias 'androiddebugkey'
-            keyPassword 'android'
+        production {
+            storeFile file(releaseProperties.getProperty('storeFile', 'keys/my-personal-trainer-release.jks'))
+            storePassword releaseProperties.getProperty('storePassword', '')
+            keyAlias releaseProperties.getProperty('keyAlias', 'my-personal-trainer')
+            keyPassword releaseProperties.getProperty('keyPassword', '')
         }
     }
     defaultConfig {
         applicationId 'com.badimps.personaltrainer'
         minSdk 26
         targetSdk 36
-        versionCode 69
-        versionName '5.28'
+        versionCode 72
+        versionName '5.31'
     }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
     testOptions { unitTests.includeAndroidResources = true }
     buildFeatures { buildConfig true }
-    buildTypes { release { signingConfig signingConfigs.otaCompatibility } }
+    buildTypes {
+        release {
+            if (!releasePropertiesFile.exists()) throw new GradleException('Missing release-signing.properties. A production OTA build must have its protected signing configuration.')
+            signingConfig signingConfigs.production
+        }
+    }
 }
 
 dependencies {

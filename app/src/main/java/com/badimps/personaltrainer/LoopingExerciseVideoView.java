@@ -10,6 +10,7 @@ import android.view.Surface;
 import android.view.TextureView;
 
 import java.io.IOException;
+import java.io.File;
 
 /**
  * A muted, local H.264 exercise loop. TextureView keeps the video inside the
@@ -18,6 +19,7 @@ import java.io.IOException;
  */
 public final class LoopingExerciseVideoView extends TextureView implements TextureView.SurfaceTextureListener {
     private final int videoResource;
+    private final File videoFile;
     private Surface surface;
     private MediaPlayer player;
     private boolean attached;
@@ -27,6 +29,18 @@ public final class LoopingExerciseVideoView extends TextureView implements Textu
     public LoopingExerciseVideoView(Context context, int videoResource) {
         super(context);
         this.videoResource = videoResource;
+        this.videoFile = null;
+        setSurfaceTextureListener(this);
+        setOpaque(false);
+        setAlpha(0f);
+        // The remastered local loops are authored at 60 FPS. TextureView renders the
+        // decoded cadence supported by the device without a custom display-mode request.
+    }
+
+    public LoopingExerciseVideoView(Context context, File videoFile) {
+        super(context);
+        this.videoResource = 0;
+        this.videoFile = videoFile;
         setSurfaceTextureListener(this);
         setOpaque(false);
         setAlpha(0f);
@@ -78,14 +92,19 @@ public final class LoopingExerciseVideoView extends TextureView implements Textu
     }
 
     private void startIfPossible() {
-        if (!attached || getWindowVisibility() != VISIBLE || surface == null || player != null || videoResource == 0) return;
-        try (AssetFileDescriptor descriptor = getResources().openRawResourceFd(videoResource)) {
-            if (descriptor == null) return;
+        if (!attached || getWindowVisibility() != VISIBLE || surface == null || player != null || (videoResource == 0 && (videoFile == null || !videoFile.isFile()))) return;
+        try {
             MediaPlayer created = new MediaPlayer();
             created.setSurface(surface);
             created.setVolume(0f, 0f);
             created.setLooping(true);
-            created.setDataSource(descriptor.getFileDescriptor(), descriptor.getStartOffset(), descriptor.getLength());
+            if (videoFile != null) created.setDataSource(videoFile.getAbsolutePath());
+            else {
+                AssetFileDescriptor descriptor = getResources().openRawResourceFd(videoResource);
+                if (descriptor == null) return;
+                created.setDataSource(descriptor.getFileDescriptor(), descriptor.getStartOffset(), descriptor.getLength());
+                descriptor.close();
+            }
             created.setOnVideoSizeChangedListener((mediaPlayer, width, height) -> {
                 videoWidth = width;
                 videoHeight = height;

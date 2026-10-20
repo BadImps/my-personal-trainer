@@ -6,3 +6,5 @@ local.properties
 .idea/
 tools/*.class
 My-Personal-Trainer-*.apk
+release-signing.properties
+keys/

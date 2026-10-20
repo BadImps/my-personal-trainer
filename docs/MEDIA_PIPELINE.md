@@ -1,6 +1,13 @@
 # Exercise media pipeline
 
-Every exercise ships with two offline resources for each selected coach:
+The core app ships with a compact WebP poster and a native motion guide for every exercise. High-quality loops are now optional verified media packs:
+
+- **Coach Mia motion library** covers Mia and female coach profiles;
+- **Coach Leo motion library** covers Leo and male coach profiles.
+
+The app downloads only the chosen library to private app storage, verifies the published SHA-256 before it is enabled, and keeps it available offline. Removing a pack returns its storage immediately without changing plans or progress.
+
+Before the media-pack change, every exercise shipped with two offline resources for each selected coach:
 
 - a compact WebP poster used in the plan collage, selection list, plan summary, and library;
 - a local H.264 MP4 used only when an exercise is in focus.

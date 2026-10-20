@@ -43,15 +43,15 @@ public final class ExerciseVideosTest {
         for (String target : Coach.TARGETS) assertTrue(!"Machines".equals(target));
     }
 
-    @Test public void newMachineExercisesUseTheirOwnCoachMediaInsteadOfAnAlias() {
+    @Test public void newMachineExercisesUseDedicatedDownloadableCoachLoopsInsteadOfAnAlias() {
         Context context = RuntimeEnvironment.getApplication();
         assertEquals("pec_deck_fly", ExerciseVisuals.resourceStem("Pec Deck Fly"));
         assertEquals("leg_extension", ExerciseVisuals.resourceStem("Leg Extension"));
         for (String trainer : new String[]{"Female", "Male"}) {
             assertTrue(ExerciseVisuals.forExercise(context, trainer, "Pec Deck Fly") != 0);
-            assertTrue(ExerciseVideos.forExercise(context, trainer, "Pec Deck Fly") != 0);
+            assertTrue(ExerciseVideos.hasDedicatedLoop("Pec Deck Fly"));
             assertTrue(ExerciseVisuals.forExercise(context, trainer, "Leg Extension") != 0);
-            assertTrue(ExerciseVideos.forExercise(context, trainer, "Leg Extension") != 0);
+            assertTrue(ExerciseVideos.hasDedicatedLoop("Leg Extension"));
         }
     }
 }

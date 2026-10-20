@@ -48,6 +48,7 @@ public final class UpdateManager {
     private static final String KEY_NAME = "version_name";
     private static final String KEY_URL = "apk_url";
     private static final String KEY_SIZE = "apk_size";
+    private static final String KEY_NOTES = "notes";
     private static final String KEY_READY = "verified_ready";
     private static final String KEY_PERMISSION_PENDING = "installer_permission_pending";
     private static final String DIRECTORY = "ota";
@@ -66,13 +67,19 @@ public final class UpdateManager {
         public final String url;
         public final String sha;
         public final long sizeBytes;
+        public final String notes;
 
         Info(int code, String name, String url, String sha, long sizeBytes) {
+            this(code, name, url, sha, sizeBytes, "");
+        }
+
+        Info(int code, String name, String url, String sha, long sizeBytes, String notes) {
             this.code = code;
             this.name = name;
             this.url = url;
             this.sha = sha;
             this.sizeBytes = sizeBytes;
+            this.notes = notes == null ? "" : notes.trim();
         }
     }
 
@@ -127,7 +134,7 @@ public final class UpdateManager {
         if (!BuildConfig.APPLICATION_ID.equals(applicationId)) throw new SecurityException("Update is for a different app");
         int code = json.getInt("versionCode");
         Info info = new Info(code, json.getString("versionName"), json.getString("apkUrl"),
-                json.getString("sha256").toLowerCase(Locale.US), json.optLong("sizeBytes", -1L));
+                json.getString("sha256").toLowerCase(Locale.US), json.optLong("sizeBytes", -1L), json.optString("notes", ""));
         validate(info);
         return info.code > BuildConfig.VERSION_CODE ? info : null;
     }
@@ -166,6 +173,7 @@ public final class UpdateManager {
                 .putString(KEY_NAME, info.name)
                 .putString(KEY_URL, info.url)
                 .putLong(KEY_SIZE, info.sizeBytes)
+                .putString(KEY_NOTES, info.notes)
                 .putBoolean(KEY_READY, false)
                 .putBoolean(KEY_PERMISSION_PENDING, false)
                 .apply();
@@ -176,7 +184,7 @@ public final class UpdateManager {
     public static Info savedInfo(Context context) {
         SharedPreferences prefs = preferences(context);
         Info info = new Info(prefs.getInt(KEY_CODE, -1), prefs.getString(KEY_NAME, ""),
-                prefs.getString(KEY_URL, ""), prefs.getString(KEY_SHA, ""), prefs.getLong(KEY_SIZE, -1L));
+                prefs.getString(KEY_URL, ""), prefs.getString(KEY_SHA, ""), prefs.getLong(KEY_SIZE, -1L), prefs.getString(KEY_NOTES, ""));
         try {
             validate(info);
             return info;
