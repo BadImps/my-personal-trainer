@@ -2774,7 +2774,8 @@ public final class MainActivity extends FragmentActivity {
         tile.setOrientation(LinearLayout.VERTICAL);
         tile.setGravity(Gravity.CENTER_HORIZONTAL);
         tile.setPadding(dp(2), dp(5), dp(2), dp(3));
-        tile.setBackground(surface(base, 10, today ? 2 : 0, today ? Color.WHITE : Color.TRANSPARENT));
+        // The coral selection frame belongs to the full day tile, not the small activity icon.
+        tile.setBackground(homeScheduleDaySurface(base, workoutDay || endurance, today));
         TextView dateLabel = text(weekDays[dayIndex] + "\n" + homeWeekDate(date, 0), 9, (workoutDay || endurance) ? navy : muted);
         dateLabel.setGravity(Gravity.CENTER);
         dateLabel.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
@@ -2816,13 +2817,24 @@ public final class MainActivity extends FragmentActivity {
         return tile;
     }
 
-    /** Small schedule marker with the approved 1.5dp coral-orange outline. */
+    private GradientDrawable homeScheduleDaySurface(int fill, boolean scheduled, boolean today) {
+        GradientDrawable shape = new GradientDrawable();
+        shape.setColor(fill);
+        shape.setCornerRadius(dp(10));
+        if (scheduled) {
+            shape.setStroke(Math.max(1, Math.round(1.5f * getResources().getDisplayMetrics().density)), coral);
+        } else if (today) {
+            shape.setStroke(dp(2), Color.WHITE);
+        }
+        return shape;
+    }
+
+    /** Compact icons label a scheduled activity; the day tile itself carries the coral frame. */
     private FrameLayout homeCalendarMarker(int drawable, String description) {
         FrameLayout marker = new FrameLayout(this);
         GradientDrawable shape = new GradientDrawable();
         shape.setColor(Color.rgb(16, 35, 57));
         shape.setCornerRadius(dp(8));
-        shape.setStroke(Math.max(1, Math.round(1.5f * getResources().getDisplayMetrics().density)), coral);
         marker.setBackground(shape);
         marker.setContentDescription(description);
         ImageView icon = new ImageView(this);
@@ -8467,7 +8479,7 @@ public final class MainActivity extends FragmentActivity {
     /** One calendar joins strength templates, rest days, and separately booked endurance appointments. */
     private void showScheduler() {
         LinearLayout body = appPage("Scheduler");
-        title(body, "SCHEDULER", "Your training calendar", "See existing work plans, rest days, and endurance appointments in one place. Tap a date to add or review a session.");
+        title(body, "SCHEDULER", "Your training calendar", "See existing work plans, rest days, and endurance appointments in one place. Select a date, then choose Schedule a workout.");
         Calendar month = schedulerMonth();
         LinearLayout header = new LinearLayout(this);
         header.setGravity(Gravity.CENTER_VERTICAL);
@@ -8529,7 +8541,7 @@ public final class MainActivity extends FragmentActivity {
         gap(body, 12);
         addSchedulerDayAgenda(body, schedulerSelectedDate);
         gap(body, 10);
-        Button book = primary("Schedule appointment");
+        Button book = primary("Schedule a workout");
         book.setOnClickListener(view -> showSchedulerAppointmentSheet(schedulerSelectedDate));
         addButton(body, book);
     }
@@ -8559,7 +8571,12 @@ public final class MainActivity extends FragmentActivity {
         cell.setBackground(surface(fill, 11, selected ? 3 : 0, selected ? coral : Color.TRANSPARENT));
         cell.setContentDescription(new SimpleDateFormat("EEEE, MMMM d", Locale.getDefault()).format(date.getTime()) + ", " + state);
         cell.setClickable(true);
-        cell.setOnClickListener(view -> showSchedulerAppointmentSheet(date));
+        // Selecting a day must only update the agenda. The explicit CTA owns wizard entry,
+        // so browsing a calendar cannot accidentally interrupt the user with a modal.
+        cell.setOnClickListener(view -> {
+            schedulerSelectedDate = (Calendar) date.clone();
+            refreshCurrentPageKeepingScroll(this::showScheduler);
+        });
         return cell;
     }
 
