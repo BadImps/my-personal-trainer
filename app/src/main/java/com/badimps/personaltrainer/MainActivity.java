@@ -7179,9 +7179,11 @@ public final class MainActivity extends FragmentActivity {
     private void runWorkoutCountIn(String phrase, TextView countView, Runnable done) {
         String mode = profile().dialogueMode;
         stopSpeech();
-        final long visualGeneration = speechGeneration;
+        // QUEUE_FLUSH advances speechGeneration when the coach speaks the lead-in. Keep the
+        // count-in attached to that new speech session instead of treating it as stale.
+        final long[] visualGeneration = {speechGeneration};
         Runnable beginCountdown = () -> {
-            if (visualGeneration != speechGeneration) return;
+            if (visualGeneration[0] != speechGeneration) return;
             if (CoachPreferences.usesBeeps(mode) && toneGenerator == null) {
                 toneGenerator = new ToneGenerator(AudioManager.STREAM_MUSIC, 72);
             }
@@ -7189,9 +7191,9 @@ public final class MainActivity extends FragmentActivity {
                 final int remaining = 5 - index;
                 final int delay = index * 1000;
                 workoutHandler.postDelayed(() -> {
-                    if (visualGeneration != speechGeneration) return;
+                    if (visualGeneration[0] != speechGeneration) return;
                     Runnable showNumber = () -> {
-                        if (visualGeneration != speechGeneration) return;
+                        if (visualGeneration[0] != speechGeneration) return;
                         countView.setText(String.valueOf(remaining));
                         if (CoachPreferences.usesBeeps(mode) && toneGenerator != null) {
                             toneGenerator.startTone(ToneGenerator.TONE_DTMF_1, 150);
@@ -7205,9 +7207,9 @@ public final class MainActivity extends FragmentActivity {
                 }, delay);
             }
             workoutHandler.postDelayed(() -> {
-                if (visualGeneration != speechGeneration) return;
+                if (visualGeneration[0] != speechGeneration) return;
                 Runnable beginWorkout = () -> {
-                    if (visualGeneration != speechGeneration) return;
+                    if (visualGeneration[0] != speechGeneration) return;
                     countView.setText("GO");
                     if (CoachPreferences.usesBeeps(mode) && toneGenerator != null) {
                         toneGenerator.startTone(ToneGenerator.TONE_DTMF_9, 230);
@@ -7222,7 +7224,10 @@ public final class MainActivity extends FragmentActivity {
             }, 5000L);
         };
         if (CoachPreferences.FULL_DIALOGUE.equals(mode)) {
-            speakCoach(countdownLeadIn(phrase), TextToSpeech.QUEUE_FLUSH, beginCountdown);
+            speakCoach(countdownLeadIn(phrase), TextToSpeech.QUEUE_FLUSH, () -> {
+                visualGeneration[0] = speechGeneration;
+                beginCountdown.run();
+            });
         } else {
             beginCountdown.run();
         }

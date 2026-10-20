@@ -2,6 +2,8 @@ package com.badimps.personaltrainer;
 
 import android.content.Context;
 import android.graphics.Color;
+import android.view.MotionEvent;
+import android.view.ViewParent;
 import android.widget.FrameLayout;
 
 import org.osmdroid.config.Configuration;
@@ -31,6 +33,15 @@ public final class OfflineRouteMapView extends FrameLayout {
         map.setTileSource(TileSourceFactory.MAPNIK);
         map.setMultiTouchControls(true);
         map.setTilesScaledToDpi(true);
+        // This map sits inside a vertically scrolling review page. Once a second finger lands,
+        // keep the gesture with osmdroid so members can pan/zoom their completed route instead
+        // of the outer page stealing the gesture.
+        map.setOnTouchListener((view, event) -> {
+            boolean mapGesture = event.getPointerCount() >= 2 || event.getActionMasked() == MotionEvent.ACTION_POINTER_UP;
+            ViewParent parent = getParent();
+            if (parent != null) parent.requestDisallowInterceptTouchEvent(mapGesture);
+            return false;
+        });
         route = new Polyline();
         route.getOutlinePaint().setColor(Color.rgb(173, 255, 47));
         route.getOutlinePaint().setStrokeWidth(context.getResources().getDisplayMetrics().density * 5f);

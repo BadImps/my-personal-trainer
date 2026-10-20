@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 68,
-  "versionName": "5.27",
-  "publishedAt": "2026-10-19T22:41:16Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.27/app-release.apk",
-  "sha256": "77600043f6b64b6af4a0ca623e540f759c8639e63c4b519b4f0de8c758a7c2f3",
-  "sizeBytes": 137807912,
-  "notes": "Adds date-first Scheduler appointments for Workout, Endurance, or both, plus verified password masking, Android credential autofill support, and keyboard-safe text fields."
+  "versionCode": 69,
+  "versionName": "5.28",
+  "publishedAt": "2026-10-20T00:58:24Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.28/app-release.apk",
+  "sha256": "ce1deba01b33d09477953c4cb127a4d57258a3b86c0f5e1c44995968d8a81456",
+  "sizeBytes": 137808480,
+  "notes": "Fixes guided Workout and Endurance sessions getting stuck at Start when Full Dialogue is enabled. Completed Endurance maps now support two-finger pan and zoom gestures."
 }
