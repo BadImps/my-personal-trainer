@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 69,
-  "versionName": "5.28",
-  "publishedAt": "2026-10-20T00:58:24Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.28/app-release.apk",
-  "sha256": "ce1deba01b33d09477953c4cb127a4d57258a3b86c0f5e1c44995968d8a81456",
-  "sizeBytes": 137808480,
-  "notes": "Fixes guided Workout and Endurance sessions getting stuck at Start when Full Dialogue is enabled. Completed Endurance maps now support two-finger pan and zoom gestures."
+  "versionCode": 72,
+  "versionName": "5.31",
+  "publishedAt": "2026-10-20T11:16:26Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.31/app-release.apk",
+  "sha256": "57c97302c8581b5dec98316679dc5363e45b6ddad683237ac817f9d3714d106c",
+  "sizeBytes": 125994612,
+  "notes": "Adds protected OTA signing, optional verified coach-motion packs, update prompts that name the available version, and complete in-app patch notes. This is a one-time replacement release for older debug-signed installs."
 }
