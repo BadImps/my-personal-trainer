@@ -4,6 +4,9 @@ plugins {
 
 def releaseProperties = new Properties()
 def releasePropertiesFile = rootProject.file('release-signing.properties')
+// A one-time debug-signed bridge can update existing legacy installs, export their data,
+// then make way for the protected production signature. Normal production builds remain signed.
+def migrationBridge = project.hasProperty('migrationBridge')
 if (releasePropertiesFile.exists()) {
     releasePropertiesFile.withInputStream { releaseProperties.load(it) }
 }
@@ -23,13 +26,17 @@ android {
         applicationId 'com.badimps.personaltrainer'
         minSdk 26
         targetSdk 36
-        versionCode 72
-        versionName '5.31'
+        versionCode (migrationBridge ? 73 : 74)
+        versionName (migrationBridge ? '5.31 Migration' : '5.32')
     }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
     testOptions { unitTests.includeAndroidResources = true }
     buildFeatures { buildConfig true }
     buildTypes {
+        migration {
+            initWith debug
+            signingConfig signingConfigs.debug
+        }
         release {
             if (!releasePropertiesFile.exists()) throw new GradleException('Missing release-signing.properties. A production OTA build must have its protected signing configuration.')
             signingConfig signingConfigs.production

@@ -193,6 +193,8 @@ public final class MainActivity extends FragmentActivity {
     private static final int REQUEST_LIVE_LOCATION = 4102;
     private static final int REQUEST_PROFILE_PHOTO = 4103;
     private static final int REQUEST_OFFLINE_MAP = 4104;
+    private static final int REQUEST_MIGRATION_EXPORT = 4105;
+    private static final int REQUEST_MIGRATION_IMPORT = 4106;
     private String pendingLiveTrackingMode;
     private String selectedProfilePhotoUri;
     private BroadcastReceiver liveTrackingReceiver;
@@ -410,6 +412,29 @@ public final class MainActivity extends FragmentActivity {
 
     @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQUEST_MIGRATION_EXPORT && resultCode == RESULT_OK && data != null && data.getData() != null) {
+            Uri destination = data.getData();
+            new Thread(() -> {
+                try { MigrationDataStore.exportTo(this, destination); runOnUiThread(() -> toast("Private backup saved. Keep it until you finish restoring the protected app.")); }
+                catch (Exception error) { runOnUiThread(() -> toast("Could not save backup: " + conciseNetworkError(error))); }
+            }).start();
+            return;
+        }
+        if (requestCode == REQUEST_MIGRATION_IMPORT && resultCode == RESULT_OK && data != null && data.getData() != null) {
+            Uri source = data.getData();
+            new Thread(() -> {
+                try {
+                    MigrationDataStore.importFrom(this, source);
+                    runOnUiThread(() -> {
+                        toast("Private backup restored.");
+                        Intent restart = getPackageManager().getLaunchIntentForPackage(getPackageName());
+                        if (restart != null) { restart.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK); startActivity(restart); }
+                        finish();
+                    });
+                } catch (Exception error) { runOnUiThread(() -> toast("Could not restore backup: " + conciseNetworkError(error))); }
+            }).start();
+            return;
+        }
         if (requestCode == REQUEST_OFFLINE_MAP && resultCode == RESULT_OK && data != null && data.getData() != null) {
             Uri map = data.getData();
             try { getContentResolver().takePersistableUriPermission(map, Intent.FLAG_GRANT_READ_URI_PERMISSION); } catch (SecurityException ignored) { }
@@ -1860,6 +1885,16 @@ public final class MainActivity extends FragmentActivity {
         applyPressMotion(register);
         content.addView(register, new LinearLayout.LayoutParams(-1, dp(34)));
 
+        if (!AccountStore.exists(this)) {
+            TextView restore = text("Already have a private backup?  Restore", 12, mint);
+            restore.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
+            restore.setGravity(Gravity.LEFT | Gravity.CENTER_VERTICAL);
+            restore.setClickable(true);
+            restore.setOnClickListener(view -> chooseMigrationImport());
+            applyPressMotion(restore);
+            content.addView(restore, new LinearLayout.LayoutParams(-1, dp(30)));
+        }
+
         TextView coachLabel = text("Coach " + heroCoach + " · " + loginCoachAccent(heroCoach), 11, Color.WHITE);
         coachLabel.setGravity(Gravity.CENTER);
         coachLabel.setPadding(dp(10), 0, dp(10), 0);
@@ -2128,8 +2163,9 @@ public final class MainActivity extends FragmentActivity {
         activeDashboardScrollKey = "Home";
         activateScroll(scroll);
         animatePage(shell);
-        // A short delay lets the signed-in dashboard settle before an optional update card appears.
+        // A short delay lets the signed-in dashboard settle before optional cards appear.
         root.postDelayed(this::maybePromptForAvailableUpdate, 500L);
+        root.postDelayed(this::maybeShowCoachMotionPromo, 1250L);
 
         FrameLayout hero = coachHeroBackdrop("Home");
         root.addView(hero, new LinearLayout.LayoutParams(-1, dp(518)));
@@ -5518,6 +5554,8 @@ public final class MainActivity extends FragmentActivity {
         accountGroup.addView(settingsRow("●", "Personal details", "Name, photo, remember me & device lock", view -> showProfileEditor()));
         accountGroup.addView(settingsDivider());
         accountGroup.addView(settingsRow("⌁", "Security", "Password and biometric unlock", view -> showSecuritySettings()));
+        accountGroup.addView(settingsDivider());
+        accountGroup.addView(settingsRow("⇄", "Data transfer", "Export or restore your private app data", view -> showMigrationCenter()));
         accountGroup.addView(settingsDivider());
         accountGroup.addView(settingsRow("◌", "Privacy", "Profile details stay on this device", null));
         body.addView(accountGroup);
@@ -9129,6 +9167,91 @@ public final class MainActivity extends FragmentActivity {
         gap(body, 12);
         LinearLayout packs = new LinearLayout(this); packs.setOrientation(LinearLayout.VERTICAL); body.addView(packs);
         loadMediaPacks(status, packs);
+    }
+
+    /** First-open reward-style invitation. It is informational only: motion packs remain optional. */
+    private void maybeShowCoachMotionPromo() {
+        if (isFinishing() || !AccountStore.exists(this)) return;
+        String coachKey = "Male".equals(profile().trainer) ? "leo" : "mia";
+        android.content.SharedPreferences prefs = getSharedPreferences("coach_motion_promo", MODE_PRIVATE);
+        if (prefs.getBoolean("shown_" + coachKey, false)) return;
+        prefs.edit().putBoolean("shown_" + coachKey, true).apply();
+
+        final Dialog dialog = new Dialog(this);
+        dialog.setCanceledOnTouchOutside(true);
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(dp(22), dp(22), dp(22), dp(20));
+        card.setBackground(surface(navyPanel, 24, 2, mint));
+
+        TextView tag = heading("OPTIONAL MOTION LIBRARY", 10, mint);
+        tag.setLetterSpacing(.13f);
+        card.addView(tag);
+        gap(card, 8);
+        card.addView(heading("Unlock smooth\ncoach demos", 27, Color.WHITE));
+        gap(card, 8);
+        card.addView(text("Add polished, looping exercise demonstrations for offline playback. Your plan still works without them.", 14, Color.rgb(211, 225, 233)));
+        gap(card, 16);
+        LinearLayout reward = new LinearLayout(this);
+        reward.setOrientation(LinearLayout.VERTICAL);
+        reward.setPadding(dp(14), dp(12), dp(14), dp(12));
+        reward.setBackground(surface(Color.rgb(20, 50, 74), 16, 1, Color.rgb(52, 102, 122)));
+        reward.addView(heading("COACH MOTION STARTER", 11, mint));
+        reward.addView(text("About 10 MB per coach · verified · saved privately on this phone", 12, Color.WHITE));
+        card.addView(reward);
+        gap(card, 18);
+        Button unlock = action("View motion packs", coral, Color.WHITE);
+        unlock.setOnClickListener(view -> { dialog.dismiss(); showMediaPacks(); });
+        card.addView(unlock, new LinearLayout.LayoutParams(-1, dp(52)));
+        gap(card, 8);
+        Button later = action("Not now", Color.TRANSPARENT, mint);
+        later.setBackground(surface(Color.TRANSPARENT, 15, 1, mint));
+        later.setOnClickListener(view -> dialog.dismiss());
+        card.addView(later, new LinearLayout.LayoutParams(-1, dp(48)));
+
+        dialog.setContentView(card);
+        dialog.show();
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(Color.TRANSPARENT));
+            dialog.getWindow().setLayout(getResources().getDisplayMetrics().widthPixels - dp(32), -2);
+        }
+    }
+
+    private void showMigrationCenter() {
+        LinearLayout body = appPage("Settings");
+        title(body, "DATA TRANSFER", "Keep your private progress", "Create a private backup before changing phones or moving to the protected app update.");
+        LinearLayout safety = darkCard();
+        safety.addView(heading("Private by design", 18, Color.WHITE));
+        safety.addView(text("Your profile, plans, progress, nutrition choices, routes, and set history are saved in one backup file you choose. Downloaded maps and demo videos are not included because they can be safely downloaded again.", 14, Color.rgb(211, 225, 233)));
+        body.addView(safety);
+        gap(body, 14);
+        Button export = primary("Export private backup");
+        export.setOnClickListener(view -> chooseMigrationExport());
+        addButton(body, export);
+        gap(body, 9);
+        Button restore = secondary("Restore private backup");
+        restore.setOnClickListener(view -> chooseMigrationImport());
+        addButton(body, restore);
+        gap(body, 16);
+        TextView note = text("Keep the .mptbackup file private. It can restore your on-device profile and should not be shared with anyone else.", 13, muted);
+        note.setLineSpacing(dp(2), 1f);
+        body.addView(note);
+    }
+
+    private void chooseMigrationExport() {
+        Intent create = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+        create.addCategory(Intent.CATEGORY_OPENABLE);
+        create.setType("application/zip");
+        create.putExtra(Intent.EXTRA_TITLE, "My-Personal-Trainer-backup.mptbackup");
+        startActivityForResult(create, REQUEST_MIGRATION_EXPORT);
+    }
+
+    private void chooseMigrationImport() {
+        Intent open = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        open.addCategory(Intent.CATEGORY_OPENABLE);
+        open.setType("application/zip");
+        open.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+        startActivityForResult(open, REQUEST_MIGRATION_IMPORT);
     }
 
     private void loadMediaPacks(TextView status, LinearLayout target) {
