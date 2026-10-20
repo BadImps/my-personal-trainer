@@ -26,8 +26,8 @@ android {
         applicationId 'com.badimps.personaltrainer'
         minSdk 26
         targetSdk 36
-        versionCode (migrationBridge ? 73 : 76)
-        versionName (migrationBridge ? '5.31 Migration' : '5.34')
+        versionCode (migrationBridge ? 73 : 77)
+        versionName (migrationBridge ? '5.31 Migration' : '5.35')
     }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
     testOptions { unitTests.includeAndroidResources = true }
