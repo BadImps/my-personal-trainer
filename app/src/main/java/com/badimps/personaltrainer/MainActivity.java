@@ -33,6 +33,7 @@ import android.view.HapticFeedbackConstants;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewTreeObserver;
+import android.view.Window;
 import android.view.WindowInsets;
 import android.view.WindowManager;
 import android.widget.Button;
@@ -5526,9 +5527,9 @@ public final class MainActivity extends FragmentActivity {
             row.setGravity(Gravity.CENTER_VERTICAL);
             row.setPadding(dp(10), dp(8), dp(10), dp(8));
             row.setBackground(surface(unlocked ? Color.rgb(221, 248, 239) : Color.rgb(241, 244, 249), 13, 1, unlocked ? mint : cardLine));
-            TextView mark = heading(unlocked ? "✓" : "○", 17, unlocked ? navy : muted);
-            mark.setGravity(Gravity.CENTER);
-            row.addView(mark, new LinearLayout.LayoutParams(dp(28), dp(32)));
+            MintfoilBadgeView mark = new MintfoilBadgeView(this);
+            mark.bindApex(tier.name, unlocked, snapshot.apexTiers.indexOf(tier));
+            row.addView(mark, new LinearLayout.LayoutParams(dp(34), dp(34)));
             LinearLayout copy = new LinearLayout(this); copy.setOrientation(LinearLayout.VERTICAL);
             copy.addView(heading(tier.name, 14, ink));
             String requirement = tier.sessionsRequired == 0 ? "Available from your first session"
@@ -5544,13 +5545,16 @@ public final class MainActivity extends FragmentActivity {
         LinearLayout achievements = card();
         achievements.addView(heading("Achievement board", 19, ink));
         achievements.addView(text(snapshot.unlockedBadgeCount() + " of " + snapshot.badges.size() + " badges earned. Achievements record progress; they never judge your body, food, or a rest day.", 14, muted));
+        gap(achievements, 10);
+        GridLayout badgeGrid = new GridLayout(this);
+        badgeGrid.setColumnCount(3);
         int displayed = 0;
         for (AchievementStore.Badge badge : snapshot.badges) {
-            if (!badge.unlocked() && displayed >= 4) continue;
-            achievements.addView(achievementBadgeRow(badge), new LinearLayout.LayoutParams(-1, -2));
-            displayed++;
-            if (displayed >= 5) break;
+            if (!badge.unlocked() && displayed >= 5) continue;
+            addAchievementBadgeTile(badgeGrid, badge, displayed++);
+            if (displayed >= 6) break;
         }
+        achievements.addView(badgeGrid, new LinearLayout.LayoutParams(-1, -2));
         body.addView(achievements);
         gap(body, 10);
         Button catalogue = lightAction("Browse all achievements");
@@ -5574,9 +5578,9 @@ public final class MainActivity extends FragmentActivity {
         row.setPadding(dp(10), dp(9), dp(10), dp(9));
         boolean unlocked = badge.unlocked();
         row.setBackground(surface(unlocked ? Color.rgb(225, 249, 242) : Color.rgb(243, 246, 250), 13, 1, unlocked ? mint : cardLine));
-        TextView medal = heading(unlocked ? "★" : "◇", 22, unlocked ? coral : Color.rgb(121, 140, 161));
-        medal.setGravity(Gravity.CENTER);
-        row.addView(medal, new LinearLayout.LayoutParams(dp(38), dp(38)));
+        MintfoilBadgeView medal = new MintfoilBadgeView(this);
+        medal.bind(badge, badgeTier(badge));
+        row.addView(medal, new LinearLayout.LayoutParams(dp(42), dp(42)));
         LinearLayout copy = new LinearLayout(this); copy.setOrientation(LinearLayout.VERTICAL);
         copy.addView(heading(badge.name, 14, ink));
         copy.addView(text(badge.family + " · " + badge.description, 11, muted));
@@ -5589,21 +5593,61 @@ public final class MainActivity extends FragmentActivity {
         return row;
     }
 
+    /** Three-up premium visual collection, matching the approved Mintfoil badge layout. */
+    private void addAchievementBadgeTile(GridLayout grid, AchievementStore.Badge badge, int position) {
+        LinearLayout tile = new LinearLayout(this);
+        tile.setOrientation(LinearLayout.VERTICAL);
+        tile.setGravity(Gravity.CENTER);
+        tile.setPadding(dp(5), dp(8), dp(5), dp(7));
+        boolean unlocked = badge.unlocked();
+        tile.setBackground(surface(unlocked ? Color.rgb(16, 42, 61) : Color.rgb(39, 52, 70), 16, 1, unlocked ? mint : Color.rgb(76, 94, 114)));
+        tile.setElevation(dp(unlocked ? 6 : 2));
+        MintfoilBadgeView medal = new MintfoilBadgeView(this);
+        medal.bind(badge, badgeTier(badge));
+        tile.addView(medal, new LinearLayout.LayoutParams(dp(66), dp(66)));
+        TextView name = heading(badge.name, 10, unlocked ? Color.WHITE : Color.rgb(185, 198, 211));
+        name.setGravity(Gravity.CENTER); name.setMaxLines(2);
+        tile.addView(name, new LinearLayout.LayoutParams(-1, dp(31)));
+        TextView state = text(unlocked ? "UNLOCKED" : badge.progressLabel(), 8, unlocked ? mint : Color.rgb(160, 176, 192));
+        state.setGravity(Gravity.CENTER); state.setSingleLine(true);
+        tile.addView(state, new LinearLayout.LayoutParams(-1, dp(16)));
+        tile.setContentDescription(badge.name + ", " + badge.progressLabel());
+        GridLayout.LayoutParams params = new GridLayout.LayoutParams();
+        params.width = 0; params.height = dp(128);
+        params.columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f);
+        params.setMargins(position % 3 == 0 ? 0 : dp(5), position >= 3 ? dp(6) : 0,
+                position % 3 == 2 ? 0 : dp(5), 0);
+        grid.addView(tile, params);
+    }
+
+    private int badgeTier(AchievementStore.Badge badge) {
+        if (badge.required >= 50 || badge.required >= 600) return 4;
+        if (badge.required >= 20 || badge.required >= 180) return 3;
+        if (badge.required >= 7 || badge.required >= 60) return 2;
+        return 1;
+    }
+
     private void showAchievementCatalogue() {
         LinearLayout body = appPage("Apex");
         AchievementStore.Snapshot snapshot = AchievementStore.snapshot(this);
         title(body, "ACHIEVEMENT BOARD", "Every milestone", "Your local collection is grouped by the type of progress it recognizes. New badges unlock automatically after a completed session is saved.");
         String activeFamily = "";
+        GridLayout grid = null;
+        int familyPosition = 0;
         for (AchievementStore.Badge badge : snapshot.badges) {
             if (!badge.family.equals(activeFamily)) {
+                if (grid != null) { body.addView(grid); gap(body, 12); }
                 activeFamily = badge.family;
                 TextView family = heading(activeFamily, 12, mint);
                 family.setLetterSpacing(.08f);
                 body.addView(family);
-                gap(body, 5);
+                grid = new GridLayout(this);
+                grid.setColumnCount(3);
+                familyPosition = 0;
             }
-            body.addView(achievementBadgeRow(badge));
+            addAchievementBadgeTile(grid, badge, familyPosition++);
         }
+        if (grid != null) body.addView(grid);
         gap(body, 12);
         Button back = secondary("Back to Apex");
         back.setOnClickListener(view -> showApex());
@@ -9710,6 +9754,7 @@ public final class MainActivity extends FragmentActivity {
         if (restTimer != null) restTimer.cancel();
         stopSetClock();
         stopWorkoutRemainingClock();
+        AchievementStore.Snapshot beforeCompletion = AchievementStore.snapshot(this);
         if (!guidedSessionRecorded) {
             long elapsed = guidedWorkoutStartedAt == 0 ? 60_000L : Math.max(60_000L, SystemClock.elapsedRealtime() - guidedWorkoutStartedAt);
             int activeMinutes = (int) Math.max(1, Math.round(elapsed / 60_000d));
@@ -9719,6 +9764,7 @@ public final class MainActivity extends FragmentActivity {
             guidedSessionRecorded = true;
         }
         JourneyStore.Snapshot snapshot = JourneyStore.snapshot(this);
+        AchievementStore.Snapshot achievementSnapshot = AchievementStore.snapshot(this);
         LinearLayout body = appPage("Workouts");
         title(body, "SESSION COMPLETE", "Strong work", "Your " + target + " workout now appears in Progress. Complete a simple fuel check-in to close the loop.");
         LinearLayout linked = card();
@@ -9737,5 +9783,49 @@ public final class MainActivity extends FragmentActivity {
         Button home = lightAction("Return home");
         home.setOnClickListener(view -> showHome());
         addButton(body, home);
+        AchievementStore.Badge newBadge = newlyUnlockedBadge(beforeCompletion, achievementSnapshot);
+        if (newBadge != null) body.postDelayed(() -> showBadgeUnlock(newBadge), 420L);
+    }
+
+    private AchievementStore.Badge newlyUnlockedBadge(AchievementStore.Snapshot before, AchievementStore.Snapshot after) {
+        Map<String, Boolean> earlier = new HashMap<>();
+        for (AchievementStore.Badge badge : before.badges) earlier.put(badge.family + "|" + badge.name, badge.unlocked());
+        for (AchievementStore.Badge badge : after.badges) {
+            Boolean wasUnlocked = earlier.get(badge.family + "|" + badge.name);
+            if (badge.unlocked() && !Boolean.TRUE.equals(wasUnlocked)) return badge;
+        }
+        return null;
+    }
+
+    /** Controlled coin-spin reward: one new medal, one haptic acknowledgement, no noisy confetti. */
+    private void showBadgeUnlock(AchievementStore.Badge badge) {
+        Dialog dialog = new Dialog(this);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setGravity(Gravity.CENTER_HORIZONTAL);
+        card.setPadding(dp(24), dp(24), dp(24), dp(20));
+        card.setBackground(surface(Color.rgb(12, 31, 52), 26, 1, mint));
+        TextView overline = heading("NEW BADGE", 12, mint); overline.setLetterSpacing(.16f); overline.setGravity(Gravity.CENTER);
+        card.addView(overline);
+        MintfoilBadgeView medal = new MintfoilBadgeView(this);
+        medal.bind(badge, badgeTier(badge));
+        LinearLayout.LayoutParams medalParams = new LinearLayout.LayoutParams(dp(154), dp(154));
+        medalParams.topMargin = dp(13); card.addView(medal, medalParams);
+        TextView name = heading(badge.name, 25, Color.WHITE); name.setGravity(Gravity.CENTER);
+        card.addView(name);
+        TextView copy = text(badge.family + " · " + badge.description, 14, Color.rgb(205, 222, 235));
+        copy.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams copyParams = new LinearLayout.LayoutParams(-1, -2); copyParams.topMargin = dp(6); card.addView(copy, copyParams);
+        Button collect = action("Collect", coral, Color.WHITE);
+        collect.setOnClickListener(view -> dialog.dismiss());
+        LinearLayout.LayoutParams collectParams = new LinearLayout.LayoutParams(-1, dp(52)); collectParams.topMargin = dp(19); card.addView(collect, collectParams);
+        dialog.setContentView(card);
+        Window window = dialog.getWindow();
+        if (window != null) { window.setBackgroundDrawableResource(android.R.color.transparent); window.setLayout(dp(332), -2); }
+        dialog.show();
+        if (dialog.getWindow() != null) dialog.getWindow().setLayout(dp(332), -2);
+        medal.setScaleX(.72f); medal.setScaleY(.72f); medal.setAlpha(0f);
+        medal.animate().alpha(1f).scaleX(1f).scaleY(1f).rotationYBy(720f).setDuration(760L).withStartAction(medal::playUnlock).start();
     }
 }
