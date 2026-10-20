@@ -209,6 +209,8 @@ public final class MainActivity extends FragmentActivity {
     private boolean schedulerWorkoutDateLocked;
     /** When a member chooses Both, the endurance appointment opens after the workout plan is saved. */
     private boolean schedulerContinueToEndurance;
+    /** True only when Plan Ready was opened from Home's Next Workout shortcut. */
+    private boolean homeShortcutPlanReady;
     private String enduranceWizardMode = EndurancePlanStore.WALKING;
     private String endurancePlanMode = "Weekly";
     private boolean[] enduranceWorkoutDays = {true, false, true, false, true, false, false};
@@ -2192,6 +2194,9 @@ public final class MainActivity extends FragmentActivity {
 
         LinearLayout next = new LinearLayout(this);
         next.setOrientation(LinearLayout.VERTICAL);
+        next.setClickable(true);
+        next.setFocusable(true);
+        next.setContentDescription("Open your next workout plan");
         next.setPadding(dp(18), dp(17), dp(18), dp(16));
         next.setBackground(surface(Color.WHITE, 22, 0, Color.TRANSPARENT));
         LinearLayout nextTop = new LinearLayout(this);
@@ -2214,7 +2219,8 @@ public final class MainActivity extends FragmentActivity {
         next.addView(nextTop);
         next.addView(text(nextSession.detail, 12, muted));
         Button start = action("▶  Start workout", coral, Color.WHITE);
-        start.setOnClickListener(view -> showPlans());
+        start.setOnClickListener(view -> openHomeNextWorkout());
+        next.setOnClickListener(view -> openHomeNextWorkout());
         LinearLayout.LayoutParams startParams = new LinearLayout.LayoutParams(-1, dp(48));
         startParams.topMargin = dp(13);
         next.addView(start, startParams);
@@ -2763,7 +2769,7 @@ public final class MainActivity extends FragmentActivity {
                                                WeeklyScheduleStore.Schedule schedule, boolean today) {
         List<SchedulerStore.Appointment> appointments = SchedulerStore.onDate(this, date);
         boolean endurance = !appointments.isEmpty();
-        int base = endurance && !workoutDay ? coral : workoutDay ? mint : Color.rgb(232, 236, 244);
+        int base = workoutDay || endurance ? Color.rgb(224, 249, 242) : Color.rgb(232, 236, 244);
         LinearLayout tile = new LinearLayout(this);
         tile.setOrientation(LinearLayout.VERTICAL);
         tile.setGravity(Gravity.CENTER_HORIZONTAL);
@@ -2777,25 +2783,54 @@ public final class MainActivity extends FragmentActivity {
             TextView plan = text(homeFocusForDay(dayIndex, schedule), 8, navy);
             plan.setGravity(Gravity.CENTER);
             plan.setMaxLines(2);
-            tile.addView(plan, new LinearLayout.LayoutParams(-1, endurance ? dp(25) : dp(40)));
+            tile.addView(plan, new LinearLayout.LayoutParams(-1, endurance ? dp(14) : dp(24)));
         } else if (!endurance) {
             TextView rest = text(confirmed ? "REST" : "OPEN", 8, muted);
             rest.setGravity(Gravity.CENTER);
-            tile.addView(rest, new LinearLayout.LayoutParams(-1, dp(40)));
+            tile.addView(rest, new LinearLayout.LayoutParams(-1, dp(24)));
         }
         if (endurance) {
             TextView activity = text(enduranceDayLabel(appointments), 8, navy);
             activity.setGravity(Gravity.CENTER);
             activity.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
-            activity.setBackground(surface(coral, 6, 0, Color.TRANSPARENT));
-            LinearLayout.LayoutParams activityParams = new LinearLayout.LayoutParams(-1, workoutDay ? dp(19) : dp(40));
-            activityParams.leftMargin = dp(1); activityParams.rightMargin = dp(1);
+            LinearLayout.LayoutParams activityParams = new LinearLayout.LayoutParams(-1, workoutDay ? dp(12) : dp(24));
             tile.addView(activity, activityParams);
+        }
+        if (workoutDay || endurance) {
+            LinearLayout icons = new LinearLayout(this);
+            icons.setOrientation(LinearLayout.VERTICAL);
+            icons.setGravity(Gravity.CENTER);
+            // When both are booked, endurance stays above the workout mark as agreed.
+            if (endurance) icons.addView(homeCalendarMarker(R.drawable.ic_nav_endurance, "Scheduled endurance"),
+                    new LinearLayout.LayoutParams(dp(25), dp(15)));
+            if (workoutDay) {
+                LinearLayout.LayoutParams markerParams = new LinearLayout.LayoutParams(dp(25), dp(15));
+                markerParams.topMargin = endurance ? dp(1) : 0;
+                icons.addView(homeCalendarMarker(R.drawable.ic_nav_workouts, "Scheduled workout"), markerParams);
+            }
+            tile.addView(icons, new LinearLayout.LayoutParams(-1, 0, 1));
         }
         String state = workoutDay ? homeFocusForDay(dayIndex, schedule) + " workout" : confirmed ? "Rest Day" : "Open";
         if (endurance) state += ", " + enduranceDayLabel(appointments);
         tile.setContentDescription(weekDays[dayIndex] + " " + homeWeekDate(date, 0) + ", " + state);
         return tile;
+    }
+
+    /** Small schedule marker with the approved 1.5dp coral-orange outline. */
+    private FrameLayout homeCalendarMarker(int drawable, String description) {
+        FrameLayout marker = new FrameLayout(this);
+        GradientDrawable shape = new GradientDrawable();
+        shape.setColor(Color.rgb(16, 35, 57));
+        shape.setCornerRadius(dp(8));
+        shape.setStroke(Math.max(1, Math.round(1.5f * getResources().getDisplayMetrics().density)), coral);
+        marker.setBackground(shape);
+        marker.setContentDescription(description);
+        ImageView icon = new ImageView(this);
+        icon.setImageResource(drawable);
+        icon.setImageTintList(ColorStateList.valueOf(mint));
+        icon.setPadding(dp(4), dp(2), dp(4), dp(2));
+        marker.addView(icon, new FrameLayout.LayoutParams(-1, -1));
+        return marker;
     }
 
     private String enduranceDayLabel(List<SchedulerStore.Appointment> appointments) {
@@ -2987,7 +3022,20 @@ public final class MainActivity extends FragmentActivity {
     }
 
     private void showPlans() {
+        homeShortcutPlanReady = false;
         showCoachHeroWorkout();
+    }
+
+    /** Home is a shortcut to the already-built plan, not a restart of the planning wizard. */
+    private void openHomeNextWorkout() {
+        if (session.isEmpty()) restoreSavedPlan();
+        if (session.isEmpty()) {
+            toast("Build a workout plan first.");
+            showPlans();
+            return;
+        }
+        homeShortcutPlanReady = true;
+        showPlanReady();
     }
 
     /**
@@ -3754,11 +3802,16 @@ public final class MainActivity extends FragmentActivity {
         tile.setClickable(true);
         tile.setFocusable(true);
         tile.setContentDescription((selected ? "Selected training area: " : "Choose training area: ") + targetLabel(choice));
-        tile.setBackground(surface(Color.WHITE, 18, selected ? 2 : 1, selected ? mint : Color.rgb(220, 229, 239)));
+        tile.setBackground(surface(Color.WHITE, 18, selected ? 3 : 1, selected ? mint : Color.rgb(220, 229, 239)));
+        // Keep the rounded selection frame visible at every edge; source imagery lives in
+        // its own inset, rounded panel rather than painting flush across the outer card.
+        int borderInset = dp(selected ? 4 : 1);
+        tile.setPadding(borderInset, borderInset, borderInset, borderInset);
         tile.setClipToOutline(true);
         elevatePlanSurface(tile, selected);
         FrameLayout imageArea = new FrameLayout(this);
-        imageArea.setBackgroundColor(Color.rgb(248, 250, 253));
+        imageArea.setBackground(surface(Color.rgb(248, 250, 253), 13, 0, Color.TRANSPARENT));
+        imageArea.setClipToOutline(true);
         int targetIndex = 0;
         for (int index = 0; index < WIZARD_TARGETS.length; index++) if (WIZARD_TARGETS[index].equals(choice)) targetIndex = index;
         // One consistent anatomy atlas: the selected muscle group is coral-red on the same
@@ -4761,7 +4814,8 @@ public final class MainActivity extends FragmentActivity {
         addPlanButton(body, start);
         gap(body, 10);
         Button scheduleLater = secondary("Schedule for later");
-        scheduleLater.setOnClickListener(view -> {
+        if (homeShortcutPlanReady) disableHomeShortcutAction(scheduleLater);
+        else scheduleLater.setOnClickListener(view -> {
             persistCurrentWeekSchedule();
             savePlanWithReminder();
             toast("Your " + planSchedule() + " is saved on this device.");
@@ -4769,8 +4823,25 @@ public final class MainActivity extends FragmentActivity {
         addButton(body, scheduleLater);
         gap(body, 10);
         Button edit = lightAction("Edit plan");
-        edit.setOnClickListener(view -> showExerciseSelection());
+        if (homeShortcutPlanReady) disableHomeShortcutAction(edit);
+        else edit.setOnClickListener(view -> showExerciseSelection());
         addButton(body, edit);
+        if (homeShortcutPlanReady) {
+            TextView shortcut = text("Opened from Home shortcut", 12, muted);
+            shortcut.setGravity(Gravity.CENTER);
+            LinearLayout.LayoutParams shortcutParams = new LinearLayout.LayoutParams(-1, dp(30));
+            shortcutParams.topMargin = dp(6);
+            body.addView(shortcut, shortcutParams);
+        }
+    }
+
+    /** Disabled choices stay visually present on the Home shortcut without changing the saved plan. */
+    private void disableHomeShortcutAction(Button button) {
+        button.setEnabled(false);
+        button.setClickable(false);
+        button.setTextColor(Color.rgb(143, 156, 175));
+        button.setAlpha(.82f);
+        button.setBackground(surface(Color.rgb(52, 65, 84), 15, 1, Color.rgb(72, 87, 108)));
     }
 
     private void addWeeklySessionPicker(LinearLayout body) {
