@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 78,
-  "versionName": "5.36",
-  "publishedAt": "2026-10-20T20:00:00Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.36/app-release.apk",
-  "sha256": "9a69ef00abc6c5375c2c7e25b4f6063428da689ce73d90c0ef6ec22232ece5a6",
-  "sizeBytes": 127161247,
-  "notes": "Canvas-locked Mintfoil badge art and restored audible coach dialogue with Android text-to-speech fallback."
+  "versionCode": 79,
+  "versionName": "5.37",
+  "publishedAt": "2026-10-21T13:44:31Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.37/app-release.apk",
+  "sha256": "8086ace3e3c96bc0fa4359c103068a685ed4a948d1acd8ab4725b7b8b52a3fc0",
+  "sizeBytes": 182318213,
+  "notes": "Complete shared neutral Strength Level-style artwork for every catalog exercise, correctly assigned by equipment and training area."
 }
