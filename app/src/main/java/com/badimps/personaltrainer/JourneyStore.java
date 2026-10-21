@@ -116,6 +116,24 @@ public final class JourneyStore {
         return output;
     }
 
+    /** True when at least one guided workout or endurance session was completed on this local date. */
+    public static boolean hasCompletedWorkoutOnDate(Context context, Calendar date) {
+        if (date == null) return false;
+        Calendar start = (Calendar) date.clone();
+        start.set(Calendar.HOUR_OF_DAY, 0);
+        start.set(Calendar.MINUTE, 0);
+        start.set(Calendar.SECOND, 0);
+        start.set(Calendar.MILLISECOND, 0);
+        Calendar end = (Calendar) start.clone();
+        end.add(Calendar.DAY_OF_YEAR, 1);
+        long from = start.getTimeInMillis();
+        long until = end.getTimeInMillis();
+        for (WorkoutRecord record : workoutRecords(context)) {
+            if (record.timestamp >= from && record.timestamp < until) return true;
+        }
+        return false;
+    }
+
     /** Removes exactly one completed-workout record; no schedules, profile, or fuel data are touched. */
     public static void removeWorkout(Context context, long timestamp) {
         List<String> events = lines(preferences(context).getString("workouts", ""));

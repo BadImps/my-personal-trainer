@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 80,
-  "versionName": "5.38",
-  "publishedAt": "2026-10-21T17:05:00Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.38/app-release.apk",
-  "sha256": "d48b2c18fe423c32d2fb7292d2abb9b41f72869dcf0a29886f24a12cd1b60f43",
-  "sizeBytes": 192194812,
-  "notes": "Persistent guided workouts, custom and untimed sessions, refined cooldown controls, expanded workout planning and nutrition, plus unified neutral Strength Level exercise artwork."
+  "versionCode": 81,
+  "versionName": "5.39",
+  "publishedAt": "2026-10-21T23:17:51Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.39/app-release.apk",
+  "sha256": "5de3101eb206650c3191f1fe7843f265510bab5414a47ec5f8b9d1d09acdc01d",
+  "sizeBytes": 194686757,
+  "notes": "Human coach cues for all six selected coaches, synchronized guided-workout audio, completed-calendar refinements, and the current guided-workout improvements."
 }

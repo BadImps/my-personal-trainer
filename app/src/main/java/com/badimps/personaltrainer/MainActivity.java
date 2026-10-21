@@ -1,5 +1,6 @@
 package com.badimps.personaltrainer;
 
+import android.animation.ValueAnimator;
 import android.app.AlertDialog;
 import android.app.Dialog;
 import android.Manifest;
@@ -10,7 +11,11 @@ import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
+import android.graphics.Canvas;
 import android.graphics.Matrix;
+import android.graphics.Paint;
+import android.graphics.Rect;
+import android.graphics.RectF;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
@@ -36,6 +41,7 @@ import android.view.ViewTreeObserver;
 import android.view.Window;
 import android.view.WindowInsets;
 import android.view.WindowManager;
+import android.view.animation.OvershootInterpolator;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
@@ -132,6 +138,8 @@ public final class MainActivity extends FragmentActivity {
     private List<Coach.Exercise> selectedExercises = new ArrayList<>();
     private String selectionKey = "";
     private TextToSpeech voice;
+    /** Recorded coach cues are used first; Android TTS remains the dynamic-text fallback. */
+    private CoachAudioClips coachAudio;
     private CountDownTimer restTimer;
     private final Handler workoutHandler = new Handler(Looper.getMainLooper());
     /** Runs when an utterance actually reaches Android's audio pipeline. */
@@ -257,6 +265,7 @@ public final class MainActivity extends FragmentActivity {
         // before content is created.
         setTheme(R.style.AppTheme);
         super.onCreate(state);
+        coachAudio = new CoachAudioClips(this);
         // Keep editable content inside the resized visible area when the IME is open.
         // The focused-field helper below also asks nested scroll containers to reveal it.
         getWindow().setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
@@ -2529,7 +2538,7 @@ public final class MainActivity extends FragmentActivity {
         WeeklyScheduleStore.Schedule savedWeek = homeWeekSchedule(0, homeWeek, homeWeekConfirmed);
         for (int i = 0; i < weekDays.length; i++) {
             Calendar date = homeDate(homeWeek, i);
-            LinearLayout day = homeScheduleDayTile(date, i, savedWeek.workoutDays[i], homeWeekConfirmed, savedWeek, isToday(homeWeek, i));
+            View day = homeScheduleDayTile(date, i, savedWeek.workoutDays[i], homeWeekConfirmed, savedWeek, isToday(homeWeek, i));
             LinearLayout.LayoutParams dayParams = new LinearLayout.LayoutParams(0, dp(112), 1);
             if (i > 0) dayParams.leftMargin = dp(4);
             days.addView(day, dayParams);
@@ -2701,7 +2710,7 @@ public final class MainActivity extends FragmentActivity {
             boolean workoutDay = homeWeekConfirmed && homeSchedule.workoutDays[i];
             boolean isToday = homeWeekOffset == 0 && isToday(homeWeekStart, i);
             Calendar date = homeDate(homeWeekStart, i);
-            LinearLayout day = homeScheduleDayTile(date, i, workoutDay, homeWeekConfirmed, homeSchedule, isToday);
+            View day = homeScheduleDayTile(date, i, workoutDay, homeWeekConfirmed, homeSchedule, isToday);
             LinearLayout.LayoutParams dayParams = new LinearLayout.LayoutParams(0, dp(90), 1);
             dayParams.rightMargin = i == weekDays.length - 1 ? 0 : dp(3);
             weekRow.addView(day, dayParams);
@@ -3044,7 +3053,7 @@ public final class MainActivity extends FragmentActivity {
     }
 
     /** Compact split tiles make a same-day strength plan and endurance booking immediately legible. */
-    private LinearLayout homeScheduleDayTile(Calendar date, int dayIndex, boolean workoutDay, boolean confirmed,
+    private View homeScheduleDayTile(Calendar date, int dayIndex, boolean workoutDay, boolean confirmed,
                                                WeeklyScheduleStore.Schedule schedule, boolean today) {
         List<SchedulerStore.Appointment> appointments = SchedulerStore.onDate(this, date);
         boolean endurance = !appointments.isEmpty();
@@ -3093,7 +3102,36 @@ public final class MainActivity extends FragmentActivity {
         String state = workoutDay ? homeFocusForDay(dayIndex, schedule) + " workout" : confirmed ? "Rest Day" : "Open";
         if (endurance) state += ", " + enduranceDayLabel(appointments);
         tile.setContentDescription(weekDays[dayIndex] + " " + homeWeekDate(date, 0) + ", " + state);
-        return tile;
+        if (!JourneyStore.hasCompletedWorkoutOnDate(this, date)) return tile;
+        FrameLayout completedDay = new FrameLayout(this);
+        completedDay.addView(tile, new FrameLayout.LayoutParams(-1, -1));
+        TextView ribbon = heading("DONE", 7, Color.WHITE);
+        ribbon.setGravity(Gravity.CENTER);
+        ribbon.setLetterSpacing(.08f);
+        ribbon.setBackground(surface(coral, 5, 1, Color.rgb(255, 159, 146)));
+        ribbon.setContentDescription("Workout completed");
+        FrameLayout.LayoutParams ribbonParams = new FrameLayout.LayoutParams(dp(38), dp(17), Gravity.TOP | Gravity.RIGHT);
+        ribbonParams.topMargin = dp(2);
+        ribbonParams.rightMargin = dp(2);
+        completedDay.addView(ribbon, ribbonParams);
+        completedDay.setContentDescription(tile.getContentDescription() + ", completed");
+        return completedDay;
+    }
+
+    /** Past local calendar dates are historical records and cannot be edited or rescheduled. */
+    private boolean isPastCalendarDate(Calendar date) {
+        if (date == null) return false;
+        Calendar candidate = (Calendar) date.clone();
+        candidate.set(Calendar.HOUR_OF_DAY, 0);
+        candidate.set(Calendar.MINUTE, 0);
+        candidate.set(Calendar.SECOND, 0);
+        candidate.set(Calendar.MILLISECOND, 0);
+        Calendar today = Calendar.getInstance();
+        today.set(Calendar.HOUR_OF_DAY, 0);
+        today.set(Calendar.MINUTE, 0);
+        today.set(Calendar.SECOND, 0);
+        today.set(Calendar.MILLISECOND, 0);
+        return candidate.before(today);
     }
 
     private GradientDrawable homeScheduleDaySurface(int fill, boolean scheduled, boolean today) {
@@ -3351,6 +3389,18 @@ public final class MainActivity extends FragmentActivity {
             return;
         }
         if ("completed".equals(homeSession.state)) {
+            Calendar today = Calendar.getInstance();
+            for (JourneyStore.WorkoutRecord record : JourneyStore.workouts(this)) {
+                Calendar completed = Calendar.getInstance();
+                completed.setTimeInMillis(record.timestamp);
+                if (completed.get(Calendar.YEAR) == today.get(Calendar.YEAR)
+                        && completed.get(Calendar.DAY_OF_YEAR) == today.get(Calendar.DAY_OF_YEAR)
+                        && EnduranceHistoryStore.load(this, record.timestamp) == null) {
+                    showWorkoutSetTimeDetails(record, SetTimeStore.loadWorkoutDetails(this, record.timestamp));
+                    return;
+                }
+            }
+            // A history item may have been removed after Home was rendered; keep the fallback useful.
             showProgress();
             return;
         }
@@ -3686,6 +3736,7 @@ public final class MainActivity extends FragmentActivity {
         for (int i = 0; i < weekDays.length; i++) {
             final int dayIndex = i;
             boolean selected = weekly ? weeklyWorkoutDays[i] : dailyScheduledDay == i;
+            boolean historical = isPastCalendarDate(selectedWeekDate(i));
             LinearLayout day = new LinearLayout(this); day.setOrientation(LinearLayout.VERTICAL); day.setGravity(Gravity.CENTER); day.setClickable(true); day.setFocusable(true);
             day.setPadding(dp(1), dp(4), dp(1), dp(2));
             day.setBackgroundColor(Color.TRANSPARENT);
@@ -3695,6 +3746,7 @@ public final class MainActivity extends FragmentActivity {
             View dot = new View(this); dot.setBackground(surface(selected ? mint : Color.rgb(66, 91, 121), 99, selected ? 2 : 1, selected ? Color.rgb(159, 255, 231) : Color.rgb(101, 128, 159)));
             LinearLayout.LayoutParams dotParams = new LinearLayout.LayoutParams(dp(selected ? 18 : 13), dp(selected ? 18 : 13)); dotParams.gravity = Gravity.CENTER; dotParams.topMargin = dp(2); day.addView(dot, dotParams);
             day.setOnClickListener(view -> {
+                if (isPastCalendarDate(selectedWeekDate(dayIndex))) { toast("Past dates are locked and cannot be changed."); return; }
                 if (weekly) {
                     weeklyWorkoutDays[dayIndex] = !weeklyWorkoutDays[dayIndex];
                     if (weeklyWorkoutDays[dayIndex] && weeklyDayTargets.get(dayIndex).isEmpty()) weeklyDayTargets.get(dayIndex).addAll(selectedTargets);
@@ -3702,6 +3754,7 @@ public final class MainActivity extends FragmentActivity {
                 } else { dailyScheduledDay = dayIndex; }
                 refreshCurrentPageKeepingScroll(this::showPlanSchedule);
             });
+            day.setAlpha(historical ? .52f : 1f);
             LinearLayout.LayoutParams dayParams = new LinearLayout.LayoutParams(0, dp(65), 1); if (i > 0) dayParams.leftMargin = dp(2);
             days.addView(day, dayParams);
         }
@@ -3714,6 +3767,7 @@ public final class MainActivity extends FragmentActivity {
         for (int i = 0; i < weekDays.length; i++) {
             final int dayIndex = i;
             boolean selected = weekly ? weeklyWorkoutDays[i] : dailyScheduledDay == i;
+            boolean historical = isPastCalendarDate(selectedWeekDate(i));
             String scheduledFocus = selected && weekly && !weeklyDayTargets.get(i).isEmpty()
                     ? focusSummary(weeklyDayTargets.get(i)) : selected
                     ? focusSummary(selectedTargets) : "Rest";
@@ -3730,10 +3784,12 @@ public final class MainActivity extends FragmentActivity {
             TextView label = heading(scheduledFocus, 9, selected ? Color.WHITE : Color.rgb(180, 200, 220)); label.setGravity(Gravity.CENTER); label.setSingleLine(true); detail.addView(label, new LinearLayout.LayoutParams(-1, dp(19)));
             TextView minutes = text(selected ? "45 min" : "Recover", 8, selected ? Color.rgb(180, 235, 222) : Color.rgb(132, 159, 188)); minutes.setGravity(Gravity.CENTER); detail.addView(minutes, new LinearLayout.LayoutParams(-1, dp(17)));
             detail.setOnClickListener(view -> {
+                if (isPastCalendarDate(selectedWeekDate(dayIndex))) { toast("Past dates are locked and cannot be changed."); return; }
                 if (weekly) { weeklyWorkoutDays[dayIndex] = !weeklyWorkoutDays[dayIndex]; if (weeklyWorkoutDays[dayIndex] && weeklyDayTargets.get(dayIndex).isEmpty()) weeklyDayTargets.get(dayIndex).addAll(selectedTargets); activeScheduleDay = dayIndex; syncTrainingDays(); persistCurrentWeekSchedule(); }
                 else { dailyScheduledDay = dayIndex; }
                 refreshCurrentPageKeepingScroll(this::showPlanSchedule);
             });
+            detail.setAlpha(historical ? .52f : 1f);
             LinearLayout.LayoutParams detailParams = new LinearLayout.LayoutParams(0, dp(68), 1); if (i > 0) detailParams.leftMargin = dp(3); cards.addView(detail, detailParams);
         }
         LinearLayout.LayoutParams cardsParams = new LinearLayout.LayoutParams(-1, dp(68)); cardsParams.topMargin = dp(12); calendar.addView(cards, cardsParams);
@@ -3787,7 +3843,9 @@ public final class MainActivity extends FragmentActivity {
             boolean active = activeScheduleDay == i;
             Button day = action(scheduleDayLabel(i) + "\n" + focusSummary(weeklyDayTargets.get(i)), active ? mint : Color.rgb(234, 240, 246), active ? navy : ink);
             day.setTextSize(10);
-            day.setOnClickListener(view -> { activeScheduleDay = dayIndex; syncPrimaryTarget(); refreshCurrentPageKeepingScroll(this::showPlanSchedule); });
+            boolean historical = isPastCalendarDate(selectedWeekDate(i));
+            day.setAlpha(historical ? .52f : 1f);
+            day.setOnClickListener(view -> { if (isPastCalendarDate(selectedWeekDate(dayIndex))) { toast("Past dates are locked and cannot be changed."); return; } activeScheduleDay = dayIndex; syncPrimaryTarget(); refreshCurrentPageKeepingScroll(this::showPlanSchedule); });
             LinearLayout.LayoutParams dayParams = new LinearLayout.LayoutParams(dp(116), dp(54));
             dayParams.rightMargin = dp(7);
             dayRow.addView(day, dayParams);
@@ -3805,6 +3863,7 @@ public final class MainActivity extends FragmentActivity {
             Button choiceButton = action((selected ? "✓  " : "") + targetLabel(choice), selected ? mint : navyPanel, selected ? navy : mint);
             choiceButton.setTextSize(11);
             choiceButton.setOnClickListener(view -> {
+                if (isPastCalendarDate(selectedWeekDate(activeScheduleDay))) { toast("Past dates are locked and cannot be changed."); return; }
                 List<String> today = weeklyDayTargets.get(activeScheduleDay);
                 if (today.contains(choice)) {
                     if (today.size() == 1) { toast("Keep one training area on a workout day."); return; }
@@ -3858,6 +3917,7 @@ public final class MainActivity extends FragmentActivity {
         for (int i = 0; i < weekDays.length; i++) {
             final int dayIndex = i;
             boolean selected = weekly ? weeklyWorkoutDays[i] : dailyScheduledDay == i;
+            boolean historical = isPastCalendarDate(selectedWeekDate(i));
             LinearLayout day = new LinearLayout(this);
             day.setOrientation(LinearLayout.VERTICAL);
             day.setGravity(Gravity.CENTER);
@@ -3875,6 +3935,7 @@ public final class MainActivity extends FragmentActivity {
             day.addView(date, new LinearLayout.LayoutParams(-1, dp(21)));
             day.addView(state, new LinearLayout.LayoutParams(-1, dp(16)));
             day.setOnClickListener(view -> {
+                if (isPastCalendarDate(selectedWeekDate(dayIndex))) { toast("Past dates are locked and cannot be changed."); return; }
                 if (weekly) {
                     weeklyWorkoutDays[dayIndex] = !weeklyWorkoutDays[dayIndex];
                     if (weeklyWorkoutDays[dayIndex] && weeklyDayTargets.get(dayIndex).isEmpty()) {
@@ -3888,6 +3949,7 @@ public final class MainActivity extends FragmentActivity {
                 }
                 refreshPlanKeepingScroll(this::showPlanSchedule);
             });
+            day.setAlpha(historical ? .52f : 1f);
             LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(58), 1);
             params.rightMargin = i == weekDays.length - 1 ? 0 : dp(3);
             days.addView(day, params);
@@ -3934,13 +3996,17 @@ public final class MainActivity extends FragmentActivity {
 
     private void applyTrainingDayCount(int count) {
         boolean[] defaultRhythm = {true, false, true, false, true, false, false};
-        for (int i = 0; i < weeklyWorkoutDays.length; i++) weeklyWorkoutDays[i] = false;
         int selected = 0;
+        for (int i = 0; i < weeklyWorkoutDays.length; i++) {
+            if (isPastCalendarDate(selectedWeekDate(i))) {
+                if (weeklyWorkoutDays[i]) selected++;
+            } else weeklyWorkoutDays[i] = false;
+        }
         for (int i = 0; i < defaultRhythm.length && selected < count; i++) {
-            if (defaultRhythm[i]) { weeklyWorkoutDays[i] = true; selected++; }
+            if (!isPastCalendarDate(selectedWeekDate(i)) && defaultRhythm[i]) { weeklyWorkoutDays[i] = true; selected++; }
         }
         for (int i = 0; i < weeklyWorkoutDays.length && selected < count; i++) {
-            if (!weeklyWorkoutDays[i]) { weeklyWorkoutDays[i] = true; selected++; }
+            if (!isPastCalendarDate(selectedWeekDate(i)) && !weeklyWorkoutDays[i]) { weeklyWorkoutDays[i] = true; selected++; }
         }
         syncTrainingDays();
         initialisePlanSelections();
@@ -4089,7 +4155,9 @@ public final class MainActivity extends FragmentActivity {
             day.setTextSize(10);
             day.setGravity(Gravity.CENTER);
             day.setContentDescription(scheduleDayLabel(i) + ", " + focusSummary(weeklyDayTargets.get(i)) + (active ? ", currently editing" : ", edit this day"));
-            day.setOnClickListener(view -> { activeScheduleDay = dayIndex; syncPrimaryTarget(); refreshCurrentPageKeepingScroll(this::showPlanTarget); });
+            boolean historical = isPastCalendarDate(selectedWeekDate(i));
+            day.setAlpha(historical ? .52f : 1f);
+            day.setOnClickListener(view -> { if (isPastCalendarDate(selectedWeekDate(dayIndex))) { toast("Past dates are locked and cannot be changed."); return; } activeScheduleDay = dayIndex; syncPrimaryTarget(); refreshCurrentPageKeepingScroll(this::showPlanTarget); });
             LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(dp(106), dp(52));
             params.rightMargin = dp(7);
             days.addView(day, params);
@@ -4100,6 +4168,10 @@ public final class MainActivity extends FragmentActivity {
     }
 
     private void toggleActiveTarget(String choice) {
+        if ("Weekly".equals(planMode) && isPastCalendarDate(selectedWeekDate(activeScheduleDay))) {
+            toast("Past dates are locked and cannot be changed.");
+            return;
+        }
         List<String> focuses = activeTargets();
         if (focuses.contains(choice)) {
             focuses.remove(choice);
@@ -5437,16 +5509,15 @@ public final class MainActivity extends FragmentActivity {
                     row.setContentDescription(record.target + ", completed " + dayFormat.format(record.timestamp)
                             + ", " + enduranceSummary(endurance) + ". Open completed route.");
                     row.setOnClickListener(view -> showEnduranceSessionDetails(endurance));
-                } else if (timing != null && timing.totalActiveMillis > 0L) {
+                } else {
                     row.setClickable(true);
                     row.setFocusable(true);
+                    String timingDescription = timing != null && timing.totalActiveMillis > 0L
+                            ? ", " + WorkoutTiming.formatElapsedMillis(timing.totalActiveMillis) + " active set time"
+                            : "";
                     row.setContentDescription(record.target + ", completed " + dayFormat.format(record.timestamp)
-                            + ", " + WorkoutTiming.formatElapsedMillis(timing.totalActiveMillis)
-                            + " active set time. Open set-time leaderboard.");
+                            + timingDescription + ". Open completed workout details.");
                     row.setOnClickListener(view -> showWorkoutSetTimeDetails(record, timing));
-                } else {
-                    row.setContentDescription(record.target + ", completed " + dayFormat.format(record.timestamp)
-                            + ", " + record.minutes + " guided minutes.");
                 }
                 LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(-1, -2);
                 rowParams.topMargin = dp(7);
@@ -5566,6 +5637,11 @@ public final class MainActivity extends FragmentActivity {
                     item.setFocusable(true);
                     item.setContentDescription("Open " + endurance.mode + " route completed " + timestamp.format(record.timestamp));
                     item.setOnClickListener(view -> showEnduranceSessionDetails(endurance));
+                } else {
+                    item.setClickable(true);
+                    item.setFocusable(true);
+                    item.setContentDescription("Open full details for " + record.target + " completed " + timestamp.format(record.timestamp));
+                    item.setOnClickListener(view -> showWorkoutSetTimeDetails(record, details));
                 }
                 Button delete = action("Delete", paper, coral);
                 delete.setTextSize(12);
@@ -5733,25 +5809,148 @@ public final class MainActivity extends FragmentActivity {
     /** Detailed progress record for a normally completed guided workout only. */
     private void showWorkoutSetTimeDetails(JourneyStore.WorkoutRecord record, SetTimeStore.WorkoutSummary timing) {
         LinearLayout body = appPage("Progress");
-        String completed = new SimpleDateFormat("EEEE, MMMM d", Locale.getDefault()).format(record.timestamp);
-        title(body, "SET-TIME PERFORMANCE", record.target,
-                "Completed " + completed + ". Each exercise is ranked from fastest to slowest. Rest and cooldown time are never included in these totals.");
+        String completed = new SimpleDateFormat("EEEE, MMMM d · h:mm a", Locale.getDefault()).format(record.timestamp);
+        int exerciseCount = timing == null ? 0 : timing.exerciseSummaries.size();
+        int setCount = 0;
+        if (timing != null) for (SetTimeStore.ExerciseSummary summary : timing.exerciseSummaries) setCount += summary.setEntries.size();
+        long guidedMillis = Math.max(1L, record.minutes) * 60_000L;
+        long activeMillis = timing == null ? 0L : timing.totalActiveMillis;
+        long nonActiveMillis = Math.max(0L, guidedMillis - activeMillis);
+        long fastestSetMillis = Long.MAX_VALUE;
+        if (timing != null) {
+            for (SetTimeStore.ExerciseSummary summary : timing.exerciseSummaries) {
+                for (SetTimeStore.SetEntry entry : summary.setEntries) fastestSetMillis = Math.min(fastestSetMillis, entry.durationMillis);
+            }
+        }
+        int activeShare = activeMillis <= 0L ? 0 : (int) Math.round(Math.min(1d, activeMillis / (double) guidedMillis) * 100d);
+
+        title(body, "WORKOUT REPORT", record.target,
+                completed + "  •  " + record.minutes + " min guided workout");
 
         LinearLayout overview = card();
-        overview.addView(heading("SESSION TOTAL", 11, muted));
-        overview.addView(heading(WorkoutTiming.formatElapsedMillis(timing.totalActiveMillis), 28, ink));
-        overview.addView(text(timing.exerciseSummaries.size() + " completed exercise"
-                + (timing.exerciseSummaries.size() == 1 ? "" : "s") + "  •  "
-                + record.minutes + " guided min", 14, muted));
+        overview.addView(heading("TOTAL GUIDED WORKOUT", 11, muted));
+        overview.addView(heading(record.minutes + " min", 34, ink));
+        overview.addView(text(exerciseCount + " completed exercise" + (exerciseCount == 1 ? "" : "s")
+                + "  •  " + setCount + " completed set" + (setCount == 1 ? "" : "s"), 14, muted));
+        gap(overview, 12);
+        View rule = new View(this);
+        rule.setBackgroundColor(cardLine);
+        overview.addView(rule, new LinearLayout.LayoutParams(-1, dp(1)));
+        gap(overview, 10);
+        LinearLayout kpis = new LinearLayout(this);
+        kpis.setGravity(Gravity.CENTER_VERTICAL);
+        View exercisesKpi = addReportKpi(kpis, R.drawable.ic_report_exercises, String.valueOf(exerciseCount), "Exercises");
+        addReportKpiDivider(kpis);
+        View setsKpi = addReportKpi(kpis, R.drawable.ic_report_sets, String.valueOf(setCount), "Sets");
+        addReportKpiDivider(kpis);
+        View activeKpi = addReportKpi(kpis, R.drawable.ic_report_stopwatch,
+                activeMillis > 0L ? WorkoutTiming.formatElapsedMillis(activeMillis) : "—", "Active");
+        overview.addView(kpis);
         body.addView(overview);
 
-        if (timing.exerciseSummaries.isEmpty()) {
-            gap(body, 12);
-            body.addView(text("No set-time details were saved for this earlier workout.", 14, muted));
+        gap(body, 12);
+        LinearLayout breakdown = card();
+        breakdown.addView(heading("TIME BREAKDOWN", 11, muted));
+        gap(breakdown, 8);
+        LinearLayout breakdownContent = new LinearLayout(this);
+        breakdownContent.setGravity(Gravity.CENTER_VERTICAL);
+        WorkoutBreakdownView chart = new WorkoutBreakdownView(this, activeShare, record.minutes);
+        breakdownContent.addView(chart, new LinearLayout.LayoutParams(dp(126), dp(126)));
+        LinearLayout breakdownCopy = new LinearLayout(this);
+        breakdownCopy.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams copyParams = new LinearLayout.LayoutParams(0, -2, 1);
+        copyParams.leftMargin = dp(14);
+        breakdownContent.addView(breakdownCopy, copyParams);
+        TextView activePercentView = addBreakdownMetric(breakdownCopy, mint,
+                reducedMotion ? activeShare + "%" : "0%", "Active work",
+                activeMillis > 0L ? WorkoutTiming.formatElapsedMillis(activeMillis) : "—");
+        TextView recoveryPercentView = addBreakdownMetric(breakdownCopy, Color.rgb(101, 124, 158),
+                reducedMotion ? Math.max(0, 100 - activeShare) + "%" : "100%",
+                "Recovery + transitions", activeMillis > 0L ? WorkoutTiming.formatElapsedMillis(nonActiveMillis) : "—");
+        gap(breakdownCopy, 6);
+        addWorkoutReportMetric(breakdownCopy, "Average set time", setCount > 0 ? WorkoutTiming.formatElapsedMillis(activeMillis / setCount) : "—");
+        addWorkoutReportMetric(breakdownCopy, "Fastest set", fastestSetMillis == Long.MAX_VALUE ? "—" : WorkoutTiming.formatElapsedMillis(fastestSetMillis));
+        breakdown.addView(breakdownContent);
+        body.addView(breakdown);
+
+        gap(body, 12);
+        LinearLayout energy = card();
+        energy.setClipChildren(false);
+        energy.setClipToPadding(false);
+        LinearLayout energyHeader = new LinearLayout(this);
+        energyHeader.setGravity(Gravity.CENTER_VERTICAL);
+        energyHeader.setClipChildren(false);
+        energyHeader.setClipToPadding(false);
+        energyHeader.addView(heading("POSSIBLE ENERGY USED", 11, muted),
+                new LinearLayout.LayoutParams(0, -2, 1));
+        FrameLayout energyIconShell = new FrameLayout(this);
+        FrameLayout energyBadge = new FrameLayout(this);
+        energyBadge.setBackground(surface(Color.rgb(220, 249, 241), 99, 1, Color.rgb(194, 239, 227)));
+        energyBadge.setElevation(dp(6));
+        ImageView energyIcon = new ImageView(this);
+        energyIcon.setImageResource(R.drawable.ic_report_energy);
+        energyIcon.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        energyIcon.setPadding(dp(9), dp(9), dp(9), dp(9));
+        energyIcon.setContentDescription("Possible energy used");
+        energyBadge.addView(energyIcon, new FrameLayout.LayoutParams(-1, -1));
+        FrameLayout.LayoutParams badgeParams = new FrameLayout.LayoutParams(dp(42), dp(42), Gravity.CENTER);
+        energyIconShell.addView(energyBadge, badgeParams);
+        LinearLayout.LayoutParams shellParams = new LinearLayout.LayoutParams(dp(52), dp(52));
+        shellParams.leftMargin = dp(10);
+        energyHeader.addView(energyIconShell, shellParams);
+        energy.addView(energyHeader);
+        View energyFill = null;
+        if (WeightStore.configured(this) && WeightStore.latest(this) > 0f) {
+            float kilograms = "lb".equalsIgnoreCase(WeightStore.unit(this))
+                    ? WeightStore.latest(this) * 0.45359237f : WeightStore.latest(this);
+            // 2024 Adult Compendium: varied-resistance training = 3.5 MET;
+            // vigorous free-weight/machine lifting = 6.0 MET. One MET is approximately
+            // 1 kcal/kg/hour, so a range is more honest than a single calorie claim.
+            int lowerCalories = Math.max(1, Math.round(3.5f * kilograms * record.minutes / 60f));
+            int upperCalories = Math.max(lowerCalories, Math.round(6.0f * kilograms * record.minutes / 60f));
+            energy.addView(heading(lowerCalories + "–" + upperCalories + " kcal", 27, ink));
+            gap(energy, 8);
+            LinearLayout energyBar = new LinearLayout(this);
+            energyBar.setBackground(surface(Color.rgb(221, 247, 239), 99, 0, Color.TRANSPARENT));
+            View measured = new View(this);
+            measured.setBackground(surface(mint, 99, 0, Color.TRANSPARENT));
+            energyFill = measured;
+            energyBar.addView(measured, new LinearLayout.LayoutParams(0, dp(10), .42f));
+            energyBar.addView(new View(this), new LinearLayout.LayoutParams(0, dp(10), .58f));
+            energy.addView(energyBar, new LinearLayout.LayoutParams(-1, dp(10)));
+            LinearLayout limits = new LinearLayout(this);
+            limits.addView(text(lowerCalories + " kcal", 11, muted), new LinearLayout.LayoutParams(0, -2, 1));
+            TextView upper = text(upperCalories + " kcal", 11, muted);
+            upper.setGravity(Gravity.END);
+            limits.addView(upper, new LinearLayout.LayoutParams(0, -2, 1));
+            energy.addView(limits);
+            gap(energy, 7);
+            energy.addView(text("Estimated from " + String.format(Locale.US, "%.1f kg", kilograms)
+                    + ", " + record.minutes + " guided minutes, and a 3.5–6.0 MET resistance-training range.", 13, muted));
         } else {
+            energy.addView(heading("Add your current weight", 21, ink));
+            energy.addView(text("A private weight entry is needed before the app can calculate a personalized calorie range.", 13, muted));
+        }
+        energy.addView(text("This is a broad activity estimate, not a measurement or nutrition allowance. Actual energy use varies with effort, rest, fitness, body composition, and exercise technique.", 12, muted));
+        body.addView(energy);
+        runWorkoutReportReveal(exercisesKpi, setsKpi, activeKpi,
+                chart, activePercentView, recoveryPercentView, activeShare);
+        runEnergyReportRevealWhenVisible(energy, energyBadge, energyFill);
+
+        if (timing == null || timing.exerciseSummaries.isEmpty()) {
+            gap(body, 12);
+            LinearLayout unavailable = card();
+            unavailable.addView(heading("SET DETAILS NOT AVAILABLE", 11, muted));
+            unavailable.addView(text("This workout predates detailed set recording. Its guided-workout duration remains in your completed history.", 14, muted));
+            body.addView(unavailable);
+        } else {
+            int exerciseNumber = 0;
             for (SetTimeStore.ExerciseSummary summary : timing.exerciseSummaries) {
+                exerciseNumber++;
                 gap(body, 12);
-                body.addView(heading(summary.exerciseName, 20, Color.WHITE));
+                body.addView(heading(exerciseNumber + ". " + summary.exerciseName, 20, Color.WHITE));
+                body.addView(text(summary.target + "  •  " + summary.setEntries.size() + " set"
+                        + (summary.setEntries.size() == 1 ? "" : "s"), 13, Color.rgb(202, 216, 234)));
                 addSetTimesCard(body, summary, true);
             }
         }
@@ -5759,6 +5958,194 @@ public final class MainActivity extends FragmentActivity {
         Button back = secondary("Back to Progress");
         back.setOnClickListener(view -> showProgress());
         addButton(body, back);
+    }
+
+    private View addReportKpi(LinearLayout row, int iconResource, String value, String label) {
+        LinearLayout item = new LinearLayout(this);
+        item.setOrientation(LinearLayout.VERTICAL);
+        item.setGravity(Gravity.CENTER_HORIZONTAL);
+        FrameLayout badge = new FrameLayout(this);
+        badge.setBackground(surface(Color.rgb(220, 249, 241), 99, 1, Color.rgb(194, 239, 227)));
+        badge.setElevation(dp(3));
+        ImageView icon = new ImageView(this);
+        icon.setImageResource(iconResource);
+        icon.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        icon.setPadding(dp(9), dp(9), dp(9), dp(9));
+        badge.addView(icon, new FrameLayout.LayoutParams(-1, -1));
+        item.addView(badge, new LinearLayout.LayoutParams(dp(42), dp(42)));
+        gap(item, 5);
+        TextView metric = heading(value, value.length() > 5 ? 14 : 20, ink);
+        metric.setGravity(Gravity.CENTER);
+        metric.setSingleLine(true);
+        item.addView(metric, new LinearLayout.LayoutParams(-1, dp(28)));
+        TextView caption = text(label, 11, muted);
+        caption.setGravity(Gravity.CENTER);
+        item.addView(caption, new LinearLayout.LayoutParams(-1, dp(22)));
+        row.addView(item, new LinearLayout.LayoutParams(0, -2, 1));
+        return badge;
+    }
+
+    private void addReportKpiDivider(LinearLayout row) {
+        View divider = new View(this);
+        divider.setBackgroundColor(cardLine);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(dp(1), dp(76));
+        params.leftMargin = dp(3);
+        params.rightMargin = dp(3);
+        row.addView(divider, params);
+    }
+
+    private TextView addBreakdownMetric(LinearLayout parent, int dotColor, String percent, String label, String elapsed) {
+        LinearLayout row = new LinearLayout(this);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        View dot = new View(this);
+        dot.setBackground(surface(dotColor, 99, 0, Color.TRANSPARENT));
+        LinearLayout.LayoutParams dotParams = new LinearLayout.LayoutParams(dp(12), dp(12));
+        dotParams.rightMargin = dp(12);
+        row.addView(dot, dotParams);
+        LinearLayout copy = new LinearLayout(this);
+        copy.setOrientation(LinearLayout.VERTICAL);
+        TextView percentValue = heading(percent, 17, ink);
+        copy.addView(percentValue);
+        copy.addView(text(label, 11, muted));
+        row.addView(copy, new LinearLayout.LayoutParams(0, -2, 1));
+        row.addView(heading(elapsed, 13, ink));
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
+        params.bottomMargin = dp(7);
+        parent.addView(row, params);
+        return percentValue;
+    }
+
+    /** Staged native reveal matching the approved report motion without delaying interaction. */
+    private void runWorkoutReportReveal(View exercises, View sets, View active,
+                                        WorkoutBreakdownView chart, TextView activePercent,
+                                        TextView recoveryPercent, int finalActivePercent) {
+        if (reducedMotion) {
+            chart.setDisplayedPercent(finalActivePercent);
+            activePercent.setText(finalActivePercent + "%");
+            recoveryPercent.setText(Math.max(0, 100 - finalActivePercent) + "%");
+            return;
+        }
+        View[] icons = {exercises, sets, active};
+        for (int i = 0; i < icons.length; i++) {
+            View icon = icons[i];
+            icon.setAlpha(0f);
+            icon.setScaleX(.55f);
+            icon.setScaleY(.55f);
+            icon.animate().cancel();
+            icon.animate().alpha(1f).scaleX(1f).scaleY(1f)
+                    .setStartDelay(110L + (i * 120L)).setDuration(360L)
+                    .setInterpolator(new OvershootInterpolator(1.35f)).start();
+        }
+        chart.postDelayed(() -> {
+            ValueAnimator sweep = ValueAnimator.ofInt(0, Math.max(0, Math.min(100, finalActivePercent)));
+            sweep.setDuration(1050L);
+            sweep.addUpdateListener(animation -> {
+                int activeValue = (Integer) animation.getAnimatedValue();
+                chart.setDisplayedPercent(activeValue);
+                activePercent.setText(activeValue + "%");
+                recoveryPercent.setText(Math.max(0, 100 - activeValue) + "%");
+            });
+            sweep.start();
+        }, 470L);
+    }
+
+    /** The energy reveal belongs to its tile, so it waits until that tile enters the viewport. */
+    private void runEnergyReportRevealWhenVisible(View energyCard, View energyIcon, View energyFill) {
+        if (reducedMotion) {
+            energyIcon.setAlpha(1f);
+            energyIcon.setScaleX(1f);
+            energyIcon.setScaleY(1f);
+            if (energyFill != null) energyFill.setScaleX(1f);
+            return;
+        }
+        energyIcon.setAlpha(0f);
+        energyIcon.setScaleX(.55f);
+        energyIcon.setScaleY(.55f);
+        if (energyFill != null) {
+            energyFill.setPivotX(0f);
+            energyFill.setScaleX(0f);
+        }
+        energyCard.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener() {
+            private boolean played;
+
+            @Override public boolean onPreDraw() {
+                if (played) return true;
+                Rect visible = new Rect();
+                boolean inFrame = energyCard.getGlobalVisibleRect(visible) && visible.height() >= dp(28);
+                if (!inFrame) return true;
+                played = true;
+                if (energyCard.getViewTreeObserver().isAlive()) {
+                    energyCard.getViewTreeObserver().removeOnPreDrawListener(this);
+                }
+                energyIcon.animate().cancel();
+                energyIcon.animate().alpha(1f).scaleX(1f).scaleY(1f)
+                        .setDuration(380L).setInterpolator(new OvershootInterpolator(1.35f)).start();
+                if (energyFill != null) {
+                    energyFill.animate().cancel();
+                    energyFill.animate().scaleX(1f).setStartDelay(180L).setDuration(920L).start();
+                }
+                return true;
+            }
+        });
+    }
+
+    /** Native, data-driven version of the approved Canvas Executive Report ring. */
+    private final class WorkoutBreakdownView extends View {
+        private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final int activePercent;
+        private final int minutes;
+        private int displayedPercent;
+
+        WorkoutBreakdownView(Context context, int activePercent, int minutes) {
+            super(context);
+            this.activePercent = Math.max(0, Math.min(100, activePercent));
+            this.minutes = minutes;
+            this.displayedPercent = reducedMotion ? this.activePercent : 0;
+            setContentDescription(activePercent + "% active work of " + minutes + " guided minutes");
+        }
+
+        void setDisplayedPercent(int percent) {
+            displayedPercent = Math.max(0, Math.min(activePercent, percent));
+            invalidate();
+        }
+
+        @Override protected void onDraw(Canvas canvas) {
+            super.onDraw(canvas);
+            float stroke = dp(16);
+            RectF arc = new RectF(stroke, stroke, getWidth() - stroke, getHeight() - stroke);
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(stroke);
+            paint.setStrokeCap(Paint.Cap.BUTT);
+            paint.setColor(Color.rgb(101, 124, 158));
+            canvas.drawArc(arc, -90, 360, false, paint);
+            paint.setColor(mint);
+            canvas.drawArc(arc, -90, 360f * displayedPercent / 100f, false, paint);
+            paint.setStyle(Paint.Style.FILL);
+            paint.setTextAlign(Paint.Align.CENTER);
+            paint.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
+            paint.setColor(ink);
+            paint.setTextSize(dp(18));
+            Paint.FontMetrics mainMetrics = paint.getFontMetrics();
+            float mainBaseline = getHeight() / 2f - dp(5) - (mainMetrics.ascent + mainMetrics.descent) / 2f;
+            canvas.drawText(minutes + " min", getWidth() / 2f, mainBaseline, paint);
+            paint.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL));
+            paint.setColor(muted);
+            paint.setTextSize(dp(10));
+            Paint.FontMetrics labelMetrics = paint.getFontMetrics();
+            float labelBaseline = getHeight() / 2f + dp(17) - (labelMetrics.ascent + labelMetrics.descent) / 2f;
+            canvas.drawText("Total", getWidth() / 2f, labelBaseline, paint);
+        }
+    }
+
+    private void addWorkoutReportMetric(LinearLayout report, String label, String value) {
+        LinearLayout row = new LinearLayout(this);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(0, dp(7), 0, dp(7));
+        row.addView(text(label, 13, muted), new LinearLayout.LayoutParams(0, -2, 1));
+        TextView result = heading(value, 14, ink);
+        result.setGravity(Gravity.RIGHT);
+        row.addView(result, new LinearLayout.LayoutParams(-2, -2));
+        report.addView(row);
     }
 
     private int plannedSessionsThisWeek() {
@@ -8369,6 +8756,7 @@ public final class MainActivity extends FragmentActivity {
     }
 
     private void speakCoach(String words, int queueMode, Runnable done) {
+        if (playRecordedCoachCue(words, queueMode, null, done)) return;
         if (!ttsReady || voice == null) {
             final long generation = speechGeneration;
             if (done != null) workoutHandler.postDelayed(() -> {
@@ -8381,6 +8769,7 @@ public final class MainActivity extends FragmentActivity {
 
     /** Speaks an utterance and runs {@code started} at the exact audio start event. */
     private void speakCoachWithStart(String words, int queueMode, Runnable started, Runnable done) {
+        if (playRecordedCoachCue(words, queueMode, started, done)) return;
         if (!ttsReady || voice == null) {
             final long generation = speechGeneration;
             workoutHandler.post(() -> {
@@ -8457,7 +8846,26 @@ public final class MainActivity extends FragmentActivity {
         speechGeneration++;
         speechStartCallbacks.clear();
         speechDoneCallbacks.clear();
+        if (coachAudio != null) coachAudio.stop();
         if (voice != null) voice.stop();
+    }
+
+    /** Uses the selected coach's human-rendered clips only where copy is an exact fixed cue. */
+    private boolean playRecordedCoachCue(String words, int queueMode, Runnable started, Runnable done) {
+        if (coachAudio == null || !CoachPreferences.usesVoice(profile().dialogueMode)) return false;
+        String cue = CoachAudioClips.cueFor(words);
+        if (cue == null) return false;
+        String coach = AccountStore.exists(this) ? profile().coachName : CoachPreferences.defaultCoach(selectedTrainer);
+        String coachId = coach == null ? "mia" : coach.toLowerCase(Locale.ROOT);
+        if (queueMode == TextToSpeech.QUEUE_FLUSH) {
+            speechGeneration++;
+            speechStartCallbacks.clear();
+            speechDoneCallbacks.clear();
+        }
+        final long generation = speechGeneration;
+        Runnable safeStart = started == null ? null : () -> { if (generation == speechGeneration) started.run(); };
+        Runnable safeDone = done == null ? null : () -> { if (generation == speechGeneration) done.run(); };
+        return coachAudio.play(coachId, cue, queueMode == TextToSpeech.QUEUE_FLUSH, safeStart, safeDone);
     }
 
     private void stopGuidedRuntime() {
@@ -9123,11 +9531,13 @@ public final class MainActivity extends FragmentActivity {
         LinearLayout days = new LinearLayout(this); days.setGravity(Gravity.CENTER_VERTICAL);
         for (int i = 0; i < weekDays.length; i++) {
             final int day = i; boolean selected = weekly ? enduranceWorkoutDays[i] : enduranceDailyDay == i;
+            boolean historical = isPastCalendarDate(selectedWeekDate(i));
             LinearLayout item = new LinearLayout(this); item.setOrientation(LinearLayout.VERTICAL); item.setGravity(Gravity.CENTER); item.setClickable(true); item.setFocusable(true); item.setPadding(dp(1), dp(4), dp(1), dp(2));
             item.addView(heading(weekDays[i], 8, selected ? mint : Color.rgb(180, 200, 220)), new LinearLayout.LayoutParams(-1, dp(16)));
             TextView date = heading(String.valueOf(selectedWeekDate(i).get(Calendar.DAY_OF_MONTH)), 14, Color.WHITE); date.setGravity(Gravity.CENTER); item.addView(date, new LinearLayout.LayoutParams(-1, dp(23)));
             View dot = new View(this); dot.setBackground(surface(selected ? mint : Color.rgb(66, 91, 121), 99, selected ? 2 : 1, selected ? Color.rgb(159, 255, 231) : Color.rgb(101, 128, 159))); LinearLayout.LayoutParams dotParams = new LinearLayout.LayoutParams(dp(selected ? 18 : 13), dp(selected ? 18 : 13)); dotParams.gravity = Gravity.CENTER; dotParams.topMargin = dp(2); item.addView(dot, dotParams);
-            item.setOnClickListener(v -> { if (weekly) enduranceWorkoutDays[day] = !enduranceWorkoutDays[day]; else enduranceDailyDay = day; refreshCurrentPageKeepingScroll(this::showEnduranceWizardSchedule); });
+            item.setOnClickListener(v -> { if (isPastCalendarDate(selectedWeekDate(day))) { toast("Past dates are locked and cannot be changed."); return; } if (weekly) enduranceWorkoutDays[day] = !enduranceWorkoutDays[day]; else enduranceDailyDay = day; refreshCurrentPageKeepingScroll(this::showEnduranceWizardSchedule); });
+            item.setAlpha(historical ? .52f : 1f);
             LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, dp(65), 1); if (i > 0) p.leftMargin = dp(2); days.addView(item, p);
         }
         LinearLayout.LayoutParams daysParams = new LinearLayout.LayoutParams(-1, dp(65)); daysParams.topMargin = dp(7); calendar.addView(days, daysParams);
@@ -9135,11 +9545,13 @@ public final class MainActivity extends FragmentActivity {
         LinearLayout cards = new LinearLayout(this); cards.setGravity(Gravity.CENTER_VERTICAL);
         for (int i = 0; i < weekDays.length; i++) {
             final int day = i; boolean selected = weekly ? enduranceWorkoutDays[i] : enduranceDailyDay == i;
+            boolean historical = isPastCalendarDate(selectedWeekDate(i));
             LinearLayout detail = new LinearLayout(this); detail.setOrientation(LinearLayout.VERTICAL); detail.setGravity(Gravity.CENTER); detail.setClickable(true); detail.setPadding(dp(2), dp(7), dp(2), dp(6)); detail.setBackground(surface(selected ? Color.rgb(18, 63, 81) : Color.rgb(20, 46, 72), 10, selected ? 1 : 0, selected ? mint : Color.TRANSPARENT));
             ImageView icon = new ImageView(this); icon.setImageResource(selected ? enduranceActivityIcon(enduranceWizardMode) : R.drawable.ic_home_rest); icon.setImageTintList(ColorStateList.valueOf(selected ? mint : Color.rgb(154, 178, 205))); icon.setScaleType(ImageView.ScaleType.CENTER_INSIDE); LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(-1, dp(22)); iconParams.leftMargin = dp(6); iconParams.rightMargin = dp(6); detail.addView(icon, iconParams);
             TextView label = heading(selected ? appointmentAbbreviation(enduranceWizardMode) : "Rest", 9, selected ? Color.WHITE : Color.rgb(180, 200, 220)); label.setGravity(Gravity.CENTER); label.setSingleLine(true); detail.addView(label, new LinearLayout.LayoutParams(-1, dp(19)));
             TextView note = text(selected ? "Planned" : "Recover", 8, selected ? Color.rgb(180, 235, 222) : Color.rgb(132, 159, 188)); note.setGravity(Gravity.CENTER); detail.addView(note, new LinearLayout.LayoutParams(-1, dp(17)));
-            detail.setOnClickListener(v -> { if (weekly) enduranceWorkoutDays[day] = !enduranceWorkoutDays[day]; else enduranceDailyDay = day; refreshCurrentPageKeepingScroll(this::showEnduranceWizardSchedule); });
+            detail.setOnClickListener(v -> { if (isPastCalendarDate(selectedWeekDate(day))) { toast("Past dates are locked and cannot be changed."); return; } if (weekly) enduranceWorkoutDays[day] = !enduranceWorkoutDays[day]; else enduranceDailyDay = day; refreshCurrentPageKeepingScroll(this::showEnduranceWizardSchedule); });
+            detail.setAlpha(historical ? .52f : 1f);
             LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, dp(68), 1); if (i > 0) p.leftMargin = dp(3); cards.addView(detail, p);
         }
         LinearLayout.LayoutParams cardsParams = new LinearLayout.LayoutParams(-1, dp(68)); cardsParams.topMargin = dp(12); calendar.addView(cards, cardsParams);
@@ -9395,6 +9807,7 @@ public final class MainActivity extends FragmentActivity {
         List<SchedulerStore.Appointment> appointments = SchedulerStore.onDate(this, date);
         boolean planned = isMonthWorkoutDay(date);
         boolean selected = sameSchedulerDate(date, schedulerSelectedDate);
+        boolean historical = isPastCalendarDate(date);
         String state = !appointments.isEmpty() ? appointmentAbbreviation(appointments.get(0).mode) : planned ? schedulerStrengthSummary(date) : "Rest";
         if (state.length() > 8) state = state.substring(0, 8);
         int fill = !appointments.isEmpty() ? coral : planned ? mint : Color.rgb(232, 236, 244);
@@ -9404,6 +9817,7 @@ public final class MainActivity extends FragmentActivity {
         cell.setBackground(surface(fill, 11, selected ? 3 : 0, selected ? coral : Color.TRANSPARENT));
         cell.setContentDescription(new SimpleDateFormat("EEEE, MMMM d", Locale.getDefault()).format(date.getTime()) + ", " + state);
         cell.setClickable(true);
+        cell.setAlpha(historical ? .52f : 1f);
         // Selecting a day must only update the agenda. The explicit CTA owns wizard entry,
         // so browsing a calendar cannot accidentally interrupt the user with a modal.
         cell.setOnClickListener(view -> {
@@ -9415,6 +9829,10 @@ public final class MainActivity extends FragmentActivity {
 
     /** Date-first Scheduler entry point. The panel stays at the bottom so the selected day remains visible behind it. */
     private void showSchedulerAppointmentSheet(Calendar date) {
+        if (isPastCalendarDate(date)) {
+            toast("Past dates are locked and cannot be scheduled or changed.");
+            return;
+        }
         schedulerSelectedDate = (Calendar) date.clone();
         final android.app.Dialog sheet = new android.app.Dialog(this);
         LinearLayout content = new LinearLayout(this);
