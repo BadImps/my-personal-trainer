@@ -29,7 +29,7 @@ public final class ExerciseVideosTest {
 
     @Test public void machineAssistedChestOffersTheFourPreviewedMovementsWithSmoothMedia() {
         Context context = RuntimeEnvironment.getApplication();
-        String[] expected = {"Machine Chest Press", "Seated Cable Press", "Pec Deck Fly", "Assisted Dip"};
+        String[] expected = {"Machine Chest Press", "Seated Cable Press", "Pec Deck Fly", "Seated Dip Machine"};
         java.util.List<Coach.Exercise> exercises = Coach.planOptions("Chest", "Machine-assisted");
         assertEquals(expected.length, exercises.size());
         for (int i = 0; i < expected.length; i++) {

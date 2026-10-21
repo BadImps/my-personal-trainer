@@ -60,4 +60,20 @@ public final class WorkoutTimingTest {
     @Test public void setTimeUsesMinuteSecondAndTenthFormat() {
         assertEquals("01:05.4", WorkoutTiming.formatElapsedMillis(65_499));
     }
+
+    @Test public void skippedExerciseAlwaysAdvancesPastItsRemainingSets() {
+        assertEquals(1, WorkoutTiming.exerciseAfterSkip(0, 4));
+        assertEquals(3, WorkoutTiming.exerciseAfterSkip(2, 4));
+        assertEquals(4, WorkoutTiming.exerciseAfterSkip(3, 4));
+    }
+
+    @Test public void untimedWorkoutClockCountsUpFromStart() {
+        assertEquals(0L, WorkoutTiming.workoutClockMillis(true, 10_000L, 9_000L, 45 * 60_000L, 0L));
+        assertEquals(75_000L, WorkoutTiming.workoutClockMillis(true, 10_000L, 85_000L, 45 * 60_000L, 0L));
+    }
+
+    @Test public void timedWorkoutClockStillShowsRemainingAllowance() {
+        assertEquals(2_620_000L,
+                WorkoutTiming.workoutClockMillis(false, 10_000L, 85_000L, 45 * 60_000L, 5_000L));
+    }
 }

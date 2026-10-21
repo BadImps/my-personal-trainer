@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_workout_notification"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:padding="12dp">
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:paddingEnd="8dp">
+
+        <TextView
+            android:id="@+id/workout_notification_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="#FFFFFF"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/workout_notification_detail"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="#B9C6D4"
+            android:textSize="12sp" />
+
+        <ProgressBar
+            android:id="@+id/workout_notification_progress"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="4dp"
+            android:layout_marginTop="6dp"
+            android:progressTint="#6FE3CB"
+            android:progressBackgroundTint="#345066" />
+    </LinearLayout>
+
+    <ImageButton
+        android:id="@+id/workout_notification_toggle"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_marginEnd="6dp"
+        android:background="@drawable/bg_notification_control"
+        android:contentDescription="Pause workout"
+        android:padding="9dp"
+        android:scaleType="fitCenter"
+        android:src="@drawable/ic_notification_pause" />
+
+    <ImageButton
+        android:id="@+id/workout_notification_open"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_marginEnd="6dp"
+        android:background="@drawable/bg_notification_control"
+        android:contentDescription="Return to workout"
+        android:padding="9dp"
+        android:scaleType="fitCenter"
+        android:src="@drawable/ic_notification_open" />
+
+    <ImageButton
+        android:id="@+id/workout_notification_end"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:background="@drawable/bg_notification_control"
+        android:contentDescription="End workout"
+        android:padding="9dp"
+        android:scaleType="fitCenter"
+        android:src="@drawable/ic_notification_end" />
+</LinearLayout>

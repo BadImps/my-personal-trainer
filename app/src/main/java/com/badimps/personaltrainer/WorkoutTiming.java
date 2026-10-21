@@ -35,6 +35,8 @@ public final class WorkoutTiming {
         private final int baseRestSeconds;
         private final List<Long> durations = new ArrayList<>();
         private long setStartedAtMillis = -1L;
+        private long pausedAtMillis = -1L;
+        private long pausedDurationMillis;
         private int restBonusSeconds;
 
         public SetTracker(int baseRestSeconds) {
@@ -43,15 +45,39 @@ public final class WorkoutTiming {
 
         public void startSet(long nowMillis) {
             setStartedAtMillis = nowMillis;
+            pausedAtMillis = -1L;
+            pausedDurationMillis = 0L;
+        }
+
+        public void pauseSet(long nowMillis) {
+            if (setStartedAtMillis >= 0L && pausedAtMillis < 0L) pausedAtMillis = nowMillis;
+        }
+
+        public void resumeSet(long nowMillis) {
+            if (pausedAtMillis < 0L) return;
+            pausedDurationMillis += Math.max(0L, nowMillis - pausedAtMillis);
+            pausedAtMillis = -1L;
+        }
+
+        public boolean isPaused() {
+            return pausedAtMillis >= 0L;
+        }
+
+        public long elapsedMillis(long nowMillis) {
+            if (setStartedAtMillis < 0L) return 0L;
+            long effectiveNow = pausedAtMillis >= 0L ? pausedAtMillis : nowMillis;
+            return Math.max(0L, effectiveNow - setStartedAtMillis - pausedDurationMillis);
         }
 
         public SetResult completeSet(long nowMillis) {
             if (setStartedAtMillis < 0L) throw new IllegalStateException("Start the set before completing it.");
-            long duration = Math.max(100L, nowMillis - setStartedAtMillis);
+            long duration = Math.max(100L, elapsedMillis(nowMillis));
             boolean slower = isMeaningfullySlower(durations, duration);
             if (slower) restBonusSeconds = Math.min(MAX_REST_SECONDS - Math.min(baseRestSeconds, MAX_REST_SECONDS), restBonusSeconds + REST_BONUS_SECONDS);
             durations.add(duration);
             setStartedAtMillis = -1L;
+            pausedAtMillis = -1L;
+            pausedDurationMillis = 0L;
             return new SetResult(durations.size(), duration, slower, recoverySeconds());
         }
 
@@ -104,6 +130,19 @@ public final class WorkoutTiming {
         long seconds = (safe / 1_000L) % 60L;
         long tenths = (safe / 100L) % 10L;
         return String.format(Locale.US, "%02d:%02d.%d", minutes, seconds, tenths);
+    }
+
+    /** Skipping an exercise always advances to the following exercise, regardless of set number. */
+    public static int exerciseAfterSkip(int currentExerciseIndex, int exerciseCount) {
+        return Math.min(Math.max(0, exerciseCount), Math.max(0, currentExerciseIndex + 1));
+    }
+
+    /** Untimed plans count upward; timed plans retain the existing remaining-time behavior. */
+    public static long workoutClockMillis(boolean noTimer, long startedAtMillis, long nowMillis,
+                                          long allowanceMillis, long skippedRecoveryMillis) {
+        long elapsed = Math.max(0L, nowMillis - startedAtMillis);
+        if (noTimer) return elapsed;
+        return Math.max(0L, allowanceMillis - elapsed - Math.max(0L, skippedRecoveryMillis));
     }
 
     private WorkoutTiming() {}

@@ -2,6 +2,9 @@
 
 ## Safe fixes completed
 
+- Added 19 exact neutral Strength Level-style exercise illustrations for the previously unassigned household, dumbbell, bodyweight, and machine-assisted movements.
+- Routed the new shared visuals through the exercise-media resolver so their presentation no longer depends on the selected coach.
+- Confirmed the affected movements remain in their intended equipment branches and training areas.
 - Corrected Apex unlocks so a tier needs both its required level and the required number of sessions inside its stated time window. Lifetime sessions can no longer unlock a recent-window tier.
 - Added unit coverage for the Apex time-window lock and unlock cases.
 - Added explicit Android backup/data-extraction rules. Private profile, health, workout, and route records remain on-device rather than being silently backed up.
@@ -12,6 +15,7 @@
 
 ## Verification completed
 
+- Current debug unit tests, debug lint, and debug APK assembly completed successfully after the exercise-media integration.
 - 69 unit tests passed with no failures or errors.
 - Release lint completed with no errors or fatal findings.
 - Debug and release APK builds completed successfully.

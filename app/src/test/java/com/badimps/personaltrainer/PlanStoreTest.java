@@ -2,6 +2,7 @@ package com.badimps.personaltrainer;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
 import android.content.Context;
 
@@ -72,6 +73,23 @@ public final class PlanStoreTest {
             assertNotNull(saved);
             assertEquals(75, saved.restSeconds);
             assertEquals(300, saved.cooldownSeconds);
+        } finally {
+            PlanStore.clear(context);
+        }
+    }
+
+    @Test public void noTimerChoiceSurvivesPlanSave() {
+        Context context = RuntimeEnvironment.getApplication();
+        PlanStore.clear(context);
+        try {
+            List<Coach.Exercise> exercises = Coach.planOptions("Full Body", "Bodyweight");
+            boolean[] schedule = {false, false, true, false, false, false, false};
+            PlanStore.save(context, "Custom", "Full Body", "Bodyweight", 75, true,
+                    0, 3, 10, 90, 180, false, 18, 0,
+                    schedule, "Full Body", "", "", 2, 0, exercises);
+            PlanStore.SavedPlan saved = PlanStore.load(context);
+            assertNotNull(saved);
+            assertTrue(saved.noTimer);
         } finally {
             PlanStore.clear(context);
         }

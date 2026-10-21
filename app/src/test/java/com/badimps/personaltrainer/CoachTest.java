@@ -45,4 +45,24 @@ public class CoachTest {
         assertFalse(hasAbsCategory);
         assertTrue(Coach.planOptions("Core", "Bodyweight").size() >= 3);
     }
+
+    @Test public void standardizedMediaNamesStayInTheirCorrectBodyAreas() {
+        assertTrue(hasExercise("Back", "Machine-assisted", "Machine Row"));
+        assertTrue(hasExercise("Back", "Dumbbells", "Dumbbell Reverse Fly"));
+        assertTrue(hasExercise("Shoulders", "Machine-assisted", "Machine Reverse Fly"));
+        assertTrue(hasExercise("Shoulders", "Machine-assisted", "Face Pull"));
+        assertTrue(hasExercise("Shoulders", "Dumbbells", "Dumbbell Front Raise"));
+        assertTrue(hasExercise("Chest", "Dumbbells", "Dumbbell Fly"));
+        assertTrue(hasExercise("Chest", "Machine-assisted", "Seated Dip Machine"));
+        assertTrue(hasExercise("Biceps", "Dumbbells", "Dumbbell Curl"));
+        assertTrue(hasExercise("Legs", "Machine-assisted", "Machine Calf Raise"));
+        assertTrue(hasExercise("Full Body", "Dumbbells", "Dumbbell Thruster"));
+    }
+
+    private static boolean hasExercise(String focus, String equipment, String name) {
+        for (Coach.Exercise exercise : Coach.planOptions(focus, equipment)) {
+            if (name.equals(exercise.name) && focus.equals(exercise.target)) return true;
+        }
+        return false;
+    }
 }

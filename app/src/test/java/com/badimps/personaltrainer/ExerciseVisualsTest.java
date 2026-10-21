@@ -12,14 +12,14 @@ import org.robolectric.RuntimeEnvironment;
 /** Regression coverage for the exercise-library images that previously disappeared on screen. */
 @RunWith(RobolectricTestRunner.class)
 public final class ExerciseVisualsTest {
-    @Test public void everyLibraryExerciseHasMiaAndLeoDemonstrations() {
+    @Test public void everyLibraryExerciseHasAnExactLoopOrBothCoachDemonstrations() {
         Context context = RuntimeEnvironment.getApplication();
         for (String group : Coach.TARGETS) {
             for (Coach.Exercise exercise : Coach.library().get(group)) {
-                assertTrue("Missing Coach Mia visual for " + exercise.name,
-                        ExerciseVisuals.forExercise(context, "Female", exercise.name) != 0);
-                assertTrue("Missing Coach Leo visual for " + exercise.name,
-                        ExerciseVisuals.forExercise(context, "Male", exercise.name) != 0);
+                boolean exactLoop = ExerciseWebp.forExercise(context, exercise.name) != 0;
+                boolean bothCoachVisuals = ExerciseVisuals.forExercise(context, "Female", exercise.name) != 0
+                        && ExerciseVisuals.forExercise(context, "Male", exercise.name) != 0;
+                assertTrue("Missing exact media for " + exercise.name, exactLoop || bothCoachVisuals);
             }
         }
     }

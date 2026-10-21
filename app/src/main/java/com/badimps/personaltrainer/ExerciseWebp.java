@@ -1,0 +1,120 @@
+package com.badimps.personaltrainer;
+
+import android.content.Context;
+
+/** Exact Strength Level animated WebP loops that have a one-to-one exercise match. */
+public final class ExerciseWebp {
+    private ExerciseWebp() { }
+
+    public static int forExercise(Context context, String exerciseName) {
+        if (exerciseName == null) return 0;
+        switch (exerciseName) {
+            case "Bodyweight Squat": return R.drawable.sl_bodyweight_squat;
+            case "Cable Lateral Raise": return R.drawable.sl_cable_lateral_raise;
+            case "Cable Reverse Fly": return R.drawable.sl_cable_reverse_fly;
+            case "Cable Biceps Curl": return R.drawable.sl_cable_biceps_curl;
+            case "Cable Hammer Curl": return R.drawable.sl_cable_hammer_curl;
+            case "Cable Overhead Extension": return R.drawable.sl_cable_overhead_extension;
+            case "Cable Triceps Pressdown": return R.drawable.sl_cable_triceps_pressdown;
+            case "Cable Wood Chop": return R.drawable.sl_cable_wood_chop;
+            case "Dumbbell Pullover": return R.drawable.sl_dumbbell_pullover;
+            case "Dumbbell Press": return R.drawable.sl_dumbbell_press;
+            case "Dumbbell Bench Press": return R.drawable.sl_dumbbell_bench_press;
+            case "Dumbbell Curl": return R.drawable.sl_dumbbell_curl;
+            case "Dumbbell Fly": return R.drawable.sl_dumbbell_fly;
+            case "Dumbbell Front Raise": return R.drawable.sl_dumbbell_front_raise;
+            case "Dumbbell Reverse Fly": return R.drawable.sl_dumbbell_reverse_fly;
+            case "Dumbbell Thruster": return R.drawable.sl_dumbbell_thruster;
+            case "Floor Press": return R.drawable.sl_dumbbell_floor_press;
+            case "Barbell Floor Press": return R.drawable.sl_floor_press;
+            case "Barbell Curl": return R.drawable.sl_barbell_curl;
+            case "Barbell Skull Crusher": return R.drawable.sl_barbell_skull_crusher;
+            case "Reverse Barbell Curl": return R.drawable.sl_reverse_barbell_curl;
+            case "Close-Grip Barbell Bench Press": return R.drawable.sl_close_grip_barbell_bench_press;
+            case "Barbell Bench Press": return R.drawable.sl_barbell_bench_press;
+            case "Incline Barbell Press": return R.drawable.sl_incline_barbell_press;
+            case "Barbell Row": return R.drawable.sl_barbell_row;
+            case "Barbell Shrug": return R.drawable.sl_barbell_shrug;
+            case "Pendlay Row": return R.drawable.sl_pendlay_row;
+            case "Barbell Overhead Press": return R.drawable.sl_barbell_overhead_press;
+            case "Landmine Press": return R.drawable.sl_landmine_press;
+            case "Barbell Front Raise": return R.drawable.sl_barbell_front_raise;
+            case "Barbell Back Squat": return R.drawable.sl_barbell_back_squat;
+            case "Barbell Hip Thrust": return R.drawable.sl_barbell_hip_thrust;
+            case "Barbell Thruster": return R.drawable.sl_barbell_thruster;
+            case "Barbell Deadlift": return R.drawable.sl_barbell_deadlift;
+            case "Barbell Clean Pull": return R.drawable.sl_barbell_clean_pull;
+            case "Glute Bridge": return R.drawable.sl_glute_bridge;
+            case "Goblet Squat": return R.drawable.sl_goblet_squat;
+            case "Hammer Curl": return R.drawable.sl_hammer_curl;
+            case "Concentration Curl": return R.drawable.sl_concentration_curl;
+            case "Incline Push-up": return R.drawable.sl_incline_push_up;
+            case "Jumping Jack": return R.drawable.sl_jumping_jack;
+            case "Lat Pulldown": return R.drawable.sl_lat_pulldown;
+            case "Lateral Raise": return R.drawable.sl_lateral_raise;
+            case "Leg Extension": return R.drawable.sl_leg_extension;
+            case "Leg Press": return R.drawable.sl_leg_press;
+            case "Machine Shoulder Press": return R.drawable.sl_machine_shoulder_press;
+            case "Machine Row": return R.drawable.sl_machine_row;
+            case "Machine Chest Press": return R.drawable.sl_machine_chest_press;
+            case "Machine Reverse Fly": return R.drawable.sl_machine_reverse_fly;
+            case "Machine Calf Raise": return R.drawable.sl_machine_calf_raise;
+            case "Mountain Climber": return R.drawable.sl_mountain_climber;
+            case "One-arm Row": return R.drawable.sl_one_arm_row;
+            case "Overhead Triceps Extension": return R.drawable.sl_overhead_triceps_extension;
+            case "Pec Deck Fly": return R.drawable.sl_pec_deck_fly;
+            case "Pike Push-up": return R.drawable.sl_pike_push_up;
+            case "Push-up": return R.drawable.sl_push_up;
+            case "Diamond Push-up": return R.drawable.sl_diamond_push_up;
+            case "Renegade Row": return R.drawable.sl_renegade_row;
+            case "Romanian Deadlift": return R.drawable.sl_dumbbell_romanian_deadlift;
+            case "Reverse Lunge": return R.drawable.sl_reverse_lunge;
+            case "Walking Lunge": return R.drawable.sl_walking_lunge;
+            case "Barbell Romanian Deadlift": return R.drawable.sl_romanian_deadlift;
+            case "Seated Cable Row": return R.drawable.sl_seated_cable_row;
+            case "Seated Leg Curl": return R.drawable.sl_seated_leg_curl;
+            case "Superman Hold": return R.drawable.sl_superman_hold;
+            case "Burpee": return R.drawable.sl_burpee;
+            case "Bench Dips": return R.drawable.sl_bench_dips;
+            case "Bodyweight Calf Raise": return R.drawable.sl_bodyweight_calf_raise;
+            case "Face Pull": return R.drawable.sl_face_pull;
+            case "Seated Dip Machine": return R.drawable.sl_seated_dip_machine;
+            case "Preacher Curl Machine": return R.drawable.sl_preacher_curl_machine;
+            case "Triceps Kickback": return R.drawable.sl_triceps_kickback;
+            case "Assisted Pull-up": return R.drawable.sl_assisted_pull_up;
+            case "Backpack Floor Press": return R.drawable.sl_backpack_floor_press;
+            case "Backpack Row": return R.drawable.sl_backpack_row;
+            case "Cable Pallof Press": return R.drawable.sl_cable_pallof_press;
+            case "Captain's Chair Knee Raise": return R.drawable.sl_captains_chair_knee_raise;
+            case "Dumbbell Dead Bug": return R.drawable.sl_dumbbell_dead_bug;
+            case "Dumbbell March": return R.drawable.sl_dumbbell_march;
+            case "Dumbbell Step-up": return R.drawable.sl_dumbbell_step_up;
+            case "Elliptical Trainer": return R.drawable.sl_elliptical_trainer;
+            case "Plank Shoulder Tap": return R.drawable.sl_plank_shoulder_tap;
+            case "Prone Y Raise": return R.drawable.sl_prone_y_raise;
+            case "Rotary Torso Machine": return R.drawable.sl_rotary_torso_machine;
+            case "Rowing Machine": return R.drawable.sl_rowing_machine;
+            case "Seated Cable Press": return R.drawable.sl_seated_cable_press;
+            case "Stationary Bike": return R.drawable.sl_stationary_bike;
+            case "Suitcase Carry": return R.drawable.sl_suitcase_carry;
+            case "Towel Pull-apart": return R.drawable.sl_towel_pull_apart;
+            case "Treadmill Incline Walk": return R.drawable.sl_treadmill_incline_walk;
+            case "Water Bottle Lateral Raise": return R.drawable.sl_water_bottle_lateral_raise;
+            case "90/90 Hip Switch": return R.drawable.sl_ninety_ninety_hip_switch;
+            case "Band Pull-apart": return R.drawable.sl_band_pull_apart;
+            case "Bird Dog": return R.drawable.sl_bird_dog;
+            case "Brisk March": return R.drawable.sl_brisk_march;
+            case "Cat Cow": return R.drawable.sl_cat_cow;
+            case "Dead Bug": return R.drawable.sl_dead_bug;
+            case "Isometric Towel Curl": return R.drawable.sl_isometric_towel_curl;
+            case "Prone Snow Angel": return R.drawable.sl_prone_snow_angel;
+            case "Shoulder Wall Slide": return R.drawable.sl_shoulder_wall_slide;
+            case "Side Plank": return R.drawable.sl_side_plank;
+            case "Squat to Press": return R.drawable.sl_squat_to_press;
+            case "Step-up": return R.drawable.sl_step_up;
+            case "Wall Sit": return R.drawable.sl_wall_sit;
+            case "World's Greatest Stretch": return R.drawable.sl_worlds_greatest_stretch;
+            default: return 0;
+        }
+    }
+}

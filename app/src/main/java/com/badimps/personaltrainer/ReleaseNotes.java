@@ -15,6 +15,7 @@ public final class ReleaseNotes {
     }
 
     public static final Entry[] HISTORY = {
+            new Entry("5.38", "Complete workout refinement", "Adds persistent guided-workout controls, custom and untimed sessions, refined cooldown navigation, expanded training and equipment choices, improved nutrition content, and unified neutral Strength Level exercise artwork."),
             new Entry("5.36", "Canvas Mintfoil & coach-audio fix", "Achievement badges now use the approved Mintfoil artwork directly, and coach dialogue no longer goes silent when Android has no manually labelled voice."),
             new Entry("5.31", "Smaller updates & clearer release history", "Adds optional coach-motion downloads, update prompts that name the available version, and this complete in-app patch-note history."),
             new Entry("5.30", "Apex accuracy & maintenance safeguards", "Apex tiers now require their stated recent-session window. Added quality checks and stronger on-device backup rules."),

@@ -43,6 +43,7 @@ import android.widget.FrameLayout;
 import android.widget.GridLayout;
 import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
+import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.RadioButton;
@@ -67,6 +68,7 @@ import java.util.ArrayDeque;
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -90,7 +92,7 @@ public final class MainActivity extends FragmentActivity {
     private View flippedCoachFront;
     private View flippedCoachBack;
     /** Image-led focuses for the approved plan-flow. Core includes trunk work; there is no Abs category. */
-    private static final String[] WIZARD_TARGETS = {"Upper", "Lower", "Arms", "Chest", "Legs", "Full Body", "Back", "Shoulders", "Core", "Endurance"};
+    private static final String[] WIZARD_TARGETS = {"Upper", "Lower", "Arms", "Chest", "Legs", "Full Body", "Back", "Shoulders", "Core", "Endurance", "Biceps", "Triceps"};
 
     private String goal = Coach.GOALS[1];
     private String target = "Full Body";
@@ -101,6 +103,8 @@ public final class MainActivity extends FragmentActivity {
     private final List<String> selectedEquipmentTypes = new ArrayList<>();
     private int sessionMinutes = 45;
     private boolean customDuration;
+    /** Custom plans may run open-ended with an ascending whole-workout clock. */
+    private boolean workoutNoTimer;
     private int trainingDays = 3;
     private int workingWeightKg = 20;
     private int planSets = 3;
@@ -162,6 +166,11 @@ public final class MainActivity extends FragmentActivity {
     private long guidedWorkoutAllowanceMillis;
     private long recoverySegmentStartedAt = -1L;
     private boolean recoverySegmentIsCooldown;
+    /** Prevents a paused/resumed recovery timer from repeating a spoken milestone. */
+    private final Set<Integer> recoveryAnnouncements = new HashSet<>();
+    private String recoveryAnnouncementKey = "";
+    /** Exercises deliberately bypassed from the cooldown preview stay skipped for this session. */
+    private final Set<Integer> skippedWorkoutExerciseIndices = new HashSet<>();
     private Runnable workoutRemainingUpdate;
     /** The active scroll surface is retained so in-place option changes do not throw a user to the top. */
     private ScrollView activeScrollView;
@@ -183,6 +192,15 @@ public final class MainActivity extends FragmentActivity {
     private boolean restoringPageHistory;
     private boolean guidedSessionRecorded;
     private boolean guidedWorkoutAborted;
+    /** Live guided-workout state survives dashboard navigation and drives the compact return bar. */
+    private int activeWorkoutExerciseIndex = -1;
+    private int activeWorkoutSet;
+    private String activeWorkoutPhase = "";
+    private boolean activeWorkoutPaused;
+    private int activeRecoveryRemainingSeconds;
+    private boolean activeRecoveryBetweenExercises;
+    /** Prevents the return bar from duplicating itself on the full guided-workout screens. */
+    private boolean composingGuidedWorkoutSurface;
     private UpdateManager.Info pendingOtaInstall;
     private Runnable otaStatusPoll;
     private boolean otaVerificationInFlight;
@@ -192,6 +210,7 @@ public final class MainActivity extends FragmentActivity {
     private boolean showingUpdatePage;
     private boolean updatePromptInFlight;
     private static final int REQUEST_LIVE_LOCATION = 4102;
+    private static final int REQUEST_WORKOUT_NOTIFICATIONS = 4107;
     private static final int REQUEST_PROFILE_PHOTO = 4103;
     private static final int REQUEST_OFFLINE_MAP = 4104;
     private static final int REQUEST_MIGRATION_EXPORT = 4105;
@@ -335,12 +354,58 @@ public final class MainActivity extends FragmentActivity {
             showPlanEquipment();
             return;
         }
+        if (BuildConfig.DEBUG && "com.badimps.personaltrainer.DEBUG_WORKOUT_DURATION".equals(getIntent().getAction())) {
+            planMode = "Custom";
+            customDuration = true;
+            showPlanDuration();
+            return;
+        }
+        if (BuildConfig.DEBUG && "com.badimps.personaltrainer.DEBUG_CUSTOM_EXERCISE_LIBRARY".equals(getIntent().getAction())) {
+            planMode = "Custom";
+            prepareExerciseSelection();
+            showCustomExerciseLibrary();
+            return;
+        }
         if (BuildConfig.DEBUG && "com.badimps.personaltrainer.DEBUG_WORKOUT_SETUP".equals(getIntent().getAction())) {
             showPlanSetup();
             return;
         }
         if (BuildConfig.DEBUG && "com.badimps.personaltrainer.DEBUG_WORKOUT_REVIEW".equals(getIntent().getAction())) {
             showPlanReview();
+            return;
+        }
+        if (BuildConfig.DEBUG && "com.badimps.personaltrainer.DEBUG_GUIDED_ACTIVE".equals(getIntent().getAction())) {
+            session = Coach.recommendation("Chest", goal, environment);
+            guidedWorkoutStartedAt = SystemClock.elapsedRealtime();
+            guidedWorkoutAllowanceMillis = 45L * 60_000L;
+            guidedSessionRecorded = false;
+            guidedWorkoutAborted = false;
+            activeWorkoutExerciseIndex = 0;
+            activeWorkoutSet = 1;
+            activeWorkoutPhase = "active";
+            showActive(0, 1);
+            return;
+        }
+        if (BuildConfig.DEBUG && "com.badimps.personaltrainer.DEBUG_GUIDED_UNTIMED".equals(getIntent().getAction())) {
+            session = Coach.recommendation("Chest", goal, environment);
+            workoutNoTimer = true;
+            guidedWorkoutStartedAt = SystemClock.elapsedRealtime() - 75_000L;
+            guidedWorkoutAllowanceMillis = 0L;
+            guidedSessionRecorded = false;
+            guidedWorkoutAborted = false;
+            activeWorkoutExerciseIndex = 0;
+            activeWorkoutSet = 1;
+            activeWorkoutPhase = "active";
+            showActive(0, 1);
+            return;
+        }
+        if (BuildConfig.DEBUG && "com.badimps.personaltrainer.DEBUG_WORKOUT_COOLDOWN".equals(getIntent().getAction())) {
+            session = Coach.recommendation("Full Body", goal, environment);
+            guidedWorkoutStartedAt = SystemClock.elapsedRealtime();
+            guidedWorkoutAllowanceMillis = 45L * 60_000L;
+            guidedSessionRecorded = false;
+            guidedWorkoutAborted = false;
+            showRest(0, session.get(0).sets, session.get(0), planCooldownSeconds, true, true);
             return;
         }
         if (hasLocalAccount) {
@@ -389,6 +454,8 @@ public final class MainActivity extends FragmentActivity {
 
     @Override protected void onResume() {
         super.onResume();
+        WorkoutSessionStore.State workoutState = WorkoutSessionStore.get(this);
+        if (hasActiveGuidedWorkout() && workoutState.active) activeWorkoutPaused = workoutState.paused;
         if (pendingOtaInstall != null) {
             if (Build.VERSION.SDK_INT >= 26 && !getPackageManager().canRequestPackageInstalls()) return;
             UpdateManager.Info ready = pendingOtaInstall;
@@ -402,6 +469,17 @@ public final class MainActivity extends FragmentActivity {
     @Override protected void onPause() {
         stopOtaStatusPolling();
         super.onPause();
+    }
+
+    @Override protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        if (intent == null) return;
+        if (GuidedWorkoutService.ACTION_END.equals(intent.getAction()) && hasActiveGuidedWorkout()) {
+            showEmergencyStopConfirmation(activeWorkoutExerciseIndex, activeWorkoutSet, this::resumeActiveWorkoutSurface);
+        } else if (GuidedWorkoutService.ACTION_OPEN.equals(intent.getAction()) && hasActiveGuidedWorkout()) {
+            resumeActiveWorkoutSurface();
+        }
     }
 
     @Override public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] results) {
@@ -560,6 +638,7 @@ public final class MainActivity extends FragmentActivity {
     /** Opens a genuinely blank workout draft so prior plan choices cannot leak into it. */
     private void beginWorkoutPlanDraft(String mode) {
         planMode = mode;
+        workoutNoTimer = false;
         target = "";
         selectedTargets.clear();
         weeklyDayTargets.clear();
@@ -856,6 +935,7 @@ public final class MainActivity extends FragmentActivity {
             });
         }
         shell.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+        addActiveWorkoutMiniBar(shell);
         shell.addView(coachHeroBottomNavigation(activeScreen), new LinearLayout.LayoutParams(-1, dp(76)));
         mountScreen(shell);
         activeDashboardScrollKey = activeScreen;
@@ -904,6 +984,7 @@ public final class MainActivity extends FragmentActivity {
             });
         }
         shell.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+        addActiveWorkoutMiniBar(shell);
         shell.addView(coachHeroBottomNavigation("Settings"), new LinearLayout.LayoutParams(-1, dp(76)));
         mountScreen(shell);
         activeDashboardScrollKey = "CoachCollection";
@@ -1049,8 +1130,183 @@ public final class MainActivity extends FragmentActivity {
         }
         Integer restore = dashboardScrollPositions.get(target);
         pendingScrollRestore = restore == null ? -1 : restore;
-        stopGuidedRuntime();
+        // A guided workout is intentionally allowed to continue while the member browses.
+        // The persistent mini-bar is the explicit route back to the exact live set.
+        if (!hasActiveGuidedWorkout()) stopGuidedRuntime();
         destination.run();
+    }
+
+    private boolean hasActiveGuidedWorkout() {
+        return guidedWorkoutStartedAt > 0L && !guidedSessionRecorded && !guidedWorkoutAborted
+                && activeWorkoutExerciseIndex >= 0 && activeWorkoutExerciseIndex < session.size();
+    }
+
+    private void requestWorkoutNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= 33
+                && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, REQUEST_WORKOUT_NOTIFICATIONS);
+        }
+    }
+
+    private void syncWorkoutService() {
+        if (!hasActiveGuidedWorkout()) return;
+        Coach.Exercise exercise = session.get(activeWorkoutExerciseIndex);
+        String workoutTitle = ("Custom".equalsIgnoreCase(planMode) ? "Custom · " : "") + target + " workout";
+        WorkoutSessionStore.save(this, workoutTitle, exercise.name, activeWorkoutExerciseIndex,
+                session.size(), Math.max(1, activeWorkoutSet), exercise.sets, activeWorkoutPaused);
+        Intent service = new Intent(this, GuidedWorkoutService.class).setAction(GuidedWorkoutService.ACTION_REFRESH);
+        ContextCompat.startForegroundService(this, service);
+    }
+
+    private void stopWorkoutService() {
+        WorkoutSessionStore.clear(this);
+        stopService(new Intent(this, GuidedWorkoutService.class));
+    }
+
+    private LinearLayout guidedWorkoutPage() {
+        composingGuidedWorkoutSurface = true;
+        try {
+            beginNewPage();
+            setSystemBars();
+            ScrollView scroll = new ScrollView(this);
+            scroll.setFillViewport(true);
+            scroll.setClipToPadding(false);
+            scroll.setBackgroundColor(navy);
+            LinearLayout body = new LinearLayout(this);
+            body.setOrientation(LinearLayout.VERTICAL);
+            body.setBackgroundColor(navy);
+            body.setPadding(dp(18), dp(18), dp(18), dp(28));
+            scroll.addView(body, new ScrollView.LayoutParams(-1, -2));
+            LinearLayout shell = new LinearLayout(this);
+            shell.setOrientation(LinearLayout.VERTICAL);
+            shell.setBackgroundColor(navy);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                shell.setOnApplyWindowInsetsListener((view, insets) -> {
+                    android.graphics.Insets bars = insets.getInsets(WindowInsets.Type.systemBars());
+                    view.setPadding(0, bars.top, 0, bars.bottom);
+                    return insets;
+                });
+            }
+            shell.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+            shell.addView(coachHeroBottomNavigation("Workouts"), new LinearLayout.LayoutParams(-1, dp(76)));
+            mountScreen(shell);
+            activeDashboardScrollKey = "Workouts";
+            activateScroll(scroll);
+            return body;
+        } finally {
+            composingGuidedWorkoutSurface = false;
+        }
+    }
+
+    /** Compact live-session controller displayed immediately above normal dashboard navigation. */
+    private void addActiveWorkoutMiniBar(LinearLayout shell) {
+        if (!hasActiveGuidedWorkout() || composingGuidedWorkoutSurface) return;
+        Coach.Exercise exercise = session.get(activeWorkoutExerciseIndex);
+        LinearLayout bar = new LinearLayout(this);
+        bar.setOrientation(LinearLayout.HORIZONTAL);
+        bar.setGravity(Gravity.CENTER_VERTICAL);
+        bar.setPadding(dp(12), dp(8), dp(8), dp(8));
+        bar.setBackground(surface(Color.rgb(12, 35, 54), 18, 2, mint));
+        bar.setElevation(dp(9));
+
+        TextView pulse = heading("●", 18, activeWorkoutPaused ? coral : mint);
+        pulse.setGravity(Gravity.CENTER);
+        pulse.setContentDescription(activeWorkoutPaused ? "Workout paused" : "Workout active");
+        bar.addView(pulse, new LinearLayout.LayoutParams(dp(24), -1));
+
+        LinearLayout copy = new LinearLayout(this);
+        copy.setOrientation(LinearLayout.VERTICAL);
+        TextView state = heading(activeWorkoutPaused ? "WORKOUT PAUSED" : "WORKOUT ACTIVE", 9, activeWorkoutPaused ? coral : mint);
+        state.setLetterSpacing(.08f);
+        copy.addView(state);
+        TextView name = heading(exercise.name, 13, Color.WHITE);
+        name.setSingleLine(true);
+        name.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        copy.addView(name);
+        copy.addView(text("Set " + activeWorkoutSet + " of " + exercise.sets + "  •  "
+                + WorkoutTiming.formatElapsedMillis(Math.max(0L, SystemClock.elapsedRealtime() - guidedWorkoutStartedAt)), 10,
+                Color.rgb(191, 211, 228)));
+        bar.addView(copy, new LinearLayout.LayoutParams(0, -2, 1));
+
+        Button returnButton = miniWorkoutButton("↗", "Return to workout", mint, navy);
+        returnButton.setOnClickListener(view -> resumeActiveWorkoutSurface());
+        bar.addView(returnButton, new LinearLayout.LayoutParams(dp(48), dp(48)));
+
+        Button pause = miniWorkoutButton(activeWorkoutPaused ? "▶" : "Ⅱ",
+                activeWorkoutPaused ? "Resume workout" : "Pause workout", navyPanel, mint);
+        LinearLayout.LayoutParams pauseParams = new LinearLayout.LayoutParams(dp(48), dp(48));
+        pauseParams.leftMargin = dp(5);
+        bar.addView(pause, pauseParams);
+        pause.setOnClickListener(view -> {
+            if (setTracker != null && "active".equals(activeWorkoutPhase)) {
+                if (activeWorkoutPaused) setTracker.resumeSet(SystemClock.elapsedRealtime());
+                else setTracker.pauseSet(SystemClock.elapsedRealtime());
+            }
+            if (("rest".equals(activeWorkoutPhase) || "cooldown".equals(activeWorkoutPhase)) && !activeWorkoutPaused) {
+                if (restTimer != null) restTimer.cancel();
+                endRecoverySegment();
+            }
+            activeWorkoutPaused = !activeWorkoutPaused;
+            syncWorkoutService();
+            refreshCurrentPageKeepingScroll(this::showCurrentDashboardPage);
+        });
+
+        Button end = miniWorkoutButton("■", "Hold to end workout", coral, Color.WHITE);
+        LinearLayout.LayoutParams endParams = new LinearLayout.LayoutParams(dp(48), dp(48));
+        endParams.leftMargin = dp(5);
+        bar.addView(end, endParams);
+        end.setOnLongClickListener(view -> {
+            showSkipCurrentExercisePopup(activeWorkoutExerciseIndex, activeWorkoutSet,
+                    this::resumeActiveWorkoutSurface);
+            return true;
+        });
+        end.setOnClickListener(view -> toast("Press and hold End to protect your workout."));
+
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(76));
+        params.leftMargin = dp(8); params.rightMargin = dp(8); params.topMargin = dp(5); params.bottomMargin = dp(5);
+        shell.addView(bar, params);
+    }
+
+    private Button miniWorkoutButton(String glyph, String description, int background, int foreground) {
+        Button button = action(glyph, background, foreground);
+        button.setTextSize(17);
+        button.setContentDescription(description);
+        button.setPadding(0, 0, 0, 0);
+        button.setMinWidth(0);
+        button.setMinimumWidth(0);
+        applyPressMotion(button);
+        return button;
+    }
+
+    private void showCurrentDashboardPage() {
+        if ("Home".equals(activeDashboardScrollKey)) showHome();
+        else if ("Progress".equals(activeDashboardScrollKey)) showProgress();
+        else if ("Nutrition".equals(activeDashboardScrollKey)) showMeals();
+        else if ("Endurance".equals(activeDashboardScrollKey)) showEndurance();
+        else if ("Scheduler".equals(activeDashboardScrollKey)) showScheduler();
+        else if ("Body".equals(activeDashboardScrollKey)) showBodyContext();
+        else if ("Apex".equals(activeDashboardScrollKey)) showApex();
+        else if ("Settings".equals(activeDashboardScrollKey)) showProfile();
+        else showPlans();
+    }
+
+    private void resumeActiveWorkoutSurface() {
+        if (!hasActiveGuidedWorkout()) return;
+        Coach.Exercise exercise = session.get(activeWorkoutExerciseIndex);
+        if ("rest".equals(activeWorkoutPhase) || "cooldown".equals(activeWorkoutPhase)) {
+            showRest(activeWorkoutExerciseIndex, activeWorkoutSet, exercise,
+                    Math.max(1, activeRecoveryRemainingSeconds), !activeWorkoutPaused, activeRecoveryBetweenExercises);
+            return;
+        }
+        if ("summary".equals(activeWorkoutPhase)) {
+            showExerciseSetSummary(activeWorkoutExerciseIndex, exercise);
+            return;
+        }
+        if (activeWorkoutPaused && setTracker != null && "active".equals(activeWorkoutPhase)) {
+            setTracker.resumeSet(SystemClock.elapsedRealtime());
+            activeWorkoutPaused = false;
+        }
+        showActive(activeWorkoutExerciseIndex, Math.max(1, activeWorkoutSet));
     }
 
     /**
@@ -1093,6 +1349,7 @@ public final class MainActivity extends FragmentActivity {
             });
         }
         shell.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+        addActiveWorkoutMiniBar(shell);
         shell.addView(coachHeroBottomNavigation(activeScreen), new LinearLayout.LayoutParams(-1, dp(76)));
         mountScreen(shell);
         activeDashboardScrollKey = activeScreen;
@@ -1114,6 +1371,7 @@ public final class MainActivity extends FragmentActivity {
             });
         }
         shell.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+        addActiveWorkoutMiniBar(shell);
         shell.addView(coachHeroBottomNavigation(activeScreen), new LinearLayout.LayoutParams(-1, dp(76)));
         mountScreen(shell);
         activeDashboardScrollKey = activeScreen;
@@ -1616,6 +1874,17 @@ public final class MainActivity extends FragmentActivity {
 
     /** One stable video component for every in-app exercise demonstration. */
     private View exerciseMedia(String trainer, Coach.Exercise exercise, int height) {
+        int webpLoop = ExerciseWebp.forExercise(this, exercise.name);
+        if (webpLoop != 0) {
+            FrameLayout mediaCard = new FrameLayout(this);
+            mediaCard.setBackground(surface(navyPanel, 18, 1, mint));
+            applyPremiumTileDepth(mediaCard, false);
+            mediaCard.setClipToOutline(true);
+            mediaCard.setClipChildren(true);
+            mediaCard.setContentDescription("Animated demonstration of " + exercise.name);
+            mediaCard.addView(new LoopingExerciseWebpView(this, webpLoop), new FrameLayout.LayoutParams(-1, -1));
+            return mediaCard;
+        }
         File downloadedVideo = MediaPackManager.localLoop(this, trainer, exercise.name);
         if (downloadedVideo != null) {
             FrameLayout mediaCard = new FrameLayout(this);
@@ -1628,10 +1897,7 @@ public final class MainActivity extends FragmentActivity {
             mediaCard.addView(demonstration, new FrameLayout.LayoutParams(-1, -1));
             return mediaCard;
         }
-        ExerciseAnimationView fallback = new ExerciseAnimationView(this, coachName(), exercise);
-        fallback.setBackground(surface(navyPanel, 18, 1, mint));
-        applyPremiumTileDepth(fallback, false);
-        return fallback;
+        return missingExerciseArtwork(exercise, navyPanel, mint);
     }
 
     /** Posters make dense selection screens fast; playback is reserved for the focused exercise. */
@@ -1645,6 +1911,16 @@ public final class MainActivity extends FragmentActivity {
         poster.setClipToOutline(true);
         poster.setContentDescription(null);
         return poster;
+    }
+
+    /** Never substitutes a coach portrait for an exercise demonstration. */
+    private View missingExerciseArtwork(Coach.Exercise exercise, int backgroundColor, int borderColor) {
+        TextView pending = heading("EXACT MOVEMENT\nIN PRODUCTION", 12, Color.WHITE);
+        pending.setGravity(Gravity.CENTER);
+        pending.setBackground(surface(backgroundColor, 18, 1, borderColor));
+        pending.setContentDescription("Exact Strength Level demonstration pending for " + exercise.name);
+        applyPremiumTileDepth(pending, false);
+        return pending;
     }
 
     private void addButton(LinearLayout body, Button button) {
@@ -2158,6 +2434,7 @@ public final class MainActivity extends FragmentActivity {
             });
         }
         shell.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+        addActiveWorkoutMiniBar(shell);
         shell.addView(coachHeroBottomNavigation("Home"), new LinearLayout.LayoutParams(-1, dp(76)));
         mountScreen(shell);
         // Home owns a custom Coach Hero shell rather than appPage(), so it must bind its
@@ -2219,9 +2496,10 @@ public final class MainActivity extends FragmentActivity {
         nextTop.addView(arrow, new LinearLayout.LayoutParams(dp(36), dp(54)));
         next.addView(nextTop);
         next.addView(text(nextSession.detail, 12, muted));
-        Button start = action("▶  Start workout", coral, Color.WHITE);
-        start.setOnClickListener(view -> openHomeNextWorkout());
-        next.setOnClickListener(view -> openHomeNextWorkout());
+        Button start = action(nextSession.action, "completed".equals(nextSession.state) ? mint : coral,
+                "completed".equals(nextSession.state) ? navy : Color.WHITE);
+        start.setOnClickListener(view -> openHomeNextWorkout(nextSession));
+        next.setOnClickListener(view -> openHomeNextWorkout(nextSession));
         LinearLayout.LayoutParams startParams = new LinearLayout.LayoutParams(-1, dp(48));
         startParams.topMargin = dp(13);
         next.addView(start, startParams);
@@ -2872,30 +3150,57 @@ public final class MainActivity extends FragmentActivity {
 
     /** The Home hero must be a view of the user's schedule, never a demo workout. */
     private HomeSession nextHomeSession() {
+        if (hasActiveGuidedWorkout()) {
+            Coach.Exercise exercise = session.get(activeWorkoutExerciseIndex);
+            String prefix = "Custom".equalsIgnoreCase(planMode) ? "Custom workout" : target + " workout";
+            return new HomeSession(prefix, exercise.name + "  •  Set " + activeWorkoutSet + " of " + exercise.sets,
+                    activeWorkoutPaused ? "▶" : "↗", "active");
+        }
+        long now = System.currentTimeMillis();
+        Calendar today = Calendar.getInstance();
+        for (JourneyStore.WorkoutRecord record : JourneyStore.workouts(this)) {
+            Calendar completed = Calendar.getInstance();
+            completed.setTimeInMillis(record.timestamp);
+            if (completed.get(Calendar.YEAR) == today.get(Calendar.YEAR)
+                    && completed.get(Calendar.DAY_OF_YEAR) == today.get(Calendar.DAY_OF_YEAR)) {
+                boolean custom = record.target.startsWith("Custom · ");
+                String completedTitle = custom ? "Custom workout completed" : "Today’s workout completed";
+                return new HomeSession(completedTitle, record.target.replace("Custom · ", "") + "  •  " + record.minutes + " guided min",
+                        "✓  View summary", "completed");
+            }
+        }
         Calendar week = homeWeekStart(0);
         boolean confirmed = hasHomeWeekSchedule(0, week);
         WeeklyScheduleStore.Schedule schedule = homeWeekSchedule(0, week, confirmed);
         for (int i = 0; i < weekDays.length; i++) {
             Calendar date = homeDate(week, i);
+            if (!isToday(week, i)) continue;
             if (schedule.workoutDays[i]) {
-                return new HomeSession(homeFocusForDay(i, schedule), sessionMinutes + " min  ·  Scheduled workout");
+                return new HomeSession(homeFocusForDay(i, schedule), sessionMinutes + " min  ·  Scheduled today",
+                        "▶  Start workout", "scheduled");
             }
             List<SchedulerStore.Appointment> appointments = SchedulerStore.onDate(this, date);
             if (!appointments.isEmpty()) {
                 SchedulerStore.Appointment appointment = appointments.get(0);
-                return new HomeSession(appointmentAbbreviation(appointment.mode), appointment.durationMinutes + " min  ·  Scheduled endurance");
+                return new HomeSession(appointmentAbbreviation(appointment.mode), appointment.durationMinutes + " min  ·  Scheduled today",
+                        "▶  Start endurance", "endurance");
             }
         }
-        return new HomeSession("Build your\nfirst plan", "Choose a workout or endurance session");
+        return new HomeSession("No workout scheduled today", "Create a custom workout whenever you are ready",
+                "+  Create custom workout", "empty");
     }
 
     private static final class HomeSession {
         final String title;
         final String detail;
+        final String action;
+        final String state;
 
-        HomeSession(String title, String detail) {
+        HomeSession(String title, String detail, String action, String state) {
             this.title = title;
             this.detail = detail;
+            this.action = action;
+            this.state = state;
         }
     }
 
@@ -3040,7 +3345,24 @@ public final class MainActivity extends FragmentActivity {
     }
 
     /** Home is a shortcut to the already-built plan, not a restart of the planning wizard. */
-    private void openHomeNextWorkout() {
+    private void openHomeNextWorkout(HomeSession homeSession) {
+        if ("active".equals(homeSession.state)) {
+            resumeActiveWorkoutSurface();
+            return;
+        }
+        if ("completed".equals(homeSession.state)) {
+            showProgress();
+            return;
+        }
+        if ("empty".equals(homeSession.state)) {
+            planMode = "Custom";
+            showCoachHeroWorkout();
+            return;
+        }
+        if ("endurance".equals(homeSession.state)) {
+            showEndurance();
+            return;
+        }
         if (session.isEmpty()) restoreSavedPlan();
         if (session.isEmpty()) {
             toast("Build a workout plan first.");
@@ -3827,16 +4149,22 @@ public final class MainActivity extends FragmentActivity {
         imageArea.setClipToOutline(true);
         int targetIndex = 0;
         for (int index = 0; index < WIZARD_TARGETS.length; index++) if (WIZARD_TARGETS[index].equals(choice)) targetIndex = index;
-        // One consistent anatomy atlas: the selected muscle group is coral-red on the same
-        // human figure, so the picture conveys the choice without relying on text alone.
-        int column = targetIndex % 2;
-        int row = targetIndex / 2;
-        int left = column == 0 ? 0 : 512;
-        int right = column == 0 ? 512 : 1024;
-        int[] rowTop = {0, 307, 614, 921, 1228};
-        int[] rowBottom = {307, 614, 921, 1228, 1536};
-        ReferenceArtworkView artwork = referenceArtwork(R.drawable.workout_anatomy_highlights,
-                left, rowTop[row], right, rowBottom[row]);
+        // User-approved 3×4 anatomy sheet. Every area, including Biceps and Triceps, is a
+        // dedicated illustration with the coral highlight painted directly into the figure.
+        // Its reading order is Upper, Lower, Arms / Chest, Legs, Full body / Back, Shoulders,
+        // Core / Biceps, Triceps, Endurance. The wizard keeps Endurance before the two arm areas.
+        int artworkIndex = targetIndex;
+        if ("Endurance".equals(choice)) artworkIndex = 11;
+        else if ("Biceps".equals(choice)) artworkIndex = 9;
+        else if ("Triceps".equals(choice)) artworkIndex = 10;
+        int column = artworkIndex % 3;
+        int row = artworkIndex / 3;
+        int[] columnLeft = {4, 365, 725};
+        int[] columnRight = {361, 721, 1082};
+        int[] rowTop = {3, 365, 726, 1087};
+        int[] rowBottom = {360, 721, 1082, 1444};
+        View artwork = referenceArtwork(R.drawable.training_area_illustrations,
+                columnLeft[column], rowTop[row], columnRight[column], rowBottom[row]);
         imageArea.addView(artwork, new FrameLayout.LayoutParams(-1, -1));
         if (selected) {
             TextView check = heading("✓", hasTallPlanViewport() ? 14 : 12, navy);
@@ -3877,7 +4205,7 @@ public final class MainActivity extends FragmentActivity {
             final int value = minutes[i];
             Button option = !customDuration && sessionMinutes == value ? action(labels[i], mint, navy) : action(labels[i], Color.rgb(232, 236, 244), ink);
             option.setTextSize(10);
-            option.setOnClickListener(view -> { sessionMinutes = value; customDuration = false; resetExerciseSelection(); refreshPlanKeepingScroll(this::showPlanDuration); });
+            option.setOnClickListener(view -> { sessionMinutes = value; customDuration = false; workoutNoTimer = false; resetExerciseSelection(); refreshPlanKeepingScroll(this::showPlanDuration); });
             LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(48), 1);
             params.rightMargin = dp(i == minutes.length - 1 ? 0 : 5);
             options.addView(option, params);
@@ -3893,14 +4221,29 @@ public final class MainActivity extends FragmentActivity {
             refreshPlanKeepingScroll(this::showPlanDuration);
         });
         lengthCard.addView(custom, customParams);
-        if (customDuration) addDurationStepper(lengthCard);
+        if (customDuration) {
+            addDurationStepper(lengthCard);
+            gap(lengthCard, 7);
+            Button noTimer = workoutNoTimer
+                    ? action("✓  No timer · count upward", mint, navy)
+                    : action("No timer", Color.rgb(232, 236, 244), ink);
+            noTimer.setContentDescription((workoutNoTimer ? "Selected. " : "")
+                    + "No workout time limit. The guided workout clock counts upward.");
+            noTimer.setOnClickListener(view -> {
+                workoutNoTimer = !workoutNoTimer;
+                refreshPlanKeepingScroll(this::showPlanDuration);
+            });
+            lengthCard.addView(noTimer, new LinearLayout.LayoutParams(-1, dp(46)));
+        }
         body.addView(lengthCard);
         gap(body, 10);
 
         LinearLayout capacity = card();
         capacity.setPadding(dp(14), dp(12), dp(14), dp(12));
-        capacity.addView(heading("Up to " + Coach.durationSummary(sessionMinutes), 16, ink));
-        capacity.addView(text("Your exercise page starts with a time-appropriate shortlist. Add or remove movements freely.", 13, muted));
+        capacity.addView(heading(workoutNoTimer ? "Open-ended guided workout" : "Up to " + Coach.durationSummary(sessionMinutes), 16, ink));
+        capacity.addView(text(workoutNoTimer
+                ? "Your workout clock counts upward. The elapsed time when you finish becomes your recorded guided-workout total."
+                : "Your exercise page starts with a time-appropriate shortlist. Add or remove movements freely.", 13, muted));
         body.addView(capacity);
         gap(body, 12);
         Button next = planPrimary("Next: choose equipment");
@@ -3947,7 +4290,7 @@ public final class MainActivity extends FragmentActivity {
         FrameLayout.LayoutParams copyParams = new FrameLayout.LayoutParams(dp(274), -2, Gravity.LEFT | Gravity.TOP); copyParams.leftMargin = dp(20); copyParams.topMargin = dp(82); hero.addView(copy, copyParams);
         addWorkoutWizardProgress(hero, "Equipment");
 
-        LinearLayout content = new LinearLayout(this); content.setOrientation(LinearLayout.VERTICAL); content.setPadding(dp(16), dp(20), dp(16), dp(36)); content.setBackgroundColor(paper); root.addView(content, new LinearLayout.LayoutParams(-1, -2));
+        LinearLayout content = new LinearLayout(this); content.setOrientation(LinearLayout.VERTICAL); content.setPadding(dp(16), dp(20), dp(16), dp(36)); content.setBackgroundColor(paper); content.setClipChildren(false); content.setClipToPadding(false); root.addView(content, new LinearLayout.LayoutParams(-1, -2));
         TextView section = heading("04  ·  EQUIPMENT", 11, muted); section.setLetterSpacing(.12f); content.addView(section);
         content.addView(heading("Train with what you have", 23, ink));
         content.addView(text("Pick up to two categories. Every exercise on the next page will fit your selection.", 13, muted));
@@ -3957,8 +4300,9 @@ public final class MainActivity extends FragmentActivity {
         LinearLayout guidanceCopy = new LinearLayout(this); guidanceCopy.setOrientation(LinearLayout.VERTICAL); guidanceCopy.addView(heading("BUILD YOUR EQUIPMENT MIX", 10, mint)); guidanceCopy.addView(text("One category is enough. Two gives your plan more variety.", 11, Color.rgb(218, 233, 241))); guidance.addView(guidanceCopy, new LinearLayout.LayoutParams(0, dp(38), 1));
         content.addView(guidance); gap(content, 12);
         for (int index = 0; index < Coach.EQUIPMENT_TYPES.length; index += 2) {
-            LinearLayout row = new LinearLayout(this); row.setOrientation(LinearLayout.HORIZONTAL);
+            LinearLayout row = new LinearLayout(this); row.setOrientation(LinearLayout.HORIZONTAL); row.setClipChildren(false); row.setClipToPadding(false); row.setPadding(0, dp(3), 0, dp(4));
             for (int offset = 0; offset < 2; offset++) {
+                if (index + offset >= Coach.EQUIPMENT_TYPES.length) break;
                 String equipment = Coach.EQUIPMENT_TYPES[index + offset];
                 LinearLayout tile = equipmentTile(equipment, selectedEquipmentTypes.contains(equipment));
                 tile.setOnClickListener(view -> {
@@ -3967,7 +4311,10 @@ public final class MainActivity extends FragmentActivity {
                     else selectedEquipmentTypes.add(equipment);
                     equipmentType = selectedEquipmentTypes.get(0); session.clear(); resetExerciseSelection(); refreshCurrentPageKeepingScroll(this::showPlanEquipment);
                 });
-                LinearLayout.LayoutParams tileParams = new LinearLayout.LayoutParams(0, dp(192), 1); if (offset == 0) tileParams.rightMargin = dp(9); row.addView(tile, tileParams);
+                boolean lastSingle = index + 1 >= Coach.EQUIPMENT_TYPES.length;
+                LinearLayout.LayoutParams tileParams = new LinearLayout.LayoutParams(lastSingle ? -1 : 0, dp(192), lastSingle ? 0 : 1);
+                if (offset == 0 && !lastSingle) tileParams.rightMargin = dp(9);
+                row.addView(tile, tileParams);
             }
             content.addView(row); gap(content, 9);
         }
@@ -3997,7 +4344,11 @@ public final class MainActivity extends FragmentActivity {
         for (int index = 0; index < Coach.EQUIPMENT_TYPES.length; index += 2) {
             LinearLayout row = new LinearLayout(this);
             row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setClipChildren(false);
+            row.setClipToPadding(false);
+            row.setPadding(0, dp(3), 0, dp(4));
             for (int offset = 0; offset < 2; offset++) {
+                if (index + offset >= Coach.EQUIPMENT_TYPES.length) break;
                 String equipment = Coach.EQUIPMENT_TYPES[index + offset];
                 LinearLayout tile = equipmentTile(equipment, selectedEquipmentTypes.contains(equipment));
                 tile.setOnClickListener(view -> {
@@ -4018,8 +4369,9 @@ public final class MainActivity extends FragmentActivity {
                     resetExerciseSelection();
                     refreshPlanKeepingScroll(this::showPlanEquipment);
                 });
-                LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(planEquipmentTileHeight()), 1);
-                params.rightMargin = offset == 0 ? dp(planGridGap()) : 0;
+                boolean lastSingle = index + 1 >= Coach.EQUIPMENT_TYPES.length;
+                LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(lastSingle ? -1 : 0, dp(planEquipmentTileHeight()), lastSingle ? 0 : 1);
+                params.rightMargin = offset == 0 && !lastSingle ? dp(planGridGap()) : 0;
                 row.addView(tile, params);
             }
             body.addView(row);
@@ -4075,6 +4427,7 @@ public final class MainActivity extends FragmentActivity {
     private LinearLayout equipmentTile(String label, boolean selected) {
         String copy;
         if ("Dumbbells".equals(label)) copy = "Free weights";
+        else if ("Barbell".equals(label)) copy = "Olympic bar and plates";
         else if ("At home".equals(label)) copy = "Household items and bands";
         else if ("Machine-assisted".equals(label)) copy = "Guided gym resistance";
         else copy = "No equipment";
@@ -4097,15 +4450,25 @@ public final class MainActivity extends FragmentActivity {
         // square white image visually flatten the top of the card.
         imageArea.setBackground(surface(Color.WHITE, 12, 0, Color.TRANSPARENT));
         imageArea.setClipToOutline(true);
-        int equipmentIndex = 0;
-        for (int index = 0; index < Coach.EQUIPMENT_TYPES.length; index++) if (Coach.EQUIPMENT_TYPES[index].equals(label)) equipmentIndex = index;
-        int column = equipmentIndex % 2;
-        int row = equipmentIndex / 2;
-        int left = column == 0 ? 2 : 629;
-        int right = column == 0 ? 625 : 1252;
-        int top = row == 0 ? 2 : 629;
-        int bottom = row == 0 ? 625 : 1252;
-        ReferenceArtworkView artwork = referenceArtwork(R.drawable.equipment_tiles, left, top, right, bottom);
+        View artwork;
+        if ("Barbell".equals(label)) {
+            ImageView barbellArtwork = new ImageView(this);
+            barbellArtwork.setImageResource(R.drawable.equipment_barbell);
+            barbellArtwork.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+            int barbellInset = dp(hasTallPlanViewport() ? 7 : 5);
+            barbellArtwork.setPadding(barbellInset, barbellInset, barbellInset, barbellInset);
+            artwork = barbellArtwork;
+        } else {
+            int equipmentIndex = 0;
+            for (int index = 0; index < Coach.EQUIPMENT_TYPES.length; index++) if (Coach.EQUIPMENT_TYPES[index].equals(label)) equipmentIndex = index;
+            int column = equipmentIndex % 2;
+            int row = equipmentIndex / 2;
+            int left = column == 0 ? 2 : 629;
+            int right = column == 0 ? 625 : 1252;
+            int top = row == 0 ? 2 : 629;
+            int bottom = row == 0 ? 625 : 1252;
+            artwork = referenceArtwork(R.drawable.equipment_tiles, left, top, right, bottom);
+        }
         imageArea.addView(artwork, new FrameLayout.LayoutParams(-1, -1));
         if (selected) {
             TextView check = heading("✓", hasTallPlanViewport() ? 14 : 12, navy);
@@ -4143,6 +4506,7 @@ public final class MainActivity extends FragmentActivity {
         target = saved.target;
         restoreEquipmentTypes(saved.equipment);
         sessionMinutes = saved.minutes;
+        workoutNoTimer = saved.noTimer;
         workingWeightKg = saved.weightKg;
         planSets = saved.sets;
         planReps = saved.reps;
@@ -4304,7 +4668,9 @@ public final class MainActivity extends FragmentActivity {
         LinearLayout copy = new LinearLayout(this); copy.setOrientation(LinearLayout.VERTICAL);
         TextView eyebrow = heading(planMode.toUpperCase(Locale.ROOT) + " PLAN · STEP 5", 10, mint); eyebrow.setLetterSpacing(.14f); copy.addView(eyebrow);
         TextView title = heading("Choose your\nexercises", 29, Color.WHITE); title.setLineSpacing(0, .93f); copy.addView(title);
-        TextView subtitle = text(sessionMinutes + " minutes, made for " + focusSummary(activeTargets()).toLowerCase(Locale.ROOT) + ". Tap to select; press and hold a card for movement details.", 13, Color.rgb(226, 236, 247));
+        TextView subtitle = text((workoutNoTimer ? "Open-ended session" : sessionMinutes + " minutes")
+                + ", made for " + focusSummary(activeTargets()).toLowerCase(Locale.ROOT)
+                + ". Tap to select; press and hold a card for movement details.", 13, Color.rgb(226, 236, 247));
         LinearLayout.LayoutParams subtitleParams = new LinearLayout.LayoutParams(dp(268), -2); subtitleParams.topMargin = dp(8); copy.addView(subtitle, subtitleParams);
         FrameLayout.LayoutParams copyParams = new FrameLayout.LayoutParams(dp(282), -2, Gravity.LEFT | Gravity.TOP); copyParams.leftMargin = dp(20); copyParams.topMargin = dp(82); hero.addView(copy, copyParams);
         addWorkoutWizardProgress(hero, "Exercises");
@@ -4313,6 +4679,11 @@ public final class MainActivity extends FragmentActivity {
         TextView section = heading("05  ·  EXERCISES", 11, muted); section.setLetterSpacing(.12f); content.addView(section);
         content.addView(heading("Make the session your own", 23, ink));
         content.addView(text("Your recommended movements are selected. Keep them all, or tailor the session one card at a time.", 13, muted));
+        gap(content, 11);
+        Button addCustom = action("＋  Add custom exercises", navyPanel, mint);
+        addCustom.setContentDescription("Open the complete exercise library and add multiple exercises to this workout");
+        addCustom.setOnClickListener(view -> showCustomExerciseLibrary());
+        content.addView(addCustom, new LinearLayout.LayoutParams(-1, dp(50)));
         gap(content, 14);
         LinearLayout actions = new LinearLayout(this); actions.setGravity(Gravity.CENTER_VERTICAL); actions.setPadding(dp(12), dp(10), dp(12), dp(10)); actions.setBackground(surface(Color.rgb(11, 48, 67), 17, 1, Color.rgb(45, 90, 102)));
         Button all = action(selectedExercises.size() == availableExercises.size() ? "Clear all" : "Select all", Color.TRANSPARENT, mint); all.setTextSize(11); all.setMinHeight(0); all.setPadding(dp(6), 0, dp(6), 0); all.setBackground(surface(Color.TRANSPARENT, 99, 1, mint));
@@ -4324,6 +4695,119 @@ public final class MainActivity extends FragmentActivity {
         }
         Button next = action("Next: set up workout  →", coral, Color.WHITE); next.setOnClickListener(view -> { if (selectedExercises.isEmpty()) toast("Select at least one exercise before continuing."); else showPlanSetup(); }); content.addView(next, new LinearLayout.LayoutParams(-1, dp(54)));
         Button back = new Button(this); back.setText("Back"); back.setTextColor(mint); back.setTextSize(14); back.setAllCaps(false); back.setBackgroundColor(Color.TRANSPARENT); back.setOnClickListener(view -> showPlanEquipment()); content.addView(back, new LinearLayout.LayoutParams(-1, dp(46)));
+    }
+
+    /** Full-library multi-select entered from the workout wizard without discarding its state. */
+    private void showCustomExerciseLibrary() {
+        beginNewPage();
+        setSystemBars();
+        ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(true);
+        scroll.setClipToPadding(false);
+        scroll.setBackgroundColor(navy);
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackgroundColor(navy);
+        scroll.addView(root, new ScrollView.LayoutParams(-1, -2));
+        setCoachHeroWizardShell(scroll, "Workouts");
+
+        FrameLayout hero = coachHeroBackdrop("Custom exercise library");
+        root.addView(hero, new LinearLayout.LayoutParams(-1, dp(250)));
+        LinearLayout copy = new LinearLayout(this);
+        copy.setOrientation(LinearLayout.VERTICAL);
+        TextView eyebrow = heading("EXERCISE LIBRARY · MULTI-SELECT", 10, mint);
+        eyebrow.setLetterSpacing(.12f);
+        copy.addView(eyebrow);
+        copy.addView(heading("Add movements\nto your plan", 29, Color.WHITE));
+        copy.addView(text("Choose from every available exercise. Your current selections stay intact.", 13,
+                Color.rgb(226, 236, 247)));
+        FrameLayout.LayoutParams copyParams = new FrameLayout.LayoutParams(dp(286), -2, Gravity.LEFT | Gravity.TOP);
+        copyParams.leftMargin = dp(20);
+        copyParams.topMargin = dp(82);
+        hero.addView(copy, copyParams);
+
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dp(16), dp(18), dp(16), dp(38));
+        content.setBackgroundColor(paper);
+        root.addView(content, new LinearLayout.LayoutParams(-1, -2));
+
+        LinearLayout selectionStatus = card();
+        selectionStatus.addView(heading(selectedExercises.size() + " exercises selected", 18, ink));
+        selectionStatus.addView(text("Tap any movement to add or remove it. Hold for the full demonstration.", 13, muted));
+        content.addView(selectionStatus);
+        gap(content, 12);
+
+        int artworkIndex = 0;
+        for (String group : Coach.TARGETS) {
+            List<Coach.Exercise> exercises = Coach.library().get(group);
+            if (exercises == null || exercises.isEmpty()) continue;
+            content.addView(heading(group, 20, ink));
+            gap(content, 7);
+            for (Coach.Exercise exercise : exercises) {
+                final int index = artworkIndex++;
+                content.addView(customLibraryExerciseCard(exercise, index),
+                        new LinearLayout.LayoutParams(-1, dp(132)));
+                gap(content, 9);
+            }
+            gap(content, 7);
+        }
+        Button done = action("Done · return to my exercises", coral, Color.WHITE);
+        done.setOnClickListener(view -> showExerciseSelection());
+        content.addView(done, new LinearLayout.LayoutParams(-1, dp(54)));
+        Button cancel = new Button(this);
+        cancel.setText("Back without changing more");
+        cancel.setTextColor(mint);
+        cancel.setTextSize(14);
+        cancel.setAllCaps(false);
+        cancel.setBackgroundColor(Color.TRANSPARENT);
+        cancel.setOnClickListener(view -> showExerciseSelection());
+        content.addView(cancel, new LinearLayout.LayoutParams(-1, dp(46)));
+    }
+
+    private LinearLayout customLibraryExerciseCard(Coach.Exercise exercise, int index) {
+        boolean selected = isSelected(exercise);
+        LinearLayout card = new LinearLayout(this);
+        card.setGravity(Gravity.CENTER_VERTICAL);
+        card.setPadding(dp(8), dp(7), dp(9), dp(7));
+        card.setBackground(surface(Color.WHITE, 18, selected ? 2 : 1,
+                selected ? mint : Color.rgb(220, 229, 239)));
+        elevatePlanSurface(card, selected);
+        View artwork = exerciseSelectionArtwork(exercise, index);
+        LinearLayout.LayoutParams artworkParams = new LinearLayout.LayoutParams(dp(105), dp(116));
+        artworkParams.rightMargin = dp(12);
+        card.addView(artwork, artworkParams);
+        LinearLayout details = new LinearLayout(this);
+        details.setOrientation(LinearLayout.VERTICAL);
+        details.addView(heading(exercise.name, 16, ink));
+        details.addView(text(exercise.target.toUpperCase(Locale.ROOT) + "  ·  " + exercise.description, 11, muted));
+        TextView cue = text(exercise.cue, 11, Color.rgb(58, 111, 106));
+        cue.setMaxLines(2);
+        details.addView(cue);
+        card.addView(details, new LinearLayout.LayoutParams(0, -2, 1));
+        TextView state = heading(selected ? "✓" : "+", 18, selected ? navy : muted);
+        state.setGravity(Gravity.CENTER);
+        state.setBackground(surface(selected ? mint : Color.rgb(242, 246, 250), 99, 1,
+                selected ? mint : Color.rgb(164, 184, 205)));
+        card.addView(state, new LinearLayout.LayoutParams(dp(36), dp(36)));
+        card.setContentDescription((selected ? "Selected " : "Add ") + exercise.name);
+        card.setOnClickListener(view -> {
+            toggleExercise(exercise);
+            if (isSelected(exercise) && !containsExercise(availableExercises, exercise.name)) {
+                availableExercises.add(exercise);
+            }
+            refreshCurrentPageKeepingScroll(this::showCustomExerciseLibrary);
+        });
+        card.setOnLongClickListener(view -> {
+            showExercisePreviewDialog(exercise);
+            return true;
+        });
+        return card;
+    }
+
+    private boolean containsExercise(List<Coach.Exercise> exercises, String name) {
+        for (Coach.Exercise exercise : exercises) if (exercise.name.equals(name)) return true;
+        return false;
     }
 
     private LinearLayout premiumExerciseCard(Coach.Exercise exercise, int index, boolean selected) {
@@ -4442,7 +4926,15 @@ public final class MainActivity extends FragmentActivity {
     }
 
     private View exerciseSelectionArtwork(Coach.Exercise exercise, int index) {
-        return exercisePoster(AccountStore.get(this).trainer, exercise);
+        int exactLoop = ExerciseWebp.forExercise(this, exercise.name);
+        if (exactLoop != 0) {
+            LoopingExerciseWebpView exactArtwork = new LoopingExerciseWebpView(this, exactLoop);
+            exactArtwork.setBackground(surface(Color.rgb(248, 250, 253), 13, 0, Color.TRANSPARENT));
+            exactArtwork.setPadding(dp(2), dp(2), dp(2), dp(2));
+            exactArtwork.setContentDescription("Exact animated demonstration of " + exercise.name);
+            return exactArtwork;
+        }
+        return missingExerciseArtwork(exercise, Color.rgb(244, 248, 251), cardLine);
     }
 
     private void showExercisePreviewDialog(Coach.Exercise exercise) {
@@ -4747,7 +5239,11 @@ public final class MainActivity extends FragmentActivity {
     }
 
     private void savePlanWithReminder() {
-        PlanStore.save(this, planMode, target, encodeEquipmentTypes(), sessionMinutes, workingWeightKg, planSets, planReps, planRestSeconds, planCooldownSeconds, planReminderEnabled, planReminderHour, planReminderMinute, weeklyWorkoutDays, encodeFocusTargets(activeTargets()), encodeWeeklyTargets(), encodeWeeklySessionNames(), "Weekly".equals(planMode) ? activeScheduleDay : dailyScheduledDay, selectedWeekOffset, session);
+        PlanStore.save(this, planMode, target, encodeEquipmentTypes(), sessionMinutes, workoutNoTimer,
+                workingWeightKg, planSets, planReps, planRestSeconds, planCooldownSeconds,
+                planReminderEnabled, planReminderHour, planReminderMinute, weeklyWorkoutDays,
+                encodeFocusTargets(activeTargets()), encodeWeeklyTargets(), encodeWeeklySessionNames(),
+                "Weekly".equals(planMode) ? activeScheduleDay : dailyScheduledDay, selectedWeekOffset, session);
         WorkoutReminderScheduler.schedule(this, PlanStore.load(this));
     }
 
@@ -4777,7 +5273,7 @@ public final class MainActivity extends FragmentActivity {
 
     private void showPlanReady() {
         LinearLayout body = planPage();
-        planTitle(body, "PLAN READY", "Your " + focusSummary(activeTargets()).toLowerCase(Locale.ROOT) + " plan is ready", session.size() + " selected movements  •  " + sessionMinutes + " min  •  " + equipmentSummary());
+        planTitle(body, "PLAN READY", "Your " + focusSummary(activeTargets()).toLowerCase(Locale.ROOT) + " plan is ready", session.size() + " selected movements  •  " + (workoutNoTimer ? "No timer" : sessionMinutes + " min") + "  •  " + equipmentSummary());
         LinearLayout schedule = card();
         schedule.addView(heading("Weekly".equals(planMode) ? "Your weekly templates" : "Scheduled workout", 18, ink));
         schedule.addView(text("Ready when you are  •  " + planSchedule(), 14, muted));
@@ -4791,7 +5287,7 @@ public final class MainActivity extends FragmentActivity {
         for (Coach.Exercise exercise : session) {
             LinearLayout item = card();
             item.setOrientation(LinearLayout.HORIZONTAL);
-            ImageView poster = exercisePoster(AccountStore.get(this).trainer, exercise);
+            View poster = exerciseSelectionArtwork(exercise, 0);
             LinearLayout.LayoutParams posterParams = new LinearLayout.LayoutParams(dp(66), dp(74));
             posterParams.rightMargin = dp(12);
             item.addView(poster, posterParams);
@@ -4815,7 +5311,9 @@ public final class MainActivity extends FragmentActivity {
         gap(body, 12);
         LinearLayout nexus = card();
         nexus.addView(heading("Plan + fuel + progress", 17, ink));
-        nexus.addView(text("This plan becomes a Progress completion when you finish. Nutrition uses " + sessionMinutes + " min and " + focusSummary(activeTargets()) + " to surface practical fuel ideas.", 14, muted));
+        nexus.addView(text("This plan becomes a Progress completion when you finish. Nutrition uses "
+                + (workoutNoTimer ? "your recorded workout duration" : sessionMinutes + " min") + " and "
+                + focusSummary(activeTargets()) + " to surface practical fuel ideas.", 14, muted));
         gap(nexus, 9);
         Button fuel = lightAction("Preview fuel for this plan");
         fuel.setOnClickListener(view -> showMeals());
@@ -6860,17 +7358,24 @@ public final class MainActivity extends FragmentActivity {
         currentExerciseSetTimes.clear();
         completedExerciseSetTimes.clear();
         guidedWorkoutStartedAt = SystemClock.elapsedRealtime();
-        guidedWorkoutAllowanceMillis = Math.max(1L, sessionMinutes) * 60_000L;
+        guidedWorkoutAllowanceMillis = workoutNoTimer ? 0L : Math.max(1L, sessionMinutes) * 60_000L;
         guidedSetRestMillis = 0L;
         guidedCooldownMillis = 0L;
         currentExerciseSetRestMillis = 0L;
         skippedSetRestMillis = 0L;
         skippedCooldownMillis = 0L;
+        skippedWorkoutExerciseIndices.clear();
         recoverySegmentStartedAt = -1L;
         recoverySegmentIsCooldown = false;
         stopWorkoutRemainingClock();
         guidedSessionRecorded = false;
         guidedWorkoutAborted = false;
+        activeWorkoutExerciseIndex = 0;
+        activeWorkoutSet = 1;
+        activeWorkoutPhase = "countdown";
+        activeWorkoutPaused = false;
+        requestWorkoutNotificationPermission();
+        syncWorkoutService();
         showSetCountIn(0, 1, true);
     }
 
@@ -6891,7 +7396,10 @@ public final class MainActivity extends FragmentActivity {
                 : setOpenings[openingPhraseIndex++ % setOpenings.length];
         String dialogueMode = profile().dialogueMode;
         boolean audioCountdown = CoachPreferences.usesVoice(dialogueMode);
-        LinearLayout body = appPage("Workouts");
+        activeWorkoutExerciseIndex = index;
+        activeWorkoutSet = set;
+        activeWorkoutPhase = "countdown";
+        LinearLayout body = guidedWorkoutPage();
         addWorkoutRemainingHeader(body);
         title(body, newExercise ? "NEW EXERCISE" : "NEXT SET", "Visual countdown", "Your set timer begins when the countdown finishes.");
         LinearLayout countCard = card();
@@ -6922,80 +7430,92 @@ public final class MainActivity extends FragmentActivity {
             currentExerciseSetTimes.clear();
             currentExerciseSetRestMillis = 0L;
         }
-        LinearLayout body = appPage("Workouts");
+        activeWorkoutExerciseIndex = index;
+        activeWorkoutSet = set;
+        activeWorkoutPhase = "active";
+        activeWorkoutPaused = setTracker != null && setTracker.isPaused();
+        syncWorkoutService();
+        LinearLayout body = guidedWorkoutPage();
         addWorkoutRemainingHeader(body);
-        title(body, "GUIDED WORKOUT", exercise.target, "Exercise " + (index + 1) + " of " + session.size() + "  •  Set " + set + " of " + exercise.sets);
+        TextView guided = heading("GUIDED WORKOUT", 13, mint);
+        guided.setLetterSpacing(.10f);
+        body.addView(guided);
+        gap(body, 9);
+        LinearLayout exerciseProgress = new LinearLayout(this);
+        exerciseProgress.setGravity(Gravity.CENTER_VERTICAL);
+        ProgressBar progress = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+        progress.setMax(Math.max(1, session.size()));
+        progress.setProgress(index + 1);
+        progress.setProgressTintList(ColorStateList.valueOf(mint));
+        progress.setIndeterminateTintList(ColorStateList.valueOf(mint));
+        progress.setProgressBackgroundTintList(ColorStateList.valueOf(Color.rgb(45, 69, 96)));
+        exerciseProgress.addView(progress, new LinearLayout.LayoutParams(0, dp(6), 1));
+        TextView progressCopy = heading((index + 1) + " of " + session.size() + " exercises", 11, Color.rgb(201, 217, 232));
+        LinearLayout.LayoutParams progressCopyParams = new LinearLayout.LayoutParams(-2, -2);
+        progressCopyParams.leftMargin = dp(10);
+        exerciseProgress.addView(progressCopy, progressCopyParams);
+        body.addView(exerciseProgress);
+        gap(body, 13);
+        TextView exerciseName = heading(exercise.name, 25, Color.WHITE);
+        exerciseName.setGravity(Gravity.CENTER);
+        body.addView(exerciseName);
+        TextView setCount = text("Set " + set + " of " + exercise.sets, 16, Color.rgb(221, 235, 246));
+        setCount.setGravity(Gravity.CENTER);
+        body.addView(setCount);
+        gap(body, 12);
 
         LinearLayout demoCard = card();
         demoCard.setPadding(0, 0, 0, 0);
-        demoCard.addView(exerciseMedia(AccountStore.get(this).trainer, exercise, 235), new LinearLayout.LayoutParams(-1, dp(235)));
+        demoCard.addView(exerciseMedia(AccountStore.get(this).trainer, exercise, 250), new LinearLayout.LayoutParams(-1, dp(250)));
         body.addView(demoCard);
-        gap(body, 14);
-        body.addView(heading(exercise.name, 25, Color.WHITE));
-        body.addView(text("Set " + set + " of " + exercise.sets + "  •  Work with controlled form", 17, mint));
-        gap(body, 10);
-
-        LinearLayout cue = card();
-        cue.addView(heading("Coach cue", 15, ink));
-        cue.addView(text(exercise.cue, 16, muted));
-        body.addView(cue);
         gap(body, 12);
 
-        LinearLayout timing = card();
-        TextView timerLabel = heading("CURRENT SET TIME", 11, muted);
-        timerLabel.setLetterSpacing(.07f);
-        timing.addView(timerLabel);
-        TextView setClock = heading("00:00.0", 44, ink);
+        FrameLayout timing = new FrameLayout(this);
+        WorkoutTimerRingView timerRing = new WorkoutTimerRingView(this, mint);
+        timing.addView(timerRing, new FrameLayout.LayoutParams(-1, -1));
+        TextView setClock = heading("00:00.0", 35, Color.WHITE);
         setClock.setGravity(Gravity.CENTER);
         setClock.setContentDescription("Current set elapsed time zero seconds");
-        timing.addView(setClock, new LinearLayout.LayoutParams(-1, dp(70)));
-        TextView paceStatus = text("Timing set " + set + ". Tap completed when the whole set is finished.", 14, muted);
-        paceStatus.setGravity(Gravity.CENTER);
-        timing.addView(paceStatus);
-        gap(timing, 8);
-        TextView history = text(setHistoryText(exercise), 13, muted);
-        history.setGravity(Gravity.CENTER);
-        timing.addView(history);
-        body.addView(timing);
+        timing.addView(setClock, new FrameLayout.LayoutParams(-1, -1));
+        LinearLayout.LayoutParams timingParams = new LinearLayout.LayoutParams(dp(168), dp(168));
+        timingParams.gravity = Gravity.CENTER_HORIZONTAL;
+        body.addView(timing, timingParams);
         gap(body, 12);
-
-        LinearLayout counters = new LinearLayout(this);
-        counters.setOrientation(LinearLayout.HORIZONTAL);
-        addCounterValue(counters, "SET", set + " / " + exercise.sets);
-        TextView recoveryValue = addCounterValue(counters, "RECOVERY", format(setTracker.recoverySeconds()));
-        body.addView(counters);
-        gap(body, 14);
         final long setStartedAt = SystemClock.elapsedRealtime();
-        setTracker.startSet(setStartedAt);
-        startSetClock(setClock, setStartedAt);
-        Button done = primary("Set " + set + " completed");
+        if (setTracker.elapsedMillis(setStartedAt) <= 0L) setTracker.startSet(setStartedAt);
+        if (activeWorkoutPaused) setTracker.pauseSet(setStartedAt);
+        startSetClock(setClock, timerRing, setTracker);
+        Button done = action("✓   SET COMPLETE", mint, navy);
         done.setContentDescription("Mark set " + set + " completed and record its total time");
         done.setOnClickListener(view -> {
             done.setEnabled(false);
             stopSetClock();
             WorkoutTiming.SetResult result = setTracker.completeSet(SystemClock.elapsedRealtime());
             currentExerciseSetTimes.add(new SetTimeStore.SetEntry(result.setNumber, result.durationMillis));
-            history.setText(setHistoryText(exercise));
-            recoveryValue.setText(format(result.recoverySeconds));
-            if (result.slowerThanRecentPace) {
-                paceStatus.setText("This set took longer · recovery increased by 10 seconds.");
-                recoveryValue.setTextColor(coral);
-            } else {
-                paceStatus.setText("Set " + set + " recorded at " + WorkoutTiming.formatElapsedMillis(result.durationMillis) + ".");
-            }
             finishSet(index, set, exercise, result.recoverySeconds);
         });
         addButton(body, done);
-        gap(body, 10);
-        if (CoachPreferences.FULL_DIALOGUE.equals(profile().dialogueMode)) {
-            Button callout = secondary("Hear set guidance");
-            callout.setOnClickListener(view -> say("Set " + set + ". Work with controlled form. " + exercise.cue));
-            addButton(body, callout);
-            gap(body, 10);
-        }
-        Button emergency = emergencyStopButton();
-        emergency.setOnClickListener(view -> showEmergencyStopConfirmation(index, set, () -> showActive(index, set)));
-        addButton(body, emergency);
+        gap(body, 9);
+        LinearLayout controls = new LinearLayout(this);
+        controls.setOrientation(LinearLayout.HORIZONTAL);
+        Button pause = secondary(activeWorkoutPaused ? "Resume" : "Pause");
+        pause.setOnClickListener(view -> {
+            if (activeWorkoutPaused) setTracker.resumeSet(SystemClock.elapsedRealtime());
+            else setTracker.pauseSet(SystemClock.elapsedRealtime());
+            activeWorkoutPaused = !activeWorkoutPaused;
+            showActive(index, set);
+        });
+        LinearLayout.LayoutParams pauseParams = new LinearLayout.LayoutParams(0, dp(54), 1);
+        pauseParams.rightMargin = dp(8);
+        controls.addView(pause, pauseParams);
+        Button end = action("End workout", coral, Color.WHITE);
+        end.setOnClickListener(view -> showEmergencyStopConfirmation(index, set, () -> showActive(index, set)));
+        end.setOnLongClickListener(view -> {
+            showSkipCurrentExercisePopup(index, set, () -> showActive(index, set));
+            return true;
+        });
+        controls.addView(end, new LinearLayout.LayoutParams(0, dp(54), 1));
+        body.addView(controls);
     }
 
     private TextView addCounterValue(LinearLayout row, String label, String value) {
@@ -7012,12 +7532,13 @@ public final class MainActivity extends FragmentActivity {
         return valueView;
     }
 
-    private void startSetClock(TextView clock, long startedAt) {
+    private void startSetClock(TextView clock, WorkoutTimerRingView ring, WorkoutTiming.SetTracker tracker) {
         stopSetClock();
         setClockUpdate = new Runnable() {
             @Override public void run() {
-                long elapsed = SystemClock.elapsedRealtime() - startedAt;
+                long elapsed = tracker.elapsedMillis(SystemClock.elapsedRealtime());
                 clock.setText(WorkoutTiming.formatElapsedMillis(elapsed));
+                ring.setElapsedMillis(elapsed);
                 clock.setContentDescription("Current set elapsed time " + WorkoutTiming.formatElapsedMillis(elapsed));
                 workoutHandler.postDelayed(this, 100L);
             }
@@ -7033,9 +7554,9 @@ public final class MainActivity extends FragmentActivity {
     /** Remaining planned workout allowance; pauses do not stop it and skipped recovery reduces it. */
     private long workoutRemainingMillis() {
         if (guidedWorkoutStartedAt <= 0L) return 0L;
-        long elapsed = Math.max(0L, SystemClock.elapsedRealtime() - guidedWorkoutStartedAt);
         long skipped = skippedCooldownMillis + skippedSetRestMillis;
-        return Math.max(0L, guidedWorkoutAllowanceMillis - elapsed - skipped);
+        return WorkoutTiming.workoutClockMillis(workoutNoTimer, guidedWorkoutStartedAt,
+                SystemClock.elapsedRealtime(), guidedWorkoutAllowanceMillis, skipped);
     }
 
     private String skippedTimerLabel(String prefix, long millis) {
@@ -7051,14 +7572,16 @@ public final class MainActivity extends FragmentActivity {
         header.setPadding(0, dp(3), 0, dp(3));
         ProgressBar progress = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
         progress.setMax(1000);
+        progress.setIndeterminate(workoutNoTimer);
         progress.setProgressTintList(ColorStateList.valueOf(mint));
+        progress.setIndeterminateTintList(ColorStateList.valueOf(mint));
         progress.setProgressBackgroundTintList(ColorStateList.valueOf(Color.rgb(45, 69, 96)));
         progress.setContentDescription("Workout time remaining");
         header.addView(progress, new LinearLayout.LayoutParams(-1, dp(4)));
         LinearLayout status = new LinearLayout(this);
-        status.setGravity(Gravity.CENTER_VERTICAL | Gravity.RIGHT);
+        status.setGravity(Gravity.CENTER_VERTICAL);
         TextView remaining = heading("", 10, Color.WHITE);
-        remaining.setGravity(Gravity.RIGHT);
+        remaining.setGravity(Gravity.LEFT | Gravity.CENTER_VERTICAL);
         status.addView(remaining, new LinearLayout.LayoutParams(0, -2, 1));
         TextView cooldownSkip = workoutTimerChip(mint);
         LinearLayout.LayoutParams cooldownParams = new LinearLayout.LayoutParams(-2, dp(23));
@@ -7077,13 +7600,15 @@ public final class MainActivity extends FragmentActivity {
         workoutRemainingUpdate = new Runnable() {
             @Override public void run() {
                 long remainingMillis = workoutRemainingMillis();
-                int fraction = guidedWorkoutAllowanceMillis <= 0L ? 0
+                int fraction = workoutNoTimer || guidedWorkoutAllowanceMillis <= 0L ? 0
                         : (int) Math.round(1000d * remainingMillis / guidedWorkoutAllowanceMillis);
-                progress.setProgress(Math.max(0, Math.min(1000, fraction)));
-                remaining.setText(WorkoutTiming.formatElapsedMillis(remainingMillis));
+                if (!workoutNoTimer) progress.setProgress(Math.max(0, Math.min(1000, fraction)));
+                remaining.setText((workoutNoTimer ? "ELAPSED  " : "")
+                        + WorkoutTiming.formatElapsedMillis(remainingMillis));
                 cooldownSkip.setText(skippedTimerLabel("COOL", skippedCooldownMillis));
                 restSkip.setText(skippedTimerLabel("REST", skippedSetRestMillis));
-                progress.setContentDescription(WorkoutTiming.formatElapsedMillis(remainingMillis) + " remaining; "
+                progress.setContentDescription(WorkoutTiming.formatElapsedMillis(remainingMillis)
+                        + (workoutNoTimer ? " elapsed; " : " remaining; ")
                         + skippedTimerLabel("cooldown skipped", skippedCooldownMillis) + "; "
                         + skippedTimerLabel("rest skipped", skippedSetRestMillis));
                 if (!guidedWorkoutAborted && !guidedSessionRecorded) workoutHandler.postDelayed(this, 250L);
@@ -7258,7 +7783,10 @@ public final class MainActivity extends FragmentActivity {
         stopSetClock();
         SetTimeStore.ExerciseSummary summary = completeExerciseTiming(index, exercise);
         boolean hasNextExercise = index + 1 < session.size();
-        LinearLayout body = appPage("Workouts");
+        activeWorkoutExerciseIndex = index;
+        activeWorkoutSet = exercise.sets;
+        activeWorkoutPhase = "summary";
+        LinearLayout body = guidedWorkoutPage();
         addWorkoutRemainingHeader(body);
         title(body, "EXERCISE COMPLETE", exercise.name, "Your set leaderboard is ordered from fastest to slowest. The total below includes work-set time only, not rest or cooldown.");
         addSetTimesCard(body, summary, true);
@@ -7316,20 +7844,65 @@ public final class MainActivity extends FragmentActivity {
     private void showRest(int index, int set, Coach.Exercise exercise, int secondsRemaining, boolean running, boolean betweenExercises) {
         if (guidedWorkoutAborted) return;
         stopSetClock();
-        LinearLayout body = appPage("Workouts");
+        activeWorkoutExerciseIndex = index;
+        activeWorkoutSet = set;
+        activeWorkoutPhase = betweenExercises ? "cooldown" : "rest";
+        activeWorkoutPaused = !running;
+        activeRecoveryRemainingSeconds = secondsRemaining;
+        activeRecoveryBetweenExercises = betweenExercises;
+        String announcementKey = index + ":" + set + ":" + betweenExercises;
+        if (!announcementKey.equals(recoveryAnnouncementKey)) {
+            recoveryAnnouncementKey = announcementKey;
+            recoveryAnnouncements.clear();
+        }
+        syncWorkoutService();
+        LinearLayout body = guidedWorkoutPage();
         addWorkoutRemainingHeader(body);
-        title(body, betweenExercises ? "COOLDOWN TIMER" : "REST TIMER", betweenExercises ? "Cooldown before next exercise" : "Set complete · recover", betweenExercises ? "Your " + restChoiceLabel(planCooldownSeconds) + " exercise cooldown is separate from set rest. The next exercise begins after its visual count-in." : "Your custom set rest is " + restChoiceLabel(secondsRemaining) + ". Your next set begins after the visual count-in.");
-        LinearLayout timerCard = card();
-        TextView timer = heading(format(secondsRemaining), 52, ink);
+        title(body, betweenExercises ? "COOLDOWN TIMER" : "REST TIMER",
+                betweenExercises ? "Cooldown before next exercise" : "Set complete · recover",
+                betweenExercises ? "" : "Your custom set rest is " + restChoiceLabel(secondsRemaining)
+                        + ". Your next set begins after the visual count-in.");
+        final int[] remaining = {secondsRemaining};
+        if (betweenExercises) {
+            int upcomingIndex = nextWorkoutExerciseIndex(index);
+            if (upcomingIndex < session.size()) {
+                addUpcomingExerciseCard(body, upcomingIndex, index >= 0,
+                        () -> restartExerciseFromCooldown(index),
+                        () -> restartExerciseFromCooldown(index), () -> {
+                    if (restTimer != null) restTimer.cancel();
+                    endRecoverySegment();
+                    stopSpeech();
+                    skippedWorkoutExerciseIndices.add(upcomingIndex);
+                    if (nextWorkoutExerciseIndex(index) >= session.size()) showComplete();
+                    else showRest(index, set, exercise, remaining[0], running, true);
+                });
+            }
+            gap(body, 14);
+        }
+        final int recoveryTotalSeconds = Math.max(1, betweenExercises
+                ? planCooldownSeconds : Math.max(secondsRemaining, exercise.restSeconds));
+        FrameLayout timerFrame = new FrameLayout(this);
+        WorkoutTimerRingView recoveryRing = new WorkoutTimerRingView(this, mint);
+        recoveryRing.setProgressFraction(Math.max(0f,
+                (recoveryTotalSeconds - secondsRemaining) / (float) recoveryTotalSeconds));
+        timerFrame.addView(recoveryRing, new FrameLayout.LayoutParams(-1, -1));
+        TextView timer = heading(format(secondsRemaining), 35, Color.WHITE);
         timer.setGravity(Gravity.CENTER);
         timer.setContentDescription((betweenExercises ? "Cooldown" : "Rest") + " time remaining " + secondsRemaining + " seconds");
-        timerCard.addView(timer, new LinearLayout.LayoutParams(-1, dp(98)));
-        TextView reminder = text(running ? "Breathe slowly. Your 5-to-1 count-in begins when recovery is complete." : "Countdown paused. Resume when you are ready.", 15, muted);
+        timerFrame.addView(timer, new FrameLayout.LayoutParams(-1, -1));
+        LinearLayout.LayoutParams timerFrameParams = new LinearLayout.LayoutParams(dp(168), dp(168));
+        timerFrameParams.gravity = Gravity.CENTER_HORIZONTAL;
+        body.addView(timerFrame, timerFrameParams);
+        gap(body, 8);
+        String recoveryMessage = running
+                ? (betweenExercises
+                    ? "Breathe slowly. Your new exercise will begin when recovery timer is complete."
+                    : "Breathe slowly. The countdown begins when the previous completes.")
+                : "Countdown paused. Resume when you are ready.";
+        TextView reminder = text(recoveryMessage, 15, Color.rgb(201, 217, 232));
         reminder.setGravity(Gravity.CENTER);
-        timerCard.addView(reminder);
-        body.addView(timerCard);
+        body.addView(reminder);
         gap(body, 14);
-        final int[] remaining = {secondsRemaining};
         LinearLayout controls = new LinearLayout(this);
         controls.setOrientation(LinearLayout.HORIZONTAL);
         Button pause = running ? secondary("Pause") : action("Resume", mint, navy);
@@ -7376,18 +7949,158 @@ public final class MainActivity extends FragmentActivity {
             @Override public void onTick(long left) {
                 int seconds = (int) Math.ceil(left / 1000d);
                 remaining[0] = seconds;
+                activeRecoveryRemainingSeconds = seconds;
                 timer.setText(format(seconds));
+                recoveryRing.setProgressFraction(Math.max(0f,
+                        (recoveryTotalSeconds - seconds) / (float) recoveryTotalSeconds));
                 timer.setContentDescription((betweenExercises ? "Cooldown" : "Rest") + " time remaining " + seconds + " seconds");
+                announceRecoveryMilestone(seconds);
                 updateTotalExerciseViews(totalExercise, activeSetMillis);
             }
 
             @Override public void onFinish() {
                 endRecoverySegment();
                 timer.setText("00:00");
+                recoveryRing.setProgressFraction(1f);
                 updateTotalExerciseViews(totalExercise, activeSetMillis);
                 advance(index, set, exercise);
             }
         }.start();
+    }
+
+    private void announceRecoveryMilestone(int secondsRemaining) {
+        if (secondsRemaining != 60 && secondsRemaining != 30
+                && secondsRemaining != 20 && secondsRemaining != 10) return;
+        if (!recoveryAnnouncements.add(secondsRemaining)) return;
+        if (!CoachPreferences.usesVoice(profile().dialogueMode)) return;
+        String words = secondsRemaining == 60
+                ? "One minute."
+                : secondsRemaining + " seconds remaining.";
+        speakCoach(words, TextToSpeech.QUEUE_FLUSH, null);
+    }
+
+    /** Keeps the athlete oriented during cooldown without starting the next movement early. */
+    private void addUpcomingExerciseCard(LinearLayout container, int nextIndex, boolean hasPrevious,
+                                         Runnable previousAction, Runnable repeatAction, Runnable skipAction) {
+        if (session == null || nextIndex < 0 || nextIndex >= session.size()) return;
+        Coach.Exercise upcoming = session.get(nextIndex);
+        LinearLayout preview = new LinearLayout(this);
+        preview.setOrientation(LinearLayout.VERTICAL);
+        preview.setPadding(dp(14), dp(13), dp(14), dp(14));
+        preview.setBackground(surface(paper, 20, 1, mint));
+        applyPremiumTileDepth(preview, false);
+        preview.setContentDescription("Coming up next, " + upcoming.name + ", "
+                + upcoming.sets + " sets of " + upcoming.reps + " repetitions");
+
+        LinearLayout headingRow = new LinearLayout(this);
+        headingRow.setGravity(Gravity.CENTER_VERTICAL);
+        TextView eyebrow = heading("COMING UP NEXT", 11, coral);
+        eyebrow.setLetterSpacing(.09f);
+        headingRow.addView(eyebrow, new LinearLayout.LayoutParams(0, -2, 1));
+        TextView marker = heading((nextIndex + 1) + " OF " + session.size(), 11, muted);
+        marker.setGravity(Gravity.END);
+        headingRow.addView(marker);
+        preview.addView(headingRow);
+        gap(preview, 4);
+
+        LinearLayout nameActionRow = new LinearLayout(this);
+        nameActionRow.setGravity(Gravity.TOP | Gravity.CENTER_VERTICAL);
+        TextView exerciseName = heading(upcoming.name, 20, ink);
+        exerciseName.setMaxLines(2);
+        LinearLayout.LayoutParams exerciseNameParams = new LinearLayout.LayoutParams(0, -2, 1);
+        exerciseNameParams.rightMargin = dp(8);
+        nameActionRow.addView(exerciseName, exerciseNameParams);
+        LinearLayout actionRail = new LinearLayout(this);
+        actionRail.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
+        actionRail.setClipChildren(false);
+        actionRail.setClipToPadding(false);
+        actionRail.setPadding(dp(3), dp(3), dp(3), dp(3));
+
+        ImageButton previous = recoveryExerciseIconAction(R.drawable.ic_previous_exercise,
+                hasPrevious ? "Previous exercise" : "Previous exercise unavailable");
+        previous.setEnabled(hasPrevious);
+        previous.setAlpha(hasPrevious ? 1f : .34f);
+        previous.setOnClickListener(view -> previousAction.run());
+        actionRail.addView(previous, recoveryExerciseIconActionParams(true));
+
+        ImageButton repeat = recoveryExerciseIconAction(R.drawable.ic_repeat_exercise,
+                "Repeat completed exercise");
+        repeat.setOnClickListener(view -> repeatAction.run());
+        actionRail.addView(repeat, recoveryExerciseIconActionParams(true));
+
+        ImageButton skipExercise = recoveryExerciseIconAction(R.drawable.ic_next_exercise,
+                "Next exercise. Skip " + upcoming.name);
+        skipExercise.setOnClickListener(view -> skipAction.run());
+        actionRail.addView(skipExercise, recoveryExerciseIconActionParams(false));
+        nameActionRow.setClipChildren(false);
+        nameActionRow.setClipToPadding(false);
+        nameActionRow.addView(actionRail, new LinearLayout.LayoutParams(-2, dp(46)));
+        preview.addView(nameActionRow);
+        gap(preview, 3);
+
+        LinearLayout content = new LinearLayout(this);
+        content.setGravity(Gravity.CENTER_VERTICAL);
+        content.setTranslationY(-dp(8));
+        View artwork = exerciseSelectionArtwork(upcoming, nextIndex);
+        LinearLayout.LayoutParams artworkParams = new LinearLayout.LayoutParams(dp(136), dp(136));
+        artworkParams.rightMargin = dp(14);
+        content.addView(artwork, artworkParams);
+
+        LinearLayout details = new LinearLayout(this);
+        details.setOrientation(LinearLayout.VERTICAL);
+        TextView targetLabel = heading(upcoming.target.toUpperCase(Locale.ROOT), 11, Color.rgb(29, 116, 106));
+        targetLabel.setLetterSpacing(.06f);
+        details.addView(targetLabel);
+        gap(details, 5);
+        details.addView(text(upcoming.sets + " sets  ·  " + upcoming.reps + " reps", 15, muted));
+        details.addView(text(upcoming.cue, 13, muted));
+        content.addView(details, new LinearLayout.LayoutParams(0, -2, 1));
+        preview.addView(content);
+        container.addView(preview);
+    }
+
+    private ImageButton recoveryExerciseIconAction(int icon, String description) {
+        ImageButton button = new ImageButton(this);
+        button.setImageResource(icon);
+        button.setScaleType(ImageView.ScaleType.CENTER);
+        button.setPadding(dp(10), dp(10), dp(10), dp(10));
+        GradientDrawable background = new GradientDrawable();
+        background.setShape(GradientDrawable.OVAL);
+        background.setColor(Color.WHITE);
+        background.setStroke(dp(1), Color.rgb(218, 225, 232));
+        button.setBackground(background);
+        button.setElevation(dp(5));
+        button.setContentDescription(description + ". Press and hold for help.");
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) button.setTooltipText(description);
+        button.setOnLongClickListener(view -> {
+            view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
+            toast(description);
+            return true;
+        });
+        applyPressMotion(button);
+        return button;
+    }
+
+    private LinearLayout.LayoutParams recoveryExerciseIconActionParams(boolean addRightMargin) {
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(dp(38), dp(38));
+        if (addRightMargin) params.rightMargin = dp(7);
+        return params;
+    }
+
+    private void restartExerciseFromCooldown(int exerciseIndex) {
+        if (exerciseIndex < 0 || exerciseIndex >= session.size()) return;
+        if (restTimer != null) restTimer.cancel();
+        endRecoverySegment();
+        stopSpeech();
+        while (completedExerciseSetTimes.size() > exerciseIndex) {
+            completedExerciseSetTimes.remove(completedExerciseSetTimes.size() - 1);
+        }
+        skippedWorkoutExerciseIndices.remove(exerciseIndex);
+        timingExerciseIndex = -1;
+        setTracker = null;
+        currentExerciseSetTimes.clear();
+        currentExerciseSetRestMillis = 0L;
+        showSetCountIn(exerciseIndex, 1, true);
     }
 
     private Button emergencyStopButton() {
@@ -7398,12 +8111,73 @@ public final class MainActivity extends FragmentActivity {
         return button;
     }
 
+    /** A long-press shortcut that skips only the active exercise; Cancel dismisses this popup only. */
+    private void showSkipCurrentExercisePopup(int index, int set, Runnable cancelAction) {
+        if (session == null || index < 0 || index >= session.size()) return;
+        Coach.Exercise exercise = session.get(index);
+        Dialog dialog = new Dialog(this);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+
+        LinearLayout panel = new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setPadding(dp(22), dp(22), dp(22), dp(20));
+        panel.setBackground(surface(paper, 24, 1, mint));
+        applyPremiumTileDepth(panel, false);
+
+        TextView eyebrow = heading("WORKOUT CONTROL", 11, mint);
+        eyebrow.setLetterSpacing(.09f);
+        panel.addView(eyebrow);
+        gap(panel, 7);
+        panel.addView(heading("Skip this exercise?", 24, ink));
+        gap(panel, 6);
+        panel.addView(text("Move past " + exercise.name
+                + " and continue to the cooldown before your next exercise.", 14, muted));
+        gap(panel, 18);
+
+        Button skipExercise = action("Skip this exercise", coral, Color.WHITE);
+        skipExercise.setContentDescription("Skip " + exercise.name + " and begin cooldown");
+        skipExercise.setOnClickListener(view -> {
+            dialog.dismiss();
+            stopSetClock();
+            stopSpeech();
+            setTracker = null;
+            timingExerciseIndex = -1;
+            currentExerciseSetTimes.clear();
+            currentExerciseSetRestMillis = 0L;
+            int nextExercise = WorkoutTiming.exerciseAfterSkip(index, session.size());
+            if (nextExercise >= session.size()) showComplete();
+            else showRest(index, exercise.sets, exercise, planCooldownSeconds, true, true);
+        });
+        addButton(panel, skipExercise);
+        gap(panel, 9);
+
+        Button cancel = secondary("Cancel");
+        cancel.setContentDescription("Cancel popup and continue the workout");
+        cancel.setOnClickListener(view -> dialog.dismiss());
+        addButton(panel, cancel);
+
+        dialog.setContentView(panel);
+        dialog.setOnCancelListener(ignored -> {
+            if (cancelAction != null) cancelAction.run();
+        });
+        Window window = dialog.getWindow();
+        if (window != null) {
+            window.setBackgroundDrawableResource(android.R.color.transparent);
+            window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+            WindowManager.LayoutParams attributes = window.getAttributes();
+            attributes.dimAmount = .68f;
+            window.setAttributes(attributes);
+        }
+        dialog.show();
+        if (window != null) window.setLayout(-1, -2);
+    }
+
     private void showEmergencyStopConfirmation(int index, int set, Runnable continueAction) {
         if (restTimer != null) restTimer.cancel();
         endRecoverySegment();
         stopSetClock();
         stopSpeech();
-        LinearLayout body = appPage("Workouts");
+        LinearLayout body = guidedWorkoutPage();
         title(body, "EMERGENCY STOP", "End this guided\nworkout?", "This stops the current session. Your saved Daily or Weekly plan will remain available to restart later.");
         LinearLayout notice = card();
         notice.addView(heading("Your progress in this session will not be marked complete.", 17, ink));
@@ -7423,6 +8197,11 @@ public final class MainActivity extends FragmentActivity {
             skippedCooldownMillis = 0L;
             recoverySegmentStartedAt = -1L;
             recoverySegmentIsCooldown = false;
+            activeWorkoutExerciseIndex = -1;
+            activeWorkoutSet = 0;
+            activeWorkoutPhase = "";
+            activeWorkoutPaused = false;
+            stopWorkoutService();
             stopWorkoutRemainingClock();
             showHome();
         });
@@ -7436,7 +8215,17 @@ public final class MainActivity extends FragmentActivity {
     private void advance(int index, int set, Coach.Exercise exercise) {
         if (guidedWorkoutAborted) return;
         if (set < exercise.sets) showSetCountIn(index, set + 1, false);
-        else showSetCountIn(index + 1, 1, true);
+        else {
+            int nextIndex = nextWorkoutExerciseIndex(index);
+            if (nextIndex >= session.size()) showComplete();
+            else showSetCountIn(nextIndex, 1, true);
+        }
+    }
+
+    private int nextWorkoutExerciseIndex(int currentIndex) {
+        int nextIndex = currentIndex + 1;
+        while (nextIndex < session.size() && skippedWorkoutExerciseIndices.contains(nextIndex)) nextIndex++;
+        return nextIndex;
     }
 
     private String format(int seconds) {
@@ -7690,7 +8479,7 @@ public final class MainActivity extends FragmentActivity {
         String trainer = AccountStore.get(this).trainer;
         String trainerName = coachName();
         LinearLayout body = appPage("Workouts");
-        title(body, "EXERCISE LIBRARY", "Every move, filmed", "Open a movement for a smooth, looping Coach " + trainerName + " demonstration and a concise form cue.");
+        title(body, "EXERCISE LIBRARY", "Every move, demonstrated", "Open a movement for its neutral Strength Level demonstration and a concise form cue.");
         for (String group : Coach.TARGETS) {
             body.addView(heading(group, 22, Color.WHITE));
             gap(body, 8);
@@ -7698,7 +8487,7 @@ public final class MainActivity extends FragmentActivity {
             for (Coach.Exercise exercise : exercises) {
                 LinearLayout item = card();
                 item.setOrientation(LinearLayout.HORIZONTAL);
-                ImageView poster = exercisePoster(trainer, exercise);
+                View poster = exerciseSelectionArtwork(exercise, 0);
                 LinearLayout.LayoutParams posterParams = new LinearLayout.LayoutParams(dp(82), dp(104));
                 posterParams.rightMargin = dp(12);
                 item.addView(poster, posterParams);
@@ -9754,12 +10543,18 @@ public final class MainActivity extends FragmentActivity {
         if (restTimer != null) restTimer.cancel();
         stopSetClock();
         stopWorkoutRemainingClock();
+        activeWorkoutExerciseIndex = -1;
+        activeWorkoutSet = 0;
+        activeWorkoutPhase = "";
+        activeWorkoutPaused = false;
+        stopWorkoutService();
         AchievementStore.Snapshot beforeCompletion = AchievementStore.snapshot(this);
         if (!guidedSessionRecorded) {
             long elapsed = guidedWorkoutStartedAt == 0 ? 60_000L : Math.max(60_000L, SystemClock.elapsedRealtime() - guidedWorkoutStartedAt);
             int activeMinutes = (int) Math.max(1, Math.round(elapsed / 60_000d));
             long completedAt = System.currentTimeMillis();
-            JourneyStore.recordWorkoutAt(this, target, activeMinutes, completedAt);
+            String completedTarget = "Custom".equalsIgnoreCase(planMode) ? "Custom · " + target : target;
+            JourneyStore.recordWorkoutAt(this, completedTarget, activeMinutes, completedAt);
             SetTimeStore.recordCompletedWorkout(this, completedAt, target, completedExerciseSetTimes);
             guidedSessionRecorded = true;
         }

@@ -16,16 +16,17 @@ public final class PlanStore {
     public static final class SavedPlan {
         public final String mode, target, equipment, focusTargets, weeklyTargets, weeklyExerciseNames;
         public final int minutes, weightKg, sets, reps, restSeconds, cooldownSeconds, reminderHour, reminderMinute;
-        public final boolean reminderEnabled;
+        public final boolean reminderEnabled, noTimer;
         public final String weeklyDays;
         public final int scheduledDay, weekOffset;
         public final List<String> exerciseNames;
 
-        SavedPlan(String mode, String target, String equipment, int minutes, int weightKg, int sets, int reps, int restSeconds, int cooldownSeconds, boolean reminderEnabled, int reminderHour, int reminderMinute, String weeklyDays, String focusTargets, String weeklyTargets, String weeklyExerciseNames, int scheduledDay, int weekOffset, List<String> exerciseNames) {
+        SavedPlan(String mode, String target, String equipment, int minutes, boolean noTimer, int weightKg, int sets, int reps, int restSeconds, int cooldownSeconds, boolean reminderEnabled, int reminderHour, int reminderMinute, String weeklyDays, String focusTargets, String weeklyTargets, String weeklyExerciseNames, int scheduledDay, int weekOffset, List<String> exerciseNames) {
             this.mode = mode;
             this.target = target;
             this.equipment = equipment;
             this.minutes = minutes;
+            this.noTimer = noTimer;
             this.weightKg = weightKg;
             this.sets = sets;
             this.reps = reps;
@@ -65,6 +66,17 @@ public final class PlanStore {
 
     /** Persists an optional local coach reminder alongside the plan. */
     public static void save(Context context, String mode, String target, String equipment, int minutes, int weightKg, int sets, int reps, int restSeconds, int cooldownSeconds, boolean reminderEnabled, int reminderHour, int reminderMinute, boolean[] weeklyDays, String focusTargets, String weeklyTargets, String weeklyExerciseNames, int scheduledDay, int weekOffset, List<Coach.Exercise> exercises) {
+        save(context, mode, target, equipment, minutes, false, weightKg, sets, reps, restSeconds,
+                cooldownSeconds, reminderEnabled, reminderHour, reminderMinute, weeklyDays, focusTargets,
+                weeklyTargets, weeklyExerciseNames, scheduledDay, weekOffset, exercises);
+    }
+
+    /** Persists whether a Custom plan uses an open-ended ascending workout clock. */
+    public static void save(Context context, String mode, String target, String equipment, int minutes, boolean noTimer,
+                            int weightKg, int sets, int reps, int restSeconds, int cooldownSeconds,
+                            boolean reminderEnabled, int reminderHour, int reminderMinute, boolean[] weeklyDays,
+                            String focusTargets, String weeklyTargets, String weeklyExerciseNames,
+                            int scheduledDay, int weekOffset, List<Coach.Exercise> exercises) {
         ArrayList<String> names = new ArrayList<>();
         for (Coach.Exercise exercise : exercises) names.add(exercise.name);
         preferences(context).edit()
@@ -73,6 +85,7 @@ public final class PlanStore {
                 .putString("target", target)
                 .putString("equipment", equipment)
                 .putInt("minutes", minutes)
+                .putBoolean("no_timer", noTimer)
                 .putInt("weight", weightKg)
                 .putInt("sets", sets)
                 .putInt("reps", reps)
@@ -101,6 +114,7 @@ public final class PlanStore {
                 preferences.getString("target", "Full Body"),
                 preferences.getString("equipment", Coach.EQUIPMENT_TYPES[0]),
                 preferences.getInt("minutes", 30),
+                preferences.getBoolean("no_timer", false),
                 preferences.getInt("weight", 20),
                 preferences.getInt("sets", 3),
                 preferences.getInt("reps", 10),

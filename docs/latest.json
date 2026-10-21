@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 79,
-  "versionName": "5.37",
-  "publishedAt": "2026-10-21T13:44:31Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.37/app-release.apk",
-  "sha256": "8086ace3e3c96bc0fa4359c103068a685ed4a948d1acd8ab4725b7b8b52a3fc0",
-  "sizeBytes": 182318213,
-  "notes": "Complete shared neutral Strength Level-style artwork for every catalog exercise, correctly assigned by equipment and training area."
+  "versionCode": 80,
+  "versionName": "5.38",
+  "publishedAt": "2026-10-21T17:05:00Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.38/app-release.apk",
+  "sha256": "d48b2c18fe423c32d2fb7292d2abb9b41f72869dcf0a29886f24a12cd1b60f43",
+  "sizeBytes": 192194812,
+  "notes": "Persistent guided workouts, custom and untimed sessions, refined cooldown controls, expanded workout planning and nutrition, plus unified neutral Strength Level exercise artwork."
 }
