@@ -15,6 +15,7 @@ public final class ReleaseNotes {
     }
 
     public static final Entry[] HISTORY = {
+            new Entry("5.46", "Shoulder Tap motion repair", "Plank Shoulder Tap now uses a stable-plank loop that alternates the opposite hand to opposite shoulder, with no hip-lift motion."),
             new Entry("5.45", "Reliable exercise moves", "Workout Library actions now open on a normal tap as well as a press and hold, so permanent Move to corrections are always reachable."),
             new Entry("5.44", "Permanent Library placements", "Manual Move to choices now permanently update Workout Library and future Daily and Weekly plan selections."),
             new Entry("5.43", "Library placement controls", "Adds a distinct premium Workout Library icon and a manual Move to control for filing exercises by body area and equipment."),
