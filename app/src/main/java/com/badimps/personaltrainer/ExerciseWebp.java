@@ -114,6 +114,20 @@ public final class ExerciseWebp {
             case "Step-up": return R.drawable.sl_step_up;
             case "Wall Sit": return R.drawable.sl_wall_sit;
             case "World's Greatest Stretch": return R.drawable.sl_worlds_greatest_stretch;
+            case "Backpack Curl": return R.drawable.sl_backpack_curl;
+            case "Barbell Rollout": return R.drawable.sl_barbell_rollout;
+            case "Chair Triceps Dip": return R.drawable.sl_chair_triceps_dip;
+            case "Close-Grip Floor Press": return R.drawable.sl_close_grip_floor_press;
+            case "Counter Triceps Press": return R.drawable.sl_counter_triceps_press;
+            case "Doorway Curl Hold": return R.drawable.sl_doorway_curl_hold;
+            case "Drag Curl": return R.drawable.sl_drag_curl;
+            case "Household Overhead Triceps Extension": return R.drawable.sl_household_overhead_triceps_extension;
+            case "Landmine Anti-Rotation Hold": return R.drawable.sl_landmine_anti_rotation_hold;
+            case "Landmine Rotation": return R.drawable.sl_landmine_rotation;
+            case "Table Row Hold": return R.drawable.sl_table_row_hold;
+            case "Triceps Push-up Hold": return R.drawable.sl_triceps_push_up_hold;
+            case "Water Bottle Hammer Curl": return R.drawable.sl_water_bottle_hammer_curl;
+            case "Water Bottle Overhead Extension": return R.drawable.sl_water_bottle_overhead_extension;
             default: return 0;
         }
     }

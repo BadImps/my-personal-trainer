@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 81,
-  "versionName": "5.39",
-  "publishedAt": "2026-10-21T23:17:51Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.39/app-release.apk",
-  "sha256": "5de3101eb206650c3191f1fe7843f265510bab5414a47ec5f8b9d1d09acdc01d",
-  "sizeBytes": 194686757,
-  "notes": "Human coach cues for all six selected coaches, synchronized guided-workout audio, completed-calendar refinements, and the current guided-workout improvements."
+  "versionCode": 82,
+  "versionName": "5.40",
+  "publishedAt": "2026-10-22T06:16:14Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.40/app-release.apk",
+  "sha256": "55092a8b4702ec67f7a30d2ded4cbad6de5851426bf067a64154d247b14d6097",
+  "sizeBytes": 213248571,
+  "notes": "Calm Coach Mia count-in with audio-locked visual cadence, safe cooldown exercise browsing, and current Strength Level exercise artwork mappings."
 }

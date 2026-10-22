@@ -8253,16 +8253,7 @@ public final class MainActivity extends FragmentActivity {
         if (betweenExercises) {
             int upcomingIndex = nextWorkoutExerciseIndex(index);
             if (upcomingIndex < session.size()) {
-                addUpcomingExerciseCard(body, upcomingIndex, index >= 0,
-                        () -> restartExerciseFromCooldown(index),
-                        () -> restartExerciseFromCooldown(index), () -> {
-                    if (restTimer != null) restTimer.cancel();
-                    endRecoverySegment();
-                    stopSpeech();
-                    skippedWorkoutExerciseIndices.add(upcomingIndex);
-                    if (nextWorkoutExerciseIndex(index) >= session.size()) showComplete();
-                    else showRest(index, set, exercise, remaining[0], running, true);
-                });
+                addUpcomingExerciseCard(body, upcomingIndex, index, set, exercise, remaining[0], running);
             }
             gap(body, 14);
         }
@@ -8367,8 +8358,9 @@ public final class MainActivity extends FragmentActivity {
     }
 
     /** Keeps the athlete oriented during cooldown without starting the next movement early. */
-    private void addUpcomingExerciseCard(LinearLayout container, int nextIndex, boolean hasPrevious,
-                                         Runnable previousAction, Runnable repeatAction, Runnable skipAction) {
+    private void addUpcomingExerciseCard(LinearLayout container, int nextIndex, int cooldownIndex,
+                                         int completedSet, Coach.Exercise completedExercise,
+                                         int secondsRemaining, boolean timerWasRunning) {
         if (session == null || nextIndex < 0 || nextIndex >= session.size()) return;
         Coach.Exercise upcoming = session.get(nextIndex);
         LinearLayout preview = new LinearLayout(this);
@@ -8404,20 +8396,23 @@ public final class MainActivity extends FragmentActivity {
         actionRail.setPadding(dp(3), dp(3), dp(3), dp(3));
 
         ImageButton previous = recoveryExerciseIconAction(R.drawable.ic_previous_exercise,
-                hasPrevious ? "Previous exercise" : "Previous exercise unavailable");
-        previous.setEnabled(hasPrevious);
-        previous.setAlpha(hasPrevious ? 1f : .34f);
-        previous.setOnClickListener(view -> previousAction.run());
+                cooldownIndex > 0 ? "Browse previous exercise" : "Browse first exercise");
+        previous.setEnabled(cooldownIndex > 0);
+        previous.setAlpha(cooldownIndex > 0 ? 1f : .34f);
+        previous.setOnClickListener(view -> openCooldownExerciseBrowser(cooldownIndex, completedSet,
+                completedExercise, secondsRemaining, timerWasRunning, Math.max(0, nextIndex - 1)));
         actionRail.addView(previous, recoveryExerciseIconActionParams(true));
 
         ImageButton repeat = recoveryExerciseIconAction(R.drawable.ic_repeat_exercise,
-                "Repeat completed exercise");
-        repeat.setOnClickListener(view -> repeatAction.run());
+                "Browse completed exercise");
+        repeat.setOnClickListener(view -> openCooldownExerciseBrowser(cooldownIndex, completedSet,
+                completedExercise, secondsRemaining, timerWasRunning, cooldownIndex));
         actionRail.addView(repeat, recoveryExerciseIconActionParams(true));
 
         ImageButton skipExercise = recoveryExerciseIconAction(R.drawable.ic_next_exercise,
-                "Next exercise. Skip " + upcoming.name);
-        skipExercise.setOnClickListener(view -> skipAction.run());
+                "Browse upcoming exercises");
+        skipExercise.setOnClickListener(view -> openCooldownExerciseBrowser(cooldownIndex, completedSet,
+                completedExercise, secondsRemaining, timerWasRunning, nextIndex));
         actionRail.addView(skipExercise, recoveryExerciseIconActionParams(false));
         nameActionRow.setClipChildren(false);
         nameActionRow.setClipToPadding(false);
@@ -8444,6 +8439,98 @@ public final class MainActivity extends FragmentActivity {
         content.addView(details, new LinearLayout.LayoutParams(0, -2, 1));
         preview.addView(content);
         container.addView(preview);
+    }
+
+    /** Browsing during cooldown is deliberately non-destructive: only the explicit Start button
+     * restarts a selected exercise. This prevents an accidental Previous tap from losing progress. */
+    private void openCooldownExerciseBrowser(int cooldownIndex, int completedSet, Coach.Exercise completedExercise,
+                                             int secondsRemaining, boolean timerWasRunning, int selectedIndex) {
+        if (session == null || selectedIndex < 0 || selectedIndex >= session.size()) return;
+        if (restTimer != null) restTimer.cancel();
+        endRecoverySegment();
+        stopSpeech();
+        showCooldownExerciseBrowser(cooldownIndex, completedSet, completedExercise,
+                Math.max(0, secondsRemaining), timerWasRunning, selectedIndex);
+    }
+
+    private void showCooldownExerciseBrowser(int cooldownIndex, int completedSet, Coach.Exercise completedExercise,
+                                             int secondsRemaining, boolean timerWasRunning, int selectedIndex) {
+        if (session == null || selectedIndex < 0 || selectedIndex >= session.size()) return;
+        Coach.Exercise selected = session.get(selectedIndex);
+        Dialog dialog = new Dialog(this);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        LinearLayout panel = new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setPadding(dp(20), dp(20), dp(20), dp(18));
+        panel.setBackground(surface(paper, 24, 1, mint));
+        applyPremiumTileDepth(panel, false);
+        TextView eyebrow = heading("EXERCISE BROWSER", 11, mint);
+        eyebrow.setLetterSpacing(.08f);
+        panel.addView(eyebrow);
+        gap(panel, 6);
+        panel.addView(heading("Review your session", 24, ink));
+        panel.addView(text("Browse completed and upcoming exercises. Nothing starts until you choose Start selected exercise.", 14, muted));
+        gap(panel, 14);
+        LinearLayout navigation = new LinearLayout(this);
+        navigation.setGravity(Gravity.CENTER_VERTICAL);
+        Button previous = secondary("‹ Previous");
+        previous.setEnabled(selectedIndex > 0);
+        previous.setOnClickListener(view -> {
+            dialog.dismiss();
+            showCooldownExerciseBrowser(cooldownIndex, completedSet, completedExercise, secondsRemaining,
+                    timerWasRunning, selectedIndex - 1);
+        });
+        navigation.addView(previous, new LinearLayout.LayoutParams(0, dp(48), 1));
+        TextView position = heading((selectedIndex + 1) + " of " + session.size(), 13, muted);
+        position.setGravity(Gravity.CENTER);
+        navigation.addView(position, new LinearLayout.LayoutParams(dp(72), dp(48)));
+        Button next = secondary("Next ›");
+        next.setEnabled(selectedIndex + 1 < session.size());
+        next.setOnClickListener(view -> {
+            dialog.dismiss();
+            showCooldownExerciseBrowser(cooldownIndex, completedSet, completedExercise, secondsRemaining,
+                    timerWasRunning, selectedIndex + 1);
+        });
+        navigation.addView(next, new LinearLayout.LayoutParams(0, dp(48), 1));
+        panel.addView(navigation);
+        gap(panel, 10);
+        LinearLayout detail = new LinearLayout(this);
+        detail.setGravity(Gravity.CENTER_VERTICAL);
+        View artwork = exerciseSelectionArtwork(selected, selectedIndex);
+        LinearLayout.LayoutParams artworkParams = new LinearLayout.LayoutParams(dp(128), dp(128));
+        artworkParams.rightMargin = dp(14);
+        detail.addView(artwork, artworkParams);
+        LinearLayout words = new LinearLayout(this);
+        words.setOrientation(LinearLayout.VERTICAL);
+        words.addView(heading(selected.name, 20, ink));
+        words.addView(text(selected.target + "  ·  " + selected.sets + " sets  ·  " + selected.reps + " reps", 14, muted));
+        gap(words, 5);
+        words.addView(text(selected.cue, 13, muted));
+        detail.addView(words, new LinearLayout.LayoutParams(0, -2, 1));
+        panel.addView(detail);
+        gap(panel, 16);
+        Button start = primary("Start selected exercise");
+        start.setOnClickListener(view -> {
+            dialog.dismiss();
+            restartExerciseFromCooldown(selectedIndex);
+        });
+        addButton(panel, start);
+        gap(panel, 8);
+        Button returnToCooldown = secondary("Return to cooldown");
+        returnToCooldown.setOnClickListener(view -> {
+            dialog.dismiss();
+            showRest(cooldownIndex, completedSet, completedExercise, secondsRemaining, timerWasRunning, true);
+        });
+        addButton(panel, returnToCooldown);
+        dialog.setOnCancelListener(ignored -> showRest(cooldownIndex, completedSet, completedExercise,
+                secondsRemaining, timerWasRunning, true));
+        dialog.setContentView(panel);
+        dialog.show();
+        Window window = dialog.getWindow();
+        if (window != null) {
+            window.setBackgroundDrawableResource(android.R.color.transparent);
+            window.setLayout(-1, -2);
+        }
     }
 
     private ImageButton recoveryExerciseIconAction(int icon, String description) {
@@ -8650,41 +8737,7 @@ public final class MainActivity extends FragmentActivity {
             if (CoachPreferences.usesBeeps(mode) && toneGenerator == null) {
                 toneGenerator = new ToneGenerator(AudioManager.STREAM_MUSIC, 72);
             }
-            for (int index = 0; index < 5; index++) {
-                final int remaining = 5 - index;
-                final int delay = index * 1000;
-                workoutHandler.postDelayed(() -> {
-                    if (visualGeneration[0] != speechGeneration) return;
-                    Runnable showNumber = () -> {
-                        if (visualGeneration[0] != speechGeneration) return;
-                        countView.setText(String.valueOf(remaining));
-                        if (CoachPreferences.usesBeeps(mode) && toneGenerator != null) {
-                            toneGenerator.startTone(ToneGenerator.TONE_DTMF_1, 150);
-                        }
-                    };
-                    if (CoachPreferences.usesVoice(mode)) {
-                        speakCoachWithStart(String.valueOf(remaining), TextToSpeech.QUEUE_ADD, showNumber, null);
-                    } else {
-                        showNumber.run();
-                    }
-                }, delay);
-            }
-            workoutHandler.postDelayed(() -> {
-                if (visualGeneration[0] != speechGeneration) return;
-                Runnable beginWorkout = () -> {
-                    if (visualGeneration[0] != speechGeneration) return;
-                    countView.setText("GO");
-                    if (CoachPreferences.usesBeeps(mode) && toneGenerator != null) {
-                        toneGenerator.startTone(ToneGenerator.TONE_DTMF_9, 230);
-                    }
-                    done.run();
-                };
-                if (CoachPreferences.usesVoice(mode)) {
-                    speakCoachWithStart("Let's go!", TextToSpeech.QUEUE_ADD, beginWorkout, null);
-                } else {
-                    beginWorkout.run();
-                }
-            }, 5000L);
+            playWorkoutCountStep(5, mode, countView, done, visualGeneration[0]);
         };
         if (CoachPreferences.FULL_DIALOGUE.equals(mode)) {
             speakCoach(countdownLeadIn(phrase), TextToSpeech.QUEUE_FLUSH, () -> {
@@ -8693,6 +8746,56 @@ public final class MainActivity extends FragmentActivity {
             });
         } else {
             beginCountdown.run();
+        }
+    }
+
+    /**
+     * Plays each numeral only after the prior clip has finished.  The old implementation queued
+     * all five audio clips one second apart; a longer human-recorded Mia clip could then drift
+     * behind the visual count.  Chaining makes one number, one spoken clip, and one second of
+     * screen time an atomic step.
+     */
+    private void playWorkoutCountStep(int remaining, String mode, TextView countView, Runnable done,
+                                      long generation) {
+        if (generation != speechGeneration) return;
+        if (remaining <= 0) {
+            Runnable showGo = () -> {
+                if (generation != speechGeneration) return;
+                countView.setText("GO");
+                if (CoachPreferences.usesBeeps(mode) && toneGenerator != null) {
+                    toneGenerator.startTone(ToneGenerator.TONE_DTMF_9, 230);
+                }
+            };
+            if (CoachPreferences.usesVoice(mode)) {
+                // Keep GO visible while the selected coach says it; the active set begins only
+                // after that final cue has completed.
+                speakCoachWithStart("Let's go!", TextToSpeech.QUEUE_ADD, showGo, done);
+            } else {
+                showGo.run();
+                done.run();
+            }
+            return;
+        }
+        final long[] startedAt = {-1L};
+        Runnable showNumber = () -> {
+            if (generation != speechGeneration) return;
+            startedAt[0] = SystemClock.elapsedRealtime();
+            countView.setText(String.valueOf(remaining));
+            if (CoachPreferences.usesBeeps(mode) && toneGenerator != null) {
+                toneGenerator.startTone(ToneGenerator.TONE_DTMF_1, 150);
+            }
+        };
+        Runnable next = () -> {
+            if (generation != speechGeneration) return;
+            long elapsed = startedAt[0] < 0L ? 0L : SystemClock.elapsedRealtime() - startedAt[0];
+            workoutHandler.postDelayed(() -> playWorkoutCountStep(remaining - 1, mode, countView, done, generation),
+                    Math.max(0L, 1000L - elapsed));
+        };
+        if (CoachPreferences.usesVoice(mode)) {
+            speakCoachWithStart(String.valueOf(remaining), TextToSpeech.QUEUE_ADD, showNumber, next);
+        } else {
+            showNumber.run();
+            workoutHandler.postDelayed(next, 1000L);
         }
     }
 
