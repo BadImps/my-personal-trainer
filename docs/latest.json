@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 82,
-  "versionName": "5.40",
-  "publishedAt": "2026-10-22T06:16:14Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.40/app-release.apk",
-  "sha256": "55092a8b4702ec67f7a30d2ded4cbad6de5851426bf067a64154d247b14d6097",
-  "sizeBytes": 213248571,
-  "notes": "Calm Coach Mia count-in with audio-locked visual cadence, safe cooldown exercise browsing, and current Strength Level exercise artwork mappings."
+  "versionCode": 83,
+  "versionName": "5.41",
+  "publishedAt": "2026-10-22T10:08:22Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.41/app-release.apk",
+  "sha256": "d766e10d61668e9fc94285386d16d4059c5b02c55e7f882217c2821579cb29b9",
+  "sizeBytes": 213255887,
+  "notes": "Workout Library now offers Preview and Add to a Schedule from each long-press menu, with multi-select additions to saved future workouts."
 }

@@ -32,7 +32,9 @@ import android.media.ToneGenerator;
 import android.speech.tts.TextToSpeech;
 import android.speech.tts.UtteranceProgressListener;
 import android.speech.tts.Voice;
+import android.text.Editable;
 import android.text.InputType;
+import android.text.TextWatcher;
 import android.view.Gravity;
 import android.view.HapticFeedbackConstants;
 import android.view.MotionEvent;
@@ -52,6 +54,7 @@ import android.widget.ImageView;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
+import android.widget.PopupMenu;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.ScrollView;
@@ -75,6 +78,7 @@ import java.util.Calendar;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -137,6 +141,10 @@ public final class MainActivity extends FragmentActivity {
     private List<Coach.Exercise> availableExercises = new ArrayList<>();
     private List<Coach.Exercise> selectedExercises = new ArrayList<>();
     private String selectionKey = "";
+    /** Library filters persist while browsing but never alter the workout-plan wizard. */
+    private String workoutLibrarySearch = "";
+    private String workoutLibraryBodyArea = "All body areas";
+    private String workoutLibraryEquipment = "All equipment";
     private TextToSpeech voice;
     /** Recorded coach cues are used first; Android TTS remains the dynamic-text fallback. */
     private CoachAudioClips coachAudio;
@@ -1049,6 +1057,7 @@ public final class MainActivity extends FragmentActivity {
 
     private String coachHeroSubtitle(String screen) {
         if ("Progress".equals(screen)) return "Your private training story, in focus.";
+        if ("Workout Library".equals(screen)) return "Every available movement, ready when you are.";
         if ("Nutrition".equals(screen)) return "Fuel that fits your real life.";
         if ("Endurance".equals(screen)) return "Plan your distance. Own your pace.";
         if ("Scheduler".equals(screen)) return "Every session, one clear calendar.";
@@ -1072,6 +1081,7 @@ public final class MainActivity extends FragmentActivity {
         row.setPadding(dp(8), dp(7), dp(8), dp(8));
         addCoachHeroNavItem(row, "Home", R.drawable.ic_nav_home, activeScreen, view -> navigateDashboard("Home", this::showHome));
         addCoachHeroNavItem(row, "Workouts", R.drawable.ic_nav_workouts, activeScreen, view -> navigateDashboard("Workouts", this::showPlans));
+        addCoachHeroNavItem(row, "Workout Library", R.drawable.ic_nav_workouts, activeScreen, view -> navigateDashboard("Workout Library", this::showWorkoutLibrary));
         addCoachHeroNavItem(row, "Progress", R.drawable.ic_nav_progress, activeScreen, view -> navigateDashboard("Progress", this::showProgress));
         addCoachHeroNavItem(row, "Nutrition", R.drawable.ic_nav_nutrition, activeScreen, view -> navigateDashboard("Nutrition", this::showMeals));
         addCoachHeroNavItem(row, "Endurance", R.drawable.ic_nav_endurance, activeScreen, view -> navigateDashboard("Endurance", this::showEndurance));
@@ -1087,7 +1097,7 @@ public final class MainActivity extends FragmentActivity {
         scroll.post(() -> {
             int maximum = Math.max(0, row.getWidth() - scroll.getWidth());
             int selectedIndex = coachHeroNavigationIndex(activeScreen);
-            int focused = Math.max(0, selectedIndex * dp(80) - (scroll.getWidth() - dp(76)) / 2);
+            int focused = Math.max(0, selectedIndex * dp(92) - (scroll.getWidth() - dp(84)) / 2);
             int desired = dashboardNavigationPositions.containsKey(activeScreen)
                     ? dashboardNavigationPositions.get(activeScreen) : focused;
             scroll.scrollTo(Math.min(Math.max(0, desired), maximum), 0);
@@ -1096,7 +1106,7 @@ public final class MainActivity extends FragmentActivity {
     }
 
     private int coachHeroNavigationIndex(String screen) {
-        String[] screens = {"Home", "Workouts", "Progress", "Nutrition", "Endurance", "Scheduler", "Body", "Apex", "Settings"};
+        String[] screens = {"Home", "Workouts", "Workout Library", "Progress", "Nutrition", "Endurance", "Scheduler", "Body", "Apex", "Settings"};
         for (int index = 0; index < screens.length; index++) {
             if (screens[index].equals(screen)) return index;
         }
@@ -1119,12 +1129,13 @@ public final class MainActivity extends FragmentActivity {
         glyph.setImageTintList(ColorStateList.valueOf(selected ? navy : Color.rgb(198, 215, 235)));
         glyph.setContentDescription(null);
         item.addView(glyph, new LinearLayout.LayoutParams(dp(23), dp(23)));
-        TextView caption = text(label, 9, selected ? navy : Color.rgb(198, 215, 235));
+        TextView caption = text(label, label.length() > 10 ? 8 : 9, selected ? navy : Color.rgb(198, 215, 235));
         caption.setGravity(Gravity.CENTER);
-        caption.setSingleLine(true);
+        caption.setSingleLine(false);
+        caption.setMaxLines(2);
         caption.setTypeface(Typeface.create("sans-serif", selected ? Typeface.BOLD : Typeface.NORMAL));
         item.addView(caption, new LinearLayout.LayoutParams(-1, dp(19)));
-        LinearLayout.LayoutParams itemParams = new LinearLayout.LayoutParams(dp(76), dp(60));
+        LinearLayout.LayoutParams itemParams = new LinearLayout.LayoutParams(dp(label.length() > 10 ? 92 : 76), dp(60));
         itemParams.rightMargin = dp(4);
         row.addView(item, itemParams);
         applyPremiumTileDepth(item, selected);
@@ -1289,6 +1300,7 @@ public final class MainActivity extends FragmentActivity {
 
     private void showCurrentDashboardPage() {
         if ("Home".equals(activeDashboardScrollKey)) showHome();
+        else if ("Workout Library".equals(activeDashboardScrollKey)) showWorkoutLibrary();
         else if ("Progress".equals(activeDashboardScrollKey)) showProgress();
         else if ("Nutrition".equals(activeDashboardScrollKey)) showMeals();
         else if ("Endurance".equals(activeDashboardScrollKey)) showEndurance();
@@ -4602,10 +4614,10 @@ public final class MainActivity extends FragmentActivity {
             if (!weeklyWorkoutDays[activeScheduleDay]) {
                 for (int i = 0; i < weeklyWorkoutDays.length; i++) if (weeklyWorkoutDays[i]) { activeScheduleDay = i; break; }
             }
-            session = new ArrayList<>(weeklySessions.get(activeScheduleDay));
+            session = sessionWithScheduledAddOns(selectedWeekDate(activeScheduleDay), weeklySessions.get(activeScheduleDay));
             persistCurrentWeekSchedule();
         } else {
-            session = prescribeNames(saved.exerciseNames, Coach.planOptions(activeTargets(), selectedEquipmentTypes));
+            session = sessionWithScheduledAddOns(selectedWeekDate(dailyScheduledDay), prescribeNames(saved.exerciseNames, Coach.planOptions(activeTargets(), selectedEquipmentTypes)));
         }
     }
 
@@ -4662,6 +4674,26 @@ public final class MainActivity extends FragmentActivity {
             }
         }
         return restored;
+    }
+
+    /** Applies optional library additions without modifying a saved plan's base exercise list. */
+    private List<Coach.Exercise> sessionWithScheduledAddOns(Calendar date, List<Coach.Exercise> base) {
+        ArrayList<Coach.Exercise> result = new ArrayList<>();
+        if (base != null) result.addAll(base);
+        for (ScheduledWorkoutAddOnStore.Entry addition : ScheduledWorkoutAddOnStore.onDate(this, date)) {
+            boolean exists = false;
+            for (Coach.Exercise exercise : result) {
+                if (exercise.name.equals(addition.name) && exercise.target.equals(addition.target)) { exists = true; break; }
+            }
+            if (exists) continue;
+            for (Coach.Exercise candidate : workoutLibraryCatalog()) {
+                if (candidate.name.equals(addition.name) && candidate.target.equals(addition.target)) {
+                    result.add(Coach.prescribe(candidate, planSets, planReps, planRestSeconds));
+                    break;
+                }
+            }
+        }
+        return result;
     }
 
     private void restoreWeeklySessions(String encoded) {
@@ -4767,6 +4799,310 @@ public final class MainActivity extends FragmentActivity {
         }
         Button next = action("Next: set up workout  →", coral, Color.WHITE); next.setOnClickListener(view -> { if (selectedExercises.isEmpty()) toast("Select at least one exercise before continuing."); else showPlanSetup(); }); content.addView(next, new LinearLayout.LayoutParams(-1, dp(54)));
         Button back = new Button(this); back.setText("Back"); back.setTextColor(mint); back.setTextSize(14); back.setAllCaps(false); back.setBackgroundColor(Color.TRANSPARENT); back.setOnClickListener(view -> showPlanEquipment()); content.addView(back, new LinearLayout.LayoutParams(-1, dp(46)));
+    }
+
+    /**
+     * A browse-only catalogue that is separate from the plan wizard. Members can explore every
+     * stored movement, filter it, and hold a card for the same detailed media preview used while
+     * building a workout. It never changes selected plan exercises.
+     */
+    private void showWorkoutLibrary() {
+        LinearLayout body = appPage("Workout Library");
+        TextView eyebrow = heading("MOVEMENT CATALOGUE", 11, mint);
+        eyebrow.setLetterSpacing(.12f);
+        body.addView(eyebrow);
+        body.addView(heading("Find your next exercise", 25, Color.WHITE));
+        body.addView(text("Search every available movement, then hold any card for its illustration and coaching detail.",
+                14, Color.rgb(214, 230, 242)));
+        gap(body, 14);
+
+        EditText search = input("Search exercises", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+        search.setText(workoutLibrarySearch);
+        search.setSelectAllOnFocus(false);
+        search.setContentDescription("Search workout library");
+        body.addView(search);
+        gap(body, 10);
+
+        LinearLayout filters = new LinearLayout(this);
+        filters.setGravity(Gravity.CENTER_VERTICAL);
+        Button bodyArea = secondary("");
+        bodyArea.setTextSize(12);
+        bodyArea.setContentDescription("Filter exercise library by body area");
+        filters.addView(bodyArea, new LinearLayout.LayoutParams(0, dp(52), 1));
+        Button equipment = secondary("");
+        equipment.setTextSize(12);
+        equipment.setContentDescription("Filter exercise library by equipment");
+        LinearLayout.LayoutParams equipmentParams = new LinearLayout.LayoutParams(0, dp(52), 1);
+        equipmentParams.leftMargin = dp(8);
+        filters.addView(equipment, equipmentParams);
+        body.addView(filters);
+        gap(body, 14);
+
+        TextView resultsSummary = text("", 13, Color.rgb(210, 229, 239));
+        body.addView(resultsSummary);
+        gap(body, 8);
+        LinearLayout results = new LinearLayout(this);
+        results.setOrientation(LinearLayout.VERTICAL);
+        results.setClipChildren(false);
+        body.addView(results);
+
+        final Runnable[] refresh = new Runnable[1];
+        refresh[0] = () -> {
+            bodyArea.setText("Body Area\n" + workoutLibraryBodyArea + "  ▾");
+            equipment.setText("Equipment\n" + workoutLibraryEquipment + "  ▾");
+            populateWorkoutLibraryResults(results, resultsSummary);
+        };
+        search.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence value, int start, int count, int after) { }
+            @Override public void onTextChanged(CharSequence value, int start, int before, int count) {
+                workoutLibrarySearch = value == null ? "" : value.toString();
+                refresh[0].run();
+            }
+            @Override public void afterTextChanged(Editable value) { }
+        });
+        bodyArea.setOnClickListener(view -> showWorkoutLibraryFilterMenu(bodyArea, true, refresh[0]));
+        equipment.setOnClickListener(view -> showWorkoutLibraryFilterMenu(equipment, false, refresh[0]));
+        refresh[0].run();
+    }
+
+    private void showWorkoutLibraryFilterMenu(View anchor, boolean bodyArea, Runnable updated) {
+        PopupMenu menu = new PopupMenu(this, anchor);
+        List<String> options = bodyArea ? workoutLibraryBodyAreas() : workoutLibraryEquipmentTypes();
+        for (String option : options) menu.getMenu().add(option);
+        menu.setOnMenuItemClickListener(item -> {
+            if (bodyArea) workoutLibraryBodyArea = item.getTitle().toString();
+            else workoutLibraryEquipment = item.getTitle().toString();
+            updated.run();
+            return true;
+        });
+        menu.show();
+    }
+
+    private List<String> workoutLibraryBodyAreas() {
+        ArrayList<String> values = new ArrayList<>();
+        values.add("All body areas");
+        for (String target : Coach.TARGETS) if (!values.contains(target)) values.add(target);
+        for (Coach.Exercise exercise : workoutLibraryCatalog()) {
+            if (!values.contains(exercise.target)) values.add(exercise.target);
+        }
+        return values;
+    }
+
+    private List<String> workoutLibraryEquipmentTypes() {
+        ArrayList<String> values = new ArrayList<>();
+        values.add("All equipment");
+        Collections.addAll(values, Coach.EQUIPMENT_TYPES);
+        return values;
+    }
+
+    private List<Coach.Exercise> workoutLibraryCatalog() {
+        LinkedHashMap<String, Coach.Exercise> exercises = new LinkedHashMap<>();
+        for (List<Coach.Exercise> group : Coach.library().values()) {
+            for (Coach.Exercise exercise : group) exercises.putIfAbsent(exercise.name + "|" + exercise.target, exercise);
+        }
+        for (String target : Coach.TARGETS) {
+            for (String equipment : Coach.EQUIPMENT_TYPES) {
+                for (Coach.Exercise exercise : Coach.planOptions(target, equipment)) {
+                    exercises.putIfAbsent(exercise.name + "|" + exercise.target, exercise);
+                }
+            }
+        }
+        return new ArrayList<>(exercises.values());
+    }
+
+    private String workoutLibraryEquipmentFor(Coach.Exercise exercise) {
+        ArrayList<String> tags = new ArrayList<>();
+        for (String equipment : Coach.EQUIPMENT_TYPES) {
+            for (Coach.Exercise candidate : Coach.planOptions(exercise.target, equipment)) {
+                if (candidate.name.equals(exercise.name)) {
+                    tags.add(equipment);
+                    break;
+                }
+            }
+        }
+        if (tags.isEmpty()) {
+            String text = (exercise.name + " " + exercise.description).toLowerCase(Locale.ROOT);
+            if (text.contains("dumbbell")) tags.add("Dumbbells");
+            else if (text.contains("barbell") || text.contains("landmine")) tags.add("Barbell");
+            else if (text.contains("machine") || text.contains("cable") || text.contains("pulldown")) tags.add("Machine-assisted");
+            else if (text.contains("band") || text.contains("towel") || text.contains("backpack") || text.contains("water bottle")) tags.add("At home");
+            else tags.add("Bodyweight");
+        }
+        return String.join(" · ", tags);
+    }
+
+    private List<Coach.Exercise> filteredWorkoutLibraryExercises() {
+        String query = workoutLibrarySearch.trim().toLowerCase(Locale.ROOT);
+        ArrayList<Coach.Exercise> filtered = new ArrayList<>();
+        for (Coach.Exercise exercise : workoutLibraryCatalog()) {
+            String equipment = workoutLibraryEquipmentFor(exercise);
+            boolean bodyMatches = "All body areas".equals(workoutLibraryBodyArea)
+                    || workoutLibraryBodyArea.equals(exercise.target);
+            boolean equipmentMatches = "All equipment".equals(workoutLibraryEquipment)
+                    || equipment.contains(workoutLibraryEquipment);
+            String searchable = (exercise.name + " " + exercise.target + " " + exercise.description + " "
+                    + exercise.cue + " " + equipment).toLowerCase(Locale.ROOT);
+            if (bodyMatches && equipmentMatches && (query.isEmpty() || searchable.contains(query))) filtered.add(exercise);
+        }
+        return filtered;
+    }
+
+    private void populateWorkoutLibraryResults(LinearLayout results, TextView summary) {
+        results.removeAllViews();
+        List<Coach.Exercise> exercises = filteredWorkoutLibraryExercises();
+        summary.setText(exercises.size() + " available exercises · hold a card for preview");
+        if (exercises.isEmpty()) {
+            LinearLayout empty = card();
+            empty.addView(heading("No matching exercises", 19, ink));
+            empty.addView(text("Try a different search, body area, or equipment filter.", 14, muted));
+            results.addView(empty);
+            return;
+        }
+        for (int index = 0; index < exercises.size(); index++) {
+            results.addView(workoutLibraryExerciseCard(exercises.get(index), index),
+                    new LinearLayout.LayoutParams(-1, dp(134)));
+            gap(results, 10);
+        }
+    }
+
+    private LinearLayout workoutLibraryExerciseCard(Coach.Exercise exercise, int index) {
+        LinearLayout card = new LinearLayout(this);
+        card.setGravity(Gravity.CENTER_VERTICAL);
+        card.setPadding(dp(8), dp(8), dp(11), dp(8));
+        card.setBackground(surface(paper, 19, 1, cardLine));
+        card.setContentDescription(exercise.name + ". " + exercise.target + ". Press and hold for exercise actions.");
+        applyPremiumTileDepth(card, false);
+        View artwork = exerciseSelectionArtwork(exercise, index);
+        LinearLayout.LayoutParams artworkParams = new LinearLayout.LayoutParams(dp(108), dp(118));
+        artworkParams.rightMargin = dp(12);
+        card.addView(artwork, artworkParams);
+        LinearLayout details = new LinearLayout(this);
+        details.setOrientation(LinearLayout.VERTICAL);
+        details.addView(heading(exercise.name, 17, ink));
+        TextView tags = text(exercise.target.toUpperCase(Locale.ROOT) + "  ·  " + workoutLibraryEquipmentFor(exercise), 11, Color.rgb(47, 110, 108));
+        tags.setMaxLines(2);
+        details.addView(tags);
+        TextView description = text(exercise.description, 12, muted);
+        description.setMaxLines(2);
+        LinearLayout.LayoutParams descriptionParams = new LinearLayout.LayoutParams(-1, 0, 1);
+        descriptionParams.topMargin = dp(4);
+        details.addView(description, descriptionParams);
+        TextView hold = text("Hold for actions", 11, coral);
+        hold.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
+        details.addView(hold);
+        card.addView(details, new LinearLayout.LayoutParams(0, dp(118), 1));
+        card.setOnClickListener(view -> toast("Press and hold " + exercise.name + " for actions."));
+        card.setOnLongClickListener(view -> {
+            showWorkoutLibraryContextMenu(view, exercise);
+            return true;
+        });
+        applyPressMotion(card);
+        return card;
+    }
+
+    /** Compact, familiar long-press action menu for each library movement. */
+    private void showWorkoutLibraryContextMenu(View anchor, Coach.Exercise exercise) {
+        PopupMenu menu = new PopupMenu(this, anchor);
+        menu.getMenu().add("Preview");
+        menu.getMenu().add("Add to a Schedule");
+        menu.getMenu().add("Close");
+        menu.setOnMenuItemClickListener(item -> {
+            String action = String.valueOf(item.getTitle());
+            if ("Preview".equals(action)) showExercisePreviewDialog(exercise);
+            else if ("Add to a Schedule".equals(action)) showAddExerciseToScheduledWorkouts(exercise);
+            return true;
+        });
+        menu.show();
+    }
+
+    /** One selectable row per genuinely saved, upcoming strength-workout date. */
+    private void showAddExerciseToScheduledWorkouts(Coach.Exercise exercise) {
+        List<Calendar> schedules = upcomingScheduledWorkoutDates();
+        if (schedules.isEmpty()) {
+            new AlertDialog.Builder(this)
+                    .setTitle("No upcoming workouts")
+                    .setMessage("Save a Daily or Weekly workout plan first, then you can add " + exercise.name + " to one or more upcoming sessions.")
+                    .setNegativeButton("Close", null)
+                    .setPositiveButton("Build a workout", (dialog, which) -> showCoachHeroWorkout())
+                    .show();
+            return;
+        }
+
+        ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(true);
+        LinearLayout list = new LinearLayout(this);
+        list.setOrientation(LinearLayout.VERTICAL);
+        list.setPadding(dp(20), dp(10), dp(20), dp(4));
+        scroll.addView(list);
+        list.addView(text("Select every scheduled workout that should include “" + exercise.name + "”. Existing additions are kept and duplicates are ignored.", 14, ink));
+        ArrayList<CheckBox> selections = new ArrayList<>();
+        for (Calendar date : schedules) {
+            CheckBox row = new CheckBox(this);
+            row.setText(upcomingScheduleLabel(date));
+            row.setTextColor(ink);
+            row.setTextSize(15);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setPadding(dp(5), dp(10), dp(5), dp(10));
+            row.setMinHeight(dp(58));
+            row.setButtonTintList(ColorStateList.valueOf(mint));
+            row.setTag((Calendar) date.clone());
+            list.addView(row, new LinearLayout.LayoutParams(-1, -2));
+            selections.add(row);
+        }
+        int maxHeight = (int) (getResources().getDisplayMetrics().heightPixels * .58f);
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle("Add to a Schedule")
+                .setView(scroll)
+                .setNegativeButton("Close", null)
+                .setPositiveButton("Add to selected", null)
+                .create();
+        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
+            int selected = 0;
+            int added = 0;
+            for (CheckBox choice : selections) {
+                if (!choice.isChecked()) continue;
+                selected++;
+                if (ScheduledWorkoutAddOnStore.add(this, (Calendar) choice.getTag(), exercise)) added++;
+            }
+            if (selected == 0) {
+                toast("Select at least one upcoming workout.");
+                return;
+            }
+            dialog.dismiss();
+            toast(added == 0 ? exercise.name + " is already in those selected workouts." : exercise.name + " added to " + added + " scheduled workout" + (added == 1 ? "." : "s."));
+        }));
+        dialog.show();
+        if (dialog.getWindow() != null) dialog.getWindow().setLayout(-1, Math.min(maxHeight, WindowManager.LayoutParams.WRAP_CONTENT));
+    }
+
+    private List<Calendar> upcomingScheduledWorkoutDates() {
+        ArrayList<Calendar> dates = new ArrayList<>();
+        Calendar cursor = Calendar.getInstance();
+        cursor.set(Calendar.HOUR_OF_DAY, 0); cursor.set(Calendar.MINUTE, 0); cursor.set(Calendar.SECOND, 0); cursor.set(Calendar.MILLISECOND, 0);
+        Calendar last = (Calendar) cursor.clone();
+        last.set(Calendar.DAY_OF_MONTH, last.getActualMaximum(Calendar.DAY_OF_MONTH));
+        while (!cursor.after(last)) {
+            Calendar week = (Calendar) cursor.clone();
+            week.setFirstDayOfWeek(Calendar.MONDAY);
+            week.add(Calendar.DAY_OF_YEAR, -((week.get(Calendar.DAY_OF_WEEK) - Calendar.MONDAY + 7) % 7));
+            int day = (cursor.get(Calendar.DAY_OF_WEEK) - Calendar.MONDAY + 7) % 7;
+            if (WeeklyScheduleStore.hasSavedSchedule(this, week)) {
+                WeeklyScheduleStore.Schedule schedule = WeeklyScheduleStore.load(this, week, defaultWeeklyDays(), defaultWeeklyTargets());
+                if (schedule.workoutDays[day]) dates.add((Calendar) cursor.clone());
+            }
+            cursor.add(Calendar.DAY_OF_YEAR, 1);
+        }
+        return dates;
+    }
+
+    private String upcomingScheduleLabel(Calendar date) {
+        Calendar week = (Calendar) date.clone();
+        week.setFirstDayOfWeek(Calendar.MONDAY);
+        week.add(Calendar.DAY_OF_YEAR, -((week.get(Calendar.DAY_OF_WEEK) - Calendar.MONDAY + 7) % 7));
+        int day = (date.get(Calendar.DAY_OF_WEEK) - Calendar.MONDAY + 7) % 7;
+        WeeklyScheduleStore.Schedule schedule = WeeklyScheduleStore.load(this, week, defaultWeeklyDays(), defaultWeeklyTargets());
+        String dateText = new SimpleDateFormat("EEE, MMM d", Locale.getDefault()).format(date.getTime());
+        return dateText + "\n" + focusSummary(schedule.targets.get(day)) + " workout";
     }
 
     /** Full-library multi-select entered from the workout wizard without discarding its state. */
@@ -5333,7 +5669,7 @@ public final class MainActivity extends FragmentActivity {
             List<Coach.Exercise> choices;
             if (i == activeScheduleDay) choices = selectedExercises;
             else choices = Coach.recommendedForDuration(Coach.planOptions(weeklyDayTargets.get(i), selectedEquipmentTypes), sessionMinutes);
-            weeklySessions.get(i).addAll(prescribeExercises(choices));
+            weeklySessions.get(i).addAll(sessionWithScheduledAddOns(selectedWeekDate(i), prescribeExercises(choices)));
         }
     }
 
@@ -5344,6 +5680,13 @@ public final class MainActivity extends FragmentActivity {
     }
 
     private void showPlanReady() {
+        // Rehydrate date-specific Library additions whenever a scheduled plan is opened.
+        // The merge is duplicate-safe, so returning here never creates a second copy.
+        if ("Weekly".equals(planMode)) {
+            session = sessionWithScheduledAddOns(selectedWeekDate(activeScheduleDay), weeklySessions.get(activeScheduleDay));
+        } else if ("Daily".equals(planMode)) {
+            session = sessionWithScheduledAddOns(selectedWeekDate(dailyScheduledDay), session);
+        }
         LinearLayout body = planPage();
         planTitle(body, "PLAN READY", "Your " + focusSummary(activeTargets()).toLowerCase(Locale.ROOT) + " plan is ready", session.size() + " selected movements  •  " + (workoutNoTimer ? "No timer" : sessionMinutes + " min") + "  •  " + equipmentSummary());
         LinearLayout schedule = card();
@@ -5454,7 +5797,7 @@ public final class MainActivity extends FragmentActivity {
             row.setOnClickListener(view -> {
                 activeScheduleDay = dayIndex;
                 syncPrimaryTarget();
-                session = new ArrayList<>(weeklySessions.get(dayIndex));
+                session = sessionWithScheduledAddOns(selectedWeekDate(dayIndex), weeklySessions.get(dayIndex));
                 showPlanReady();
             });
             LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
@@ -6595,6 +6938,7 @@ public final class MainActivity extends FragmentActivity {
             AccountStore.clear(this);
             PlanStore.clear(this);
             WeeklyScheduleStore.clear(this);
+            ScheduledWorkoutAddOnStore.clear(this);
             WorkoutReminderScheduler.cancel(this);
             WeightStore.clear(this);
             BodyProfileStore.clear(this);
