@@ -4512,7 +4512,7 @@ public final class MainActivity extends FragmentActivity {
         String copy;
         if ("Dumbbells".equals(label)) copy = "Free weights";
         else if ("Barbell".equals(label)) copy = "Olympic bar and plates";
-        else if ("At home".equals(label)) copy = "Household items and bands";
+        else if ("At home".equals(label)) copy = "Household items only";
         else if ("Machine-assisted".equals(label)) copy = "Guided gym resistance";
         else copy = "No equipment";
         LinearLayout tile = new LinearLayout(this);
@@ -4897,9 +4897,8 @@ public final class MainActivity extends FragmentActivity {
 
     private List<Coach.Exercise> workoutLibraryCatalog() {
         LinkedHashMap<String, Coach.Exercise> exercises = new LinkedHashMap<>();
-        for (List<Coach.Exercise> group : Coach.library().values()) {
-            for (Coach.Exercise exercise : group) exercises.putIfAbsent(exercise.name + "|" + exercise.target, exercise);
-        }
+        // The catalogue is built from the equipment-specific planner source so a
+        // filter never leaks an old generic movement into the wrong equipment group.
         for (String target : Coach.TARGETS) {
             for (String equipment : Coach.EQUIPMENT_TYPES) {
                 for (Coach.Exercise exercise : Coach.planOptions(target, equipment)) {
@@ -4925,7 +4924,7 @@ public final class MainActivity extends FragmentActivity {
             if (text.contains("dumbbell")) tags.add("Dumbbells");
             else if (text.contains("barbell") || text.contains("landmine")) tags.add("Barbell");
             else if (text.contains("machine") || text.contains("cable") || text.contains("pulldown")) tags.add("Machine-assisted");
-            else if (text.contains("band") || text.contains("towel") || text.contains("backpack") || text.contains("water bottle")) tags.add("At home");
+            else if (text.contains("towel") || text.contains("backpack") || text.contains("water bottle") || text.contains("chair") || text.contains("counter") || text.contains("stair")) tags.add("At home");
             else tags.add("Bodyweight");
         }
         return String.join(" · ", tags);

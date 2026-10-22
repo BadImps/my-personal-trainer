@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 83,
-  "versionName": "5.41",
-  "publishedAt": "2026-10-22T10:08:22Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.41/app-release.apk",
-  "sha256": "d766e10d61668e9fc94285386d16d4059c5b02c55e7f882217c2821579cb29b9",
-  "sizeBytes": 213255887,
-  "notes": "Workout Library now offers Preview and Add to a Schedule from each long-press menu, with multi-select additions to saved future workouts."
+  "versionCode": 84,
+  "versionName": "5.42",
+  "publishedAt": "2026-10-22T10:27:19Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.42/app-release.apk",
+  "sha256": "cd626ca692f8ac34e973861b21143bf8ea802f4601f68fec9208f66948fe2ba2",
+  "sizeBytes": 213257267,
+  "notes": "Corrected workout equipment groupings: Bodyweight uses no equipment, Dumbbells and Barbells use their named implement, and At Home uses household items only."
 }

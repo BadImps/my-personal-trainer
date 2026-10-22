@@ -15,6 +15,7 @@ public final class ReleaseNotes {
     }
 
     public static final Entry[] HISTORY = {
+            new Entry("5.42", "Correct equipment groupings", "Bodyweight now means no equipment; dumbbell, barbell, and household-item plans each contain only movements matching that choice."),
             new Entry("5.41", "Workout Library scheduling", "Holding a library movement now offers Preview or Add to a Schedule, with multi-select additions for saved future workouts."),
             new Entry("5.39", "Human coach voices", "Adds six selected coach voice packs for synchronized guided-workout cues, with Android speech retained for dynamic exercise names."),
             new Entry("5.38", "Complete workout refinement", "Adds persistent guided-workout controls, custom and untimed sessions, refined cooldown navigation, expanded training and equipment choices, improved nutrition content, and unified neutral Strength Level exercise artwork."),
