@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 88,
-  "versionName": "5.46",
-  "publishedAt": "2026-10-22T11:50:06Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.46/app-release.apk",
-  "sha256": "a52eb3f14d03b7a96d55ed0dbcdcb8f1e5a3c9c97d018878721e3ba8cd4743e7",
-  "sizeBytes": 212985407,
-  "notes": "Plank Shoulder Tap now uses a stable-plank loop that alternates the opposite hand to opposite shoulder, without hip-lift motion."
+  "versionCode": 89,
+  "versionName": "5.47",
+  "publishedAt": "2026-10-22T12:02:20Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.47/app-release.apk",
+  "sha256": "0c64792bd8c1f7f5c87882fc3d687aaf1f73eb24b5c434950968c8bfc5fe1682",
+  "sizeBytes": 212985771,
+  "notes": "Move to now opens one clear popup with Body Area and Equipment selectors together, followed by Save placement."
 }

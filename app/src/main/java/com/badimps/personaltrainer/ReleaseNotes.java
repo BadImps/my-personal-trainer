@@ -15,6 +15,7 @@ public final class ReleaseNotes {
     }
 
     public static final Entry[] HISTORY = {
+            new Entry("5.47", "Move placement editor", "Move to now opens one clear popup with Body Area and Equipment selectors together, followed by Save placement."),
             new Entry("5.46", "Shoulder Tap motion repair", "Plank Shoulder Tap now uses a stable-plank loop that alternates the opposite hand to opposite shoulder, with no hip-lift motion."),
             new Entry("5.45", "Reliable exercise moves", "Workout Library actions now open on a normal tap as well as a press and hold, so permanent Move to corrections are always reachable."),
             new Entry("5.44", "Permanent Library placements", "Manual Move to choices now permanently update Workout Library and future Daily and Weekly plan selections."),

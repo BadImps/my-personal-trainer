@@ -45,6 +45,7 @@ import android.view.WindowInsets;
 import android.view.WindowManager;
 import android.view.animation.OvershootInterpolator;
 import android.widget.Button;
+import android.widget.ArrayAdapter;
 import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.FrameLayout;
@@ -59,6 +60,7 @@ import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.ScrollView;
 import android.widget.SeekBar;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -5050,7 +5052,7 @@ public final class MainActivity extends FragmentActivity {
         menu.setOnMenuItemClickListener(item -> {
             String action = String.valueOf(item.getTitle());
             if ("Preview".equals(action)) showExercisePreviewDialog(exercise);
-            else if ("Move to…".equals(action)) showMoveExerciseToBodyArea(exercise);
+            else if ("Move to…".equals(action)) showMoveExerciseDialog(exercise);
             else if ("Add to a Schedule".equals(action)) showAddExerciseToScheduledWorkouts(exercise);
             else if ("Restore original placement".equals(action)) {
                 ExercisePlacementStore.clear(this, exercise);
@@ -5062,44 +5064,57 @@ public final class MainActivity extends FragmentActivity {
         menu.show();
     }
 
-    /** Two short pickers keep manual Library filing purposeful and uncluttered. */
-    private void showMoveExerciseToBodyArea(Coach.Exercise exercise) {
-        String[] areas = Coach.TARGETS;
-        String selected = workoutLibraryBodyAreaFor(exercise);
-        int checked = 0;
-        for (int index = 0; index < areas.length; index++) if (areas[index].equals(selected)) checked = index;
-        new AlertDialog.Builder(this)
+    /** One confirmation popup exposes both permanent catalogue fields together. */
+    private void showMoveExerciseDialog(Coach.Exercise exercise) {
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dp(22), dp(6), dp(22), dp(2));
+        content.addView(text("Place this movement under the body area and equipment group you choose. This applies to Workout Library and future plans.", 14, muted));
+        gap(content, 16);
+
+        TextView bodyLabel = text("BODY AREA", 12, Color.rgb(47, 110, 108));
+        bodyLabel.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
+        content.addView(bodyLabel);
+        Spinner bodyArea = movePlacementSpinner(Coach.TARGETS, workoutLibraryBodyAreaFor(exercise));
+        content.addView(bodyArea, new LinearLayout.LayoutParams(-1, dp(52)));
+        gap(content, 14);
+
+        TextView equipmentLabel = text("EQUIPMENT", 12, Color.rgb(47, 110, 108));
+        equipmentLabel.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
+        content.addView(equipmentLabel);
+        Spinner equipment = movePlacementSpinner(Coach.EQUIPMENT_TYPES, workoutLibraryEquipmentFor(exercise));
+        content.addView(equipment, new LinearLayout.LayoutParams(-1, dp(52)));
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle("Move " + exercise.name)
-                .setMessage("This permanently updates its body area for Workout Library and future plan choices.")
-                .setSingleChoiceItems(areas, checked, (dialog, which) -> {
-                    dialog.dismiss();
-                    showMoveExerciseToEquipment(exercise, areas[which]);
-                })
-                .setNegativeButton("Close", null)
-                .show();
+                .setView(content)
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Save placement", null)
+                .create();
+        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
+            String targetPlacement = String.valueOf(bodyArea.getSelectedItem());
+            String equipmentPlacement = String.valueOf(equipment.getSelectedItem());
+            ExercisePlacementStore.save(this, exercise, targetPlacement, equipmentPlacement);
+            dialog.dismiss();
+            toast("Permanently moved to " + targetPlacement + " · " + equipmentPlacement + ".");
+            refreshCurrentPageKeepingScroll(this::showWorkoutLibrary);
+        }));
+        dialog.show();
     }
 
-    private void showMoveExerciseToEquipment(Coach.Exercise exercise, String bodyArea) {
-        String[] equipment = Coach.EQUIPMENT_TYPES;
-        String selected = workoutLibraryEquipmentFor(exercise);
-        int checked = 0;
-        for (int index = 0; index < equipment.length; index++) {
-            if (selected.equals(equipment[index]) || selected.contains(equipment[index])) {
-                checked = index;
+    private Spinner movePlacementSpinner(String[] options, String selected) {
+        Spinner picker = new Spinner(this);
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, options);
+        picker.setAdapter(adapter);
+        for (int index = 0; index < options.length; index++) {
+            if (options[index].equals(selected) || selected.contains(options[index])) {
+                picker.setSelection(index);
                 break;
             }
         }
-        new AlertDialog.Builder(this)
-                .setTitle("Choose equipment")
-                .setMessage("This permanently updates its equipment for Workout Library and future plan choices.")
-                .setSingleChoiceItems(equipment, checked, (dialog, which) -> {
-                    ExercisePlacementStore.save(this, exercise, bodyArea, equipment[which]);
-                    dialog.dismiss();
-                    toast("Permanently moved to " + bodyArea + " · " + equipment[which] + ".");
-                    refreshCurrentPageKeepingScroll(this::showWorkoutLibrary);
-                })
-                .setNegativeButton("Back", (dialog, ignored) -> showMoveExerciseToBodyArea(exercise))
-                .show();
+        picker.setBackground(surface(paper, 14, 1, cardLine));
+        picker.setPadding(dp(12), 0, dp(12), 0);
+        return picker;
     }
 
     /** One selectable row per genuinely saved, upcoming strength-workout date. */
