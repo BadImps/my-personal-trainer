@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 85,
-  "versionName": "5.43",
-  "publishedAt": "2026-10-22T11:20:53Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.43/app-release.apk",
-  "sha256": "cd93e0ec1219792867d68ba33cbde8d1c09f3df99288a19d8f288b51edda0ea3",
-  "sizeBytes": 213260491,
-  "notes": "Adds a premium Workout Library navigation icon, manual Move to placement controls, and complete illustration mappings for the exercise library."
+  "versionCode": 86,
+  "versionName": "5.44",
+  "publishedAt": "2026-10-22T11:26:56Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.44/app-release.apk",
+  "sha256": "52a24ae96a8f432614211ab72f539419d1a476daa33496329d5a1e13d68e8d17",
+  "sizeBytes": 213260643,
+  "notes": "Manual Move to placements now permanently apply to the Workout Library and future Daily and Weekly workout choices."
 }

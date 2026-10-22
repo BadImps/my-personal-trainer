@@ -4,9 +4,9 @@ import android.content.Context;
 import android.content.SharedPreferences;
 
 /**
- * A deliberately temporary, member-managed filing layer for Workout Library.
- * It changes library filters and labels without rewriting the original coaching
- * programme data, so a person can audit and organise movements safely.
+ * Permanent, member-managed exercise placement. A saved move is used by the
+ * Library and future plan choices until the person moves it again or restores
+ * its original placement.
  */
 public final class ExercisePlacementStore {
     private static final String FILE = "exercise_library_placements";

@@ -4617,7 +4617,7 @@ public final class MainActivity extends FragmentActivity {
             session = sessionWithScheduledAddOns(selectedWeekDate(activeScheduleDay), weeklySessions.get(activeScheduleDay));
             persistCurrentWeekSchedule();
         } else {
-            session = sessionWithScheduledAddOns(selectedWeekDate(dailyScheduledDay), prescribeNames(saved.exerciseNames, Coach.planOptions(activeTargets(), selectedEquipmentTypes)));
+            session = sessionWithScheduledAddOns(selectedWeekDate(dailyScheduledDay), prescribeNames(saved.exerciseNames, permanentlyPlacedPlanOptions(activeTargets(), selectedEquipmentTypes)));
         }
     }
 
@@ -4702,7 +4702,7 @@ public final class MainActivity extends FragmentActivity {
         for (int i = 0; i < weeklySessions.size(); i++) {
             weeklySessions.get(i).clear();
             if (!weeklyWorkoutDays[i]) continue;
-            List<Coach.Exercise> choices = Coach.planOptions(weeklyDayTargets.get(i), selectedEquipmentTypes);
+            List<Coach.Exercise> choices = permanentlyPlacedPlanOptions(weeklyDayTargets.get(i), selectedEquipmentTypes);
             List<String> names = i < days.length && !days[i].isEmpty()
                     ? java.util.Arrays.asList(days[i].split("\\|", -1)) : Collections.emptyList();
             List<Coach.Exercise> restored = prescribeNames(names, choices);
@@ -4740,7 +4740,7 @@ public final class MainActivity extends FragmentActivity {
         String key = String.join("|", activeTargets()) + "|" + encodeEquipmentTypes() + "|" + sessionMinutes;
         if (key.equals(selectionKey) && !availableExercises.isEmpty()) return;
         selectionKey = key;
-        availableExercises = Coach.planOptions(activeTargets(), selectedEquipmentTypes);
+        availableExercises = permanentlyPlacedPlanOptions(activeTargets(), selectedEquipmentTypes);
         selectedExercises = Coach.recommendedForDuration(availableExercises, sessionMinutes);
     }
 
@@ -4909,6 +4909,34 @@ public final class MainActivity extends FragmentActivity {
         return new ArrayList<>(exercises.values());
     }
 
+    /**
+     * Starts with the coach catalogue, removes movements moved away from their
+     * old group, then injects the saved placement into its new body/equipment
+     * pairing. This makes a Library move a real, durable planning correction.
+     */
+    private List<Coach.Exercise> permanentlyPlacedPlanOptions(List<String> targets, List<String> equipmentTypes) {
+        LinkedHashMap<String, Coach.Exercise> choices = new LinkedHashMap<>();
+        if (targets == null || targets.isEmpty() || equipmentTypes == null || equipmentTypes.isEmpty()) return new ArrayList<>();
+        for (String target : targets) {
+            for (String equipment : equipmentTypes) {
+                for (Coach.Exercise exercise : Coach.planOptions(target, equipment)) {
+                    ExercisePlacementStore.Placement placement = ExercisePlacementStore.get(this, exercise);
+                    if (placement == null || (target.equals(placement.bodyArea) && equipment.equals(placement.equipment))) {
+                        choices.put(exercise.name + "|" + exercise.target, exercise);
+                    }
+                }
+            }
+        }
+        for (Coach.Exercise exercise : workoutLibraryCatalog()) {
+            ExercisePlacementStore.Placement placement = ExercisePlacementStore.get(this, exercise);
+            if (placement == null || !targets.contains(placement.bodyArea) || !equipmentTypes.contains(placement.equipment)) continue;
+            Coach.Exercise moved = new Coach.Exercise(exercise.name, placement.bodyArea, exercise.sets, exercise.reps,
+                    exercise.restSeconds, exercise.cue, exercise.description);
+            choices.put(moved.name + "|" + moved.target, moved);
+        }
+        return new ArrayList<>(choices.values());
+    }
+
     private String workoutLibraryBodyAreaFor(Coach.Exercise exercise) {
         ExercisePlacementStore.Placement placement = ExercisePlacementStore.get(this, exercise);
         return placement == null ? exercise.target : placement.bodyArea;
@@ -5040,7 +5068,7 @@ public final class MainActivity extends FragmentActivity {
         for (int index = 0; index < areas.length; index++) if (areas[index].equals(selected)) checked = index;
         new AlertDialog.Builder(this)
                 .setTitle("Move " + exercise.name)
-                .setMessage("Choose its body area for Workout Library sorting.")
+                .setMessage("This permanently updates its body area for Workout Library and future plan choices.")
                 .setSingleChoiceItems(areas, checked, (dialog, which) -> {
                     dialog.dismiss();
                     showMoveExerciseToEquipment(exercise, areas[which]);
@@ -5061,11 +5089,11 @@ public final class MainActivity extends FragmentActivity {
         }
         new AlertDialog.Builder(this)
                 .setTitle("Choose equipment")
-                .setMessage("Save this placement for Workout Library filters and labels.")
+                .setMessage("This permanently updates its equipment for Workout Library and future plan choices.")
                 .setSingleChoiceItems(equipment, checked, (dialog, which) -> {
                     ExercisePlacementStore.save(this, exercise, bodyArea, equipment[which]);
                     dialog.dismiss();
-                    toast("Saved under " + bodyArea + " · " + equipment[which] + ".");
+                    toast("Permanently moved to " + bodyArea + " · " + equipment[which] + ".");
                     refreshCurrentPageKeepingScroll(this::showWorkoutLibrary);
                 })
                 .setNegativeButton("Back", (dialog, ignored) -> showMoveExerciseToBodyArea(exercise))
@@ -5725,7 +5753,7 @@ public final class MainActivity extends FragmentActivity {
             if (!weeklyWorkoutDays[i]) continue;
             List<Coach.Exercise> choices;
             if (i == activeScheduleDay) choices = selectedExercises;
-            else choices = Coach.recommendedForDuration(Coach.planOptions(weeklyDayTargets.get(i), selectedEquipmentTypes), sessionMinutes);
+            else choices = Coach.recommendedForDuration(permanentlyPlacedPlanOptions(weeklyDayTargets.get(i), selectedEquipmentTypes), sessionMinutes);
             weeklySessions.get(i).addAll(sessionWithScheduledAddOns(selectedWeekDate(i), prescribeExercises(choices)));
         }
     }
@@ -6996,7 +7024,6 @@ public final class MainActivity extends FragmentActivity {
             PlanStore.clear(this);
             WeeklyScheduleStore.clear(this);
             ScheduledWorkoutAddOnStore.clear(this);
-            ExercisePlacementStore.clear(this);
             WorkoutReminderScheduler.cancel(this);
             WeightStore.clear(this);
             BodyProfileStore.clear(this);
