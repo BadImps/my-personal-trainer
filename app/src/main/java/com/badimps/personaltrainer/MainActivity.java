@@ -5007,7 +5007,7 @@ public final class MainActivity extends FragmentActivity {
         card.setGravity(Gravity.CENTER_VERTICAL);
         card.setPadding(dp(8), dp(8), dp(11), dp(8));
         card.setBackground(surface(paper, 19, 1, cardLine));
-        card.setContentDescription(exercise.name + ". " + exercise.target + ". Press and hold for exercise actions.");
+        card.setContentDescription(exercise.name + ". " + workoutLibraryBodyAreaFor(exercise) + ". Tap or press and hold for exercise actions.");
         applyPremiumTileDepth(card, false);
         View artwork = exerciseSelectionArtwork(exercise, index);
         LinearLayout.LayoutParams artworkParams = new LinearLayout.LayoutParams(dp(108), dp(118));
@@ -5024,11 +5024,13 @@ public final class MainActivity extends FragmentActivity {
         LinearLayout.LayoutParams descriptionParams = new LinearLayout.LayoutParams(-1, 0, 1);
         descriptionParams.topMargin = dp(4);
         details.addView(description, descriptionParams);
-        TextView hold = text("Hold for actions", 11, coral);
+        TextView hold = text("Tap or hold to move", 11, coral);
         hold.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
         details.addView(hold);
         card.addView(details, new LinearLayout.LayoutParams(0, dp(118), 1));
-        card.setOnClickListener(view -> toast("Press and hold " + exercise.name + " for actions."));
+        // Both gestures deliberately expose the same menu. Long press remains familiar,
+        // while normal tap gives a dependable route to permanent catalogue corrections.
+        card.setOnClickListener(view -> showWorkoutLibraryContextMenu(view, exercise));
         card.setOnLongClickListener(view -> {
             showWorkoutLibraryContextMenu(view, exercise);
             return true;

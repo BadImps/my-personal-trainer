@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 86,
-  "versionName": "5.44",
-  "publishedAt": "2026-10-22T11:26:56Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.44/app-release.apk",
-  "sha256": "52a24ae96a8f432614211ab72f539419d1a476daa33496329d5a1e13d68e8d17",
-  "sizeBytes": 213260643,
-  "notes": "Manual Move to placements now permanently apply to the Workout Library and future Daily and Weekly workout choices."
+  "versionCode": 87,
+  "versionName": "5.45",
+  "publishedAt": "2026-10-22T11:40:15Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.45/app-release.apk",
+  "sha256": "f7b2159337792b1e40209601bb22075c578f1edc1f91adb5465efa3f0a21548b",
+  "sizeBytes": 213260739,
+  "notes": "Workout Library actions now open by normal tap or press and hold, making permanent Move to corrections reliably accessible."
 }
