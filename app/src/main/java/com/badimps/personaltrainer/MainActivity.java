@@ -1081,7 +1081,7 @@ public final class MainActivity extends FragmentActivity {
         row.setPadding(dp(8), dp(7), dp(8), dp(8));
         addCoachHeroNavItem(row, "Home", R.drawable.ic_nav_home, activeScreen, view -> navigateDashboard("Home", this::showHome));
         addCoachHeroNavItem(row, "Workouts", R.drawable.ic_nav_workouts, activeScreen, view -> navigateDashboard("Workouts", this::showPlans));
-        addCoachHeroNavItem(row, "Workout Library", R.drawable.ic_nav_workouts, activeScreen, view -> navigateDashboard("Workout Library", this::showWorkoutLibrary));
+        addCoachHeroNavItem(row, "Workout Library", R.drawable.ic_nav_library_premium, activeScreen, view -> navigateDashboard("Workout Library", this::showWorkoutLibrary));
         addCoachHeroNavItem(row, "Progress", R.drawable.ic_nav_progress, activeScreen, view -> navigateDashboard("Progress", this::showProgress));
         addCoachHeroNavItem(row, "Nutrition", R.drawable.ic_nav_nutrition, activeScreen, view -> navigateDashboard("Nutrition", this::showMeals));
         addCoachHeroNavItem(row, "Endurance", R.drawable.ic_nav_endurance, activeScreen, view -> navigateDashboard("Endurance", this::showEndurance));
@@ -4909,7 +4909,17 @@ public final class MainActivity extends FragmentActivity {
         return new ArrayList<>(exercises.values());
     }
 
+    private String workoutLibraryBodyAreaFor(Coach.Exercise exercise) {
+        ExercisePlacementStore.Placement placement = ExercisePlacementStore.get(this, exercise);
+        return placement == null ? exercise.target : placement.bodyArea;
+    }
+
     private String workoutLibraryEquipmentFor(Coach.Exercise exercise) {
+        ExercisePlacementStore.Placement placement = ExercisePlacementStore.get(this, exercise);
+        return placement == null ? workoutLibraryDefaultEquipmentFor(exercise) : placement.equipment;
+    }
+
+    private String workoutLibraryDefaultEquipmentFor(Coach.Exercise exercise) {
         ArrayList<String> tags = new ArrayList<>();
         for (String equipment : Coach.EQUIPMENT_TYPES) {
             for (Coach.Exercise candidate : Coach.planOptions(exercise.target, equipment)) {
@@ -4936,10 +4946,10 @@ public final class MainActivity extends FragmentActivity {
         for (Coach.Exercise exercise : workoutLibraryCatalog()) {
             String equipment = workoutLibraryEquipmentFor(exercise);
             boolean bodyMatches = "All body areas".equals(workoutLibraryBodyArea)
-                    || workoutLibraryBodyArea.equals(exercise.target);
+                    || workoutLibraryBodyArea.equals(workoutLibraryBodyAreaFor(exercise));
             boolean equipmentMatches = "All equipment".equals(workoutLibraryEquipment)
                     || equipment.contains(workoutLibraryEquipment);
-            String searchable = (exercise.name + " " + exercise.target + " " + exercise.description + " "
+            String searchable = (exercise.name + " " + workoutLibraryBodyAreaFor(exercise) + " " + exercise.description + " "
                     + exercise.cue + " " + equipment).toLowerCase(Locale.ROOT);
             if (bodyMatches && equipmentMatches && (query.isEmpty() || searchable.contains(query))) filtered.add(exercise);
         }
@@ -4978,7 +4988,7 @@ public final class MainActivity extends FragmentActivity {
         LinearLayout details = new LinearLayout(this);
         details.setOrientation(LinearLayout.VERTICAL);
         details.addView(heading(exercise.name, 17, ink));
-        TextView tags = text(exercise.target.toUpperCase(Locale.ROOT) + "  ·  " + workoutLibraryEquipmentFor(exercise), 11, Color.rgb(47, 110, 108));
+        TextView tags = text(workoutLibraryBodyAreaFor(exercise).toUpperCase(Locale.ROOT) + "  ·  " + workoutLibraryEquipmentFor(exercise), 11, Color.rgb(47, 110, 108));
         tags.setMaxLines(2);
         details.addView(tags);
         TextView description = text(exercise.description, 12, muted);
@@ -5003,15 +5013,63 @@ public final class MainActivity extends FragmentActivity {
     private void showWorkoutLibraryContextMenu(View anchor, Coach.Exercise exercise) {
         PopupMenu menu = new PopupMenu(this, anchor);
         menu.getMenu().add("Preview");
+        menu.getMenu().add("Move to…");
         menu.getMenu().add("Add to a Schedule");
+        if (ExercisePlacementStore.has(this, exercise)) menu.getMenu().add("Restore original placement");
         menu.getMenu().add("Close");
         menu.setOnMenuItemClickListener(item -> {
             String action = String.valueOf(item.getTitle());
             if ("Preview".equals(action)) showExercisePreviewDialog(exercise);
+            else if ("Move to…".equals(action)) showMoveExerciseToBodyArea(exercise);
             else if ("Add to a Schedule".equals(action)) showAddExerciseToScheduledWorkouts(exercise);
+            else if ("Restore original placement".equals(action)) {
+                ExercisePlacementStore.clear(this, exercise);
+                toast("Restored the original Library placement for " + exercise.name + ".");
+                refreshCurrentPageKeepingScroll(this::showWorkoutLibrary);
+            }
             return true;
         });
         menu.show();
+    }
+
+    /** Two short pickers keep manual Library filing purposeful and uncluttered. */
+    private void showMoveExerciseToBodyArea(Coach.Exercise exercise) {
+        String[] areas = Coach.TARGETS;
+        String selected = workoutLibraryBodyAreaFor(exercise);
+        int checked = 0;
+        for (int index = 0; index < areas.length; index++) if (areas[index].equals(selected)) checked = index;
+        new AlertDialog.Builder(this)
+                .setTitle("Move " + exercise.name)
+                .setMessage("Choose its body area for Workout Library sorting.")
+                .setSingleChoiceItems(areas, checked, (dialog, which) -> {
+                    dialog.dismiss();
+                    showMoveExerciseToEquipment(exercise, areas[which]);
+                })
+                .setNegativeButton("Close", null)
+                .show();
+    }
+
+    private void showMoveExerciseToEquipment(Coach.Exercise exercise, String bodyArea) {
+        String[] equipment = Coach.EQUIPMENT_TYPES;
+        String selected = workoutLibraryEquipmentFor(exercise);
+        int checked = 0;
+        for (int index = 0; index < equipment.length; index++) {
+            if (selected.equals(equipment[index]) || selected.contains(equipment[index])) {
+                checked = index;
+                break;
+            }
+        }
+        new AlertDialog.Builder(this)
+                .setTitle("Choose equipment")
+                .setMessage("Save this placement for Workout Library filters and labels.")
+                .setSingleChoiceItems(equipment, checked, (dialog, which) -> {
+                    ExercisePlacementStore.save(this, exercise, bodyArea, equipment[which]);
+                    dialog.dismiss();
+                    toast("Saved under " + bodyArea + " · " + equipment[which] + ".");
+                    refreshCurrentPageKeepingScroll(this::showWorkoutLibrary);
+                })
+                .setNegativeButton("Back", (dialog, ignored) -> showMoveExerciseToBodyArea(exercise))
+                .show();
     }
 
     /** One selectable row per genuinely saved, upcoming strength-workout date. */
@@ -6938,6 +6996,7 @@ public final class MainActivity extends FragmentActivity {
             PlanStore.clear(this);
             WeeklyScheduleStore.clear(this);
             ScheduledWorkoutAddOnStore.clear(this);
+            ExercisePlacementStore.clear(this);
             WorkoutReminderScheduler.cancel(this);
             WeightStore.clear(this);
             BodyProfileStore.clear(this);

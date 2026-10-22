@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 84,
-  "versionName": "5.42",
-  "publishedAt": "2026-10-22T10:27:19Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.42/app-release.apk",
-  "sha256": "cd626ca692f8ac34e973861b21143bf8ea802f4601f68fec9208f66948fe2ba2",
-  "sizeBytes": 213257267,
-  "notes": "Corrected workout equipment groupings: Bodyweight uses no equipment, Dumbbells and Barbells use their named implement, and At Home uses household items only."
+  "versionCode": 85,
+  "versionName": "5.43",
+  "publishedAt": "2026-10-22T11:20:53Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.43/app-release.apk",
+  "sha256": "cd93e0ec1219792867d68ba33cbde8d1c09f3df99288a19d8f288b51edda0ea3",
+  "sizeBytes": 213260491,
+  "notes": "Adds a premium Workout Library navigation icon, manual Move to placement controls, and complete illustration mappings for the exercise library."
 }

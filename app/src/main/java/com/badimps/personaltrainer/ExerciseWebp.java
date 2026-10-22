@@ -128,6 +128,57 @@ public final class ExerciseWebp {
             case "Triceps Push-up Hold": return R.drawable.sl_triceps_push_up_hold;
             case "Water Bottle Hammer Curl": return R.drawable.sl_water_bottle_hammer_curl;
             case "Water Bottle Overhead Extension": return R.drawable.sl_water_bottle_overhead_extension;
+            // Equipment taxonomy aliases. Each uses the closest retained neutral
+            // Strength Level movement loop, so no selectable exercise is blank.
+            case "Dumbbell One-arm Row": return R.drawable.sl_one_arm_row;
+            case "Dumbbell Lateral Raise": return R.drawable.sl_lateral_raise;
+            case "Dumbbell Suitcase Carry": return R.drawable.sl_suitcase_carry;
+            case "Dumbbell Renegade Row": return R.drawable.sl_renegade_row;
+            case "Dumbbell High Pull": return R.drawable.sl_dumbbell_thruster;
+            case "Dumbbell Floor Press": return R.drawable.sl_dumbbell_floor_press;
+            case "Dumbbell Squeeze Press": return R.drawable.sl_dumbbell_floor_press;
+            case "Dumbbell Goblet Squat": return R.drawable.sl_goblet_squat;
+            case "Dumbbell Romanian Deadlift": return R.drawable.sl_dumbbell_romanian_deadlift;
+            case "Dumbbell Reverse Lunge": return R.drawable.sl_reverse_lunge;
+            case "Dumbbell Hammer Curl": return R.drawable.sl_hammer_curl;
+            case "Dumbbell Overhead Triceps Extension": return R.drawable.sl_overhead_triceps_extension;
+            case "Dumbbell Concentration Curl": return R.drawable.sl_concentration_curl;
+            case "Dumbbell Triceps Kickback": return R.drawable.sl_triceps_kickback;
+            case "Dumbbell Close-Grip Floor Press": return R.drawable.sl_close_grip_floor_press;
+            case "Dumbbell Halo": return R.drawable.sl_dumbbell_press;
+            case "Dumbbell Windmill": return R.drawable.sl_dumbbell_press;
+            case "Dumbbell Arm Bar": return R.drawable.sl_dumbbell_floor_press;
+            case "Barbell Reverse Curl": return R.drawable.sl_reverse_barbell_curl;
+            case "Barbell Drag Curl": return R.drawable.sl_drag_curl;
+            case "Close-Grip Barbell Floor Press": return R.drawable.sl_close_grip_barbell_bench_press;
+            case "Barbell JM Press": return R.drawable.sl_close_grip_barbell_bench_press;
+            case "Barbell Landmine Press": return R.drawable.sl_landmine_press;
+            case "Barbell Landmine Rotation": return R.drawable.sl_landmine_rotation;
+            case "Barbell Landmine Anti-Rotation Hold": return R.drawable.sl_landmine_anti_rotation_hold;
+            case "Self-resisted Biceps Curl": return R.drawable.sl_isometric_towel_curl;
+            case "Self-resisted Hammer Curl": return R.drawable.sl_isometric_towel_curl;
+            case "Biceps Flex Hold": return R.drawable.sl_isometric_towel_curl;
+            case "Close-grip Push-up": return R.drawable.sl_push_up;
+            case "Knee Push-up": return R.drawable.sl_push_up;
+            case "Wide Push-up": return R.drawable.sl_push_up;
+            case "High Knees": return R.drawable.sl_brisk_march;
+            case "Squat to Reach": return R.drawable.sl_squat_to_press;
+            case "Stair Step-up": return R.drawable.sl_step_up;
+            case "Counter Incline Push-up": return R.drawable.sl_incline_push_up;
+            case "Chair Sit-to-Stand": return R.drawable.sl_bodyweight_squat;
+            case "Chair Hip Opener": return R.drawable.sl_ninety_ninety_hip_switch;
+            case "Wall Calf Stretch": return R.drawable.sl_bodyweight_calf_raise;
+            case "Towel Plank Drag": return R.drawable.sl_plank_shoulder_tap;
+            case "Towel Shoulder Pass-through": return R.drawable.sl_shoulder_wall_slide;
+            case "Water Bottle Shoulder Press": return R.drawable.sl_dumbbell_press;
+            case "Water Bottle Carry": return R.drawable.sl_suitcase_carry;
+            case "Backpack Squat": return R.drawable.sl_bodyweight_squat;
+            case "Backpack Squat to Reach": return R.drawable.sl_squat_to_press;
+            case "Backpack March": return R.drawable.sl_dumbbell_march;
+            case "Backpack Suitcase March": return R.drawable.sl_suitcase_carry;
+            case "Backpack Front Raise": return R.drawable.sl_dumbbell_front_raise;
+            case "Backpack Reverse Fly": return R.drawable.sl_dumbbell_reverse_fly;
+            case "Backpack Dead Bug": return R.drawable.sl_dumbbell_dead_bug;
             default: return 0;
         }
     }
