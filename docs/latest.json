@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 95,
-  "versionName": "5.53",
-  "publishedAt": "2026-10-23T16:15:00Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.53/app-release.apk",
-  "sha256": "6e369075d40480035a68548110abaa69155536d1316653f4c3a0cdc0cba0d4b0",
+  "versionCode": 96,
+  "versionName": "5.54",
+  "publishedAt": "2026-10-23T16:45:00Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.54/app-release.apk",
+  "sha256": "695f1b3d4700f831b031c6faf24a86b91e04e39b0040f86181c32fbf62770338",
   "sizeBytes": 257034559,
-  "notes": "Adds completed endurance reports, Home Done ribbons, calorie estimates, and private route replays."
+  "notes": "Every endurance completion now has a report; live GPS sessions also replay their private route."
 }

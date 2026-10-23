@@ -33,10 +33,16 @@ public final class EnduranceHistoryStore {
 
     public static void record(Context context, long timestamp, LiveTrackingStore.Session session) {
         if (session == null) return;
+        record(context, timestamp, session.mode, session.activeMillis, session.distanceMeters, session.points);
+    }
+
+    /** Records timer-only and guided endurance sessions too; their route list may intentionally be empty. */
+    public static void record(Context context, long timestamp, String mode, long activeMillis,
+                              float distanceMeters, List<LiveTrackingStore.Point> routePoints) {
         List<String> entries = lines(prefs(context).getString(KEY, ""));
-        List<LiveTrackingStore.Point> points = compact(session.points);
-        entries.add(timestamp + "|" + safe(session.mode) + "|" + Math.max(0L, session.activeMillis)
-                + "|" + Math.max(0f, session.distanceMeters) + "|" + encodePoints(points));
+        List<LiveTrackingStore.Point> points = compact(routePoints);
+        entries.add(timestamp + "|" + safe(mode) + "|" + Math.max(0L, activeMillis)
+                + "|" + Math.max(0f, distanceMeters) + "|" + encodePoints(points));
         while (entries.size() > MAX_ENTRIES) entries.remove(0);
         prefs(context).edit().putString(KEY, String.join("\n", entries)).apply();
     }

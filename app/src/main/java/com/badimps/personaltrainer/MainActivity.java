@@ -10372,7 +10372,9 @@ public final class MainActivity extends FragmentActivity {
         Button finish = primary("Finish " + action);
         finish.setOnClickListener(view -> {
             long duration = Math.max(60_000L, SystemClock.elapsedRealtime() - guidedEnduranceStartedAt);
-            JourneyStore.recordWorkout(this, "Endurance · " + guidedEnduranceMode, Math.max(1, Math.round(duration / 60_000f)));
+            long completedAt = System.currentTimeMillis();
+            JourneyStore.recordWorkoutAt(this, "Endurance · " + guidedEnduranceMode, Math.max(1, Math.round(duration / 60_000f)), completedAt);
+            EnduranceHistoryStore.record(this, completedAt, guidedEnduranceMode, duration, 0f, Collections.emptyList());
             stopEnduranceGuided();
             toast(action + " saved to Progress.");
             showProgress();
@@ -10748,7 +10750,9 @@ public final class MainActivity extends FragmentActivity {
             gap(tile, 7);
             Button complete = primary("Log " + plan.minutes + " min to Progress");
             complete.setOnClickListener(view -> {
-                JourneyStore.recordWorkout(this, "Endurance · " + mode, plan.minutes);
+                long completedAt = System.currentTimeMillis();
+                JourneyStore.recordWorkoutAt(this, "Endurance · " + mode, plan.minutes, completedAt);
+                EnduranceHistoryStore.record(this, completedAt, mode, plan.minutes * 60_000L, 0f, Collections.emptyList());
                 toast("Endurance session added to local Progress.");
                 showProgress();
             });
@@ -10797,7 +10801,9 @@ public final class MainActivity extends FragmentActivity {
         finish.setOnClickListener(view -> {
             long duration = Math.max(60_000L, SystemClock.elapsedRealtime() - manualEnduranceStartedAt);
             int minutes = Math.max(1, Math.round(duration / 60_000f));
-            JourneyStore.recordWorkout(this, "Endurance · " + manualEnduranceMode, minutes);
+            long completedAt = System.currentTimeMillis();
+            JourneyStore.recordWorkoutAt(this, "Endurance · " + manualEnduranceMode, minutes, completedAt);
+            EnduranceHistoryStore.record(this, completedAt, manualEnduranceMode, duration, 0f, Collections.emptyList());
             endManualEnduranceSession();
             toast("Timer-only endurance session saved to Progress.");
             showProgress();
