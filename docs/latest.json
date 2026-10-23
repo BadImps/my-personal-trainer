@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 97,
-  "versionName": "5.55",
-  "publishedAt": "2026-10-23T17:15:00Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.55/app-release.apk",
-  "sha256": "b08a3ca36cc009bf71076ff05e97597b0a125fc512eae057fa4c67c005fc01f3",
+  "versionCode": 98,
+  "versionName": "5.56",
+  "publishedAt": "2026-10-23T18:00:00Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.56/app-release.apk",
+  "sha256": "f0b58fcc7afa1befbeddacec2260c20a7fc93f650fe03eb1e23e9589083782c1",
   "sizeBytes": 257050943,
-  "notes": "Route maps now frame closer, pan directly, and respect your zoom position."
+  "notes": "Adds guided warm-up and cool-down choices, filtered custom exercises, accurate Weekly validation, historical Home days, and coach recovery guidance."
 }
