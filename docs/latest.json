@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 93,
-  "versionName": "5.51",
-  "publishedAt": "2026-10-23T14:45:00Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.51/app-release.apk",
-  "sha256": "0f9e9c45fff82117dfd11f26e49e30245cd4a6ab79955718f6b5cf35712fb485",
+  "versionCode": 94,
+  "versionName": "5.52",
+  "publishedAt": "2026-10-23T15:30:00Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.52/app-release.apk",
+  "sha256": "faa3279ab311cdde8f13af1cc39ca3fada6c6f48dfcae41eb565d05074921788",
   "sizeBytes": 257034559,
-  "notes": "Fixed MapLibre route rendering so selected vector streets visibly load on live endurance routes."
+  "notes": "Adds private training intelligence: recovery guidance, transparent progression suggestions, and a barbell plate guide."
 }

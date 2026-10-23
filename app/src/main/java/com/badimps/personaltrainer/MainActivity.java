@@ -5549,8 +5549,10 @@ public final class MainActivity extends FragmentActivity {
         settings.addView(heading("Working sets", 21, ink));
         settings.addView(text("Choose comfortable starting targets. You can adjust them later.", 13, muted));
         gap(settings, 8);
-        if (selectedEquipmentTypes.contains("Dumbbells") || selectedEquipmentTypes.contains("Machine-assisted")) {
-            addWorkingStepper(settings, "Weight", workingWeightKg + " kg", () -> workingWeightKg = Math.max(0, workingWeightKg - 2), () -> workingWeightKg += 2);
+        if (selectedEquipmentTypes.contains("Dumbbells") || selectedEquipmentTypes.contains("Machine-assisted") || selectedEquipmentTypes.contains("Barbell")) {
+            String weightLabel = selectedEquipmentTypes.contains("Barbell") ? "Barbell total" : "Weight";
+            int minimumWeight = selectedEquipmentTypes.contains("Barbell") ? 20 : 0;
+            addWorkingStepper(settings, weightLabel, workingWeightKg + " kg", () -> workingWeightKg = Math.max(minimumWeight, workingWeightKg - 2), () -> workingWeightKg += 2);
         }
         addWorkingStepper(settings, "Sets", String.valueOf(planSets), () -> planSets = Math.max(1, planSets - 1), () -> planSets = Math.min(6, planSets + 1));
         addWorkingStepper(settings, "Reps", String.valueOf(planReps), () -> planReps = Math.max(1, planReps - 1), () -> planReps = Math.min(30, planReps + 1));
@@ -5797,6 +5799,10 @@ public final class MainActivity extends FragmentActivity {
         schedule.addView(text(planReminderEnabled ? "Coach reminder · " + WorkoutReminderScheduler.timeLabel(planReminderHour, planReminderMinute) : "No coach reminder set", 13, planReminderEnabled ? Color.rgb(50, 116, 103) : muted));
         body.addView(schedule);
         gap(body, 10);
+        if (selectedEquipmentTypes.contains("Barbell")) {
+            addBarbellPlateCard(body);
+            gap(body, 10);
+        }
         if ("Weekly".equals(planMode)) {
             addWeeklySessionPicker(body);
             gap(body, 10);
@@ -5811,7 +5817,7 @@ public final class MainActivity extends FragmentActivity {
             LinearLayout details = new LinearLayout(this);
             details.setOrientation(LinearLayout.VERTICAL);
             details.addView(heading(exercise.name, 18, ink));
-            String load = (selectedEquipmentTypes.contains("Dumbbells") || selectedEquipmentTypes.contains("Machine-assisted")) ? "  •  " + workingWeightKg + " kg" : "";
+            String load = (selectedEquipmentTypes.contains("Dumbbells") || selectedEquipmentTypes.contains("Machine-assisted") || selectedEquipmentTypes.contains("Barbell")) ? "  •  " + workingWeightKg + " kg" : "";
             details.addView(text(exercise.sets + " sets × " + exercise.reps + " reps" + load + "  •  Set rest " + restChoiceLabel(exercise.restSeconds), 14, muted));
             item.addView(details, new LinearLayout.LayoutParams(0, -2, 1));
             body.addView(item);
@@ -5972,6 +5978,9 @@ public final class MainActivity extends FragmentActivity {
         body.addView(history);
         gap(body, 12);
 
+        addTrainingIntelligenceCards(body, snapshot);
+        gap(body, 12);
+
         Button allHistory = lightAction("View all workout history");
         allHistory.setOnClickListener(view -> showWorkoutHistory());
         addButton(body, allHistory);
@@ -6052,6 +6061,48 @@ public final class MainActivity extends FragmentActivity {
         weight.setOnClickListener(view -> showWeightTracker());
         addButton(trend, weight);
         body.addView(trend);
+    }
+
+    /** A local-first progression and readiness summary; it never changes a plan automatically. */
+    private void addTrainingIntelligenceCards(LinearLayout body, JourneyStore.Snapshot snapshot) {
+        String focus = focusSummary(activeTargets());
+        if (focus == null || focus.trim().isEmpty()) focus = target;
+        TrainingIntelligence.RecoveryInsight recovery = TrainingIntelligence.recovery(this, focus);
+        LinearLayout recoveryCard = card();
+        recoveryCard.addView(heading("Training readiness", 19, ink));
+        recoveryCard.addView(heading(recovery.headline, 17,
+                recovery.readiness == TrainingIntelligence.Readiness.READY ? Color.rgb(38, 118, 100) : coral));
+        recoveryCard.addView(text(recovery.detail, 14, muted));
+        recoveryCard.addView(text("Based on your private completion history only. It is guidance—not medical advice.", 12, muted));
+        body.addView(recoveryCard);
+        gap(body, 10);
+
+        TrainingIntelligence.ProgressionAdvice progression = TrainingIntelligence.progression(this, focus, planSets, planReps);
+        LinearLayout progressionCard = card();
+        progressionCard.addView(heading("Smart progression", 19, ink));
+        progressionCard.addView(heading(progression.headline, 17, navy));
+        progressionCard.addView(text(progression.detail, 14, muted));
+        gap(progressionCard, 6);
+        progressionCard.addView(text("Suggested next target · " + progression.nextTarget, 13, mint));
+        Button openPlan = lightAction("Review my plan");
+        openPlan.setOnClickListener(view -> { if (session.isEmpty()) showPlans(); else showPlanReady(); });
+        addButton(progressionCard, openPlan);
+        body.addView(progressionCard);
+    }
+
+    /** Shows an always-symmetrical, metric plate prescription for the barbell plan. */
+    private void addBarbellPlateCard(LinearLayout body) {
+        PlateCalculator.Result plates = PlateCalculator.calculate(workingWeightKg);
+        LinearLayout calculator = card();
+        calculator.addView(heading("Barbell plate guide", 18, ink));
+        calculator.addView(text("" + plates.requestedKg + " kg total · " + plates.barKg + " kg bar", 14, muted));
+        gap(calculator, 5);
+        calculator.addView(heading(plates.perSideLabel(), 16, navy));
+        String note = plates.exact()
+                ? "Load the same plates on both sides. Confirm the bar and collars in front of you before lifting."
+                : "Closest safe plate match: " + plates.achievableKg + " kg total. Confirm the available plates before lifting.";
+        calculator.addView(text(note, 12, muted));
+        body.addView(calculator);
     }
 
     /** User-managed, local-only archive of completed workouts with a confirmation before deletion. */
