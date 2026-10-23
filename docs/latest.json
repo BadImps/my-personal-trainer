@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 101,
-  "versionName": "5.59",
-  "publishedAt": "2026-10-23T19:05:00Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.59/app-release.apk",
-  "sha256": "6545849aacf5ef9b602d31e2b88e1b75f77d399dde3007cb7eeeaa7167bfd0c5",
-  "sizeBytes": 257050943,
-  "notes": "Progress dashboard refinement: aligned weekly reports, report-style motion, load reference, and direct completed-session review from Home."
+  "versionCode": 102,
+  "versionName": "5.60",
+  "publishedAt": "2026-10-23T20:25:00Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.60/app-release.apk",
+  "sha256": "df11eb6966ec958ee9e47f7cfab927b1fdb1553def6f3fc995789101c1cd10ba",
+  "sizeBytes": 257050947,
+  "notes": "Coach Hero workout flow refinement: unified duration and plan-ready screens, plus protected in-session exercise settings for weight, sets, reps, set rest, and cooldown."
 }

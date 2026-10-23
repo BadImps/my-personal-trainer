@@ -151,6 +151,8 @@ public final class MainActivity extends FragmentActivity {
     /** Recorded coach cues are used first; Android TTS remains the dynamic-text fallback. */
     private CoachAudioClips coachAudio;
     private CountDownTimer restTimer;
+    /** Kept across a rest-surface refresh so changing an interval never collapses the athlete's controls. */
+    private boolean restExerciseSettingsExpanded;
     /** Optional preparation/recovery selected immediately before a guided session. */
     private boolean guidedWarmupEnabled;
     private boolean guidedFinishCooldownEnabled;
@@ -832,6 +834,57 @@ public final class MainActivity extends FragmentActivity {
     private void addWorkoutWizardProgress(FrameLayout hero, String currentStep) {
         int active = Math.max(0, wizardStep(currentStep) - 1);
         addCoachHeroWizardSteps(hero, wizardLabels(), active);
+    }
+
+    /** Shared full-bleed Coach Hero composition for every Workout wizard step. */
+    private LinearLayout coachHeroWorkoutWizardPage(String backdropKey, String eyebrowText,
+                                                    String titleText, String subtitleText,
+                                                    String currentStep, String sectionText,
+                                                    String contentTitle, String contentSubtitle) {
+        beginNewPage();
+        setSystemBars();
+        ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(true);
+        scroll.setClipToPadding(false);
+        scroll.setBackgroundColor(navy);
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackgroundColor(navy);
+        scroll.addView(root, new ScrollView.LayoutParams(-1, -2));
+        setCoachHeroWizardShell(scroll, "Workouts");
+
+        FrameLayout hero = coachHeroBackdrop(backdropKey);
+        root.addView(hero, new LinearLayout.LayoutParams(-1, dp(260)));
+        LinearLayout copy = new LinearLayout(this);
+        copy.setOrientation(LinearLayout.VERTICAL);
+        TextView eyebrow = heading(eyebrowText, 10, mint);
+        eyebrow.setLetterSpacing(.14f);
+        copy.addView(eyebrow);
+        TextView title = heading(titleText, 29, Color.WHITE);
+        title.setLineSpacing(0, .93f);
+        copy.addView(title);
+        TextView subtitle = text(subtitleText, 13, Color.rgb(226, 236, 247));
+        LinearLayout.LayoutParams subtitleParams = new LinearLayout.LayoutParams(dp(274), -2);
+        subtitleParams.topMargin = dp(8);
+        copy.addView(subtitle, subtitleParams);
+        FrameLayout.LayoutParams copyParams = new FrameLayout.LayoutParams(dp(278), -2, Gravity.LEFT | Gravity.TOP);
+        copyParams.leftMargin = dp(20);
+        copyParams.topMargin = dp(82);
+        hero.addView(copy, copyParams);
+        addWorkoutWizardProgress(hero, currentStep);
+
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dp(16), dp(20), dp(16), dp(36));
+        content.setBackgroundColor(paper);
+        root.addView(content, new LinearLayout.LayoutParams(-1, -2));
+        TextView section = heading(sectionText, 11, muted);
+        section.setLetterSpacing(.12f);
+        content.addView(section);
+        content.addView(heading(contentTitle, 23, ink));
+        content.addView(text(contentSubtitle, 13, muted));
+        gap(content, 14);
+        return content;
     }
 
     /** The supplied reference was composed around a compact phone. Modern Android phones are taller. */
@@ -4334,9 +4387,12 @@ public final class MainActivity extends FragmentActivity {
     /** Step 3: only equipment choices. This keeps the requested Machine-assisted category distinct and discoverable. */
     /** Daily and Custom plans size the recommendation before choosing equipment. */
     private void showPlanDuration() {
-        LinearLayout body = planPage();
-        planTitle(body, planMode.toUpperCase(Locale.ROOT) + " PLAN · " + focusSummary(activeTargets()).toUpperCase(Locale.ROOT), "How long do you\nwant to train?", "We’ll recommend a balanced range of movements that fits this time without rushing recovery.");
-        addWizardProgress(body, wizardStep("Time"));
+        LinearLayout body = coachHeroWorkoutWizardPage("Workout duration",
+                planMode.toUpperCase(Locale.ROOT) + " PLAN · STEP 3",
+                "How long do you\nwant to train?",
+                "We’ll recommend a balanced range of movements that fits your time without rushing recovery.",
+                "Time", "03  ·  WORKOUT LENGTH", "Shape your session",
+                "Choose your available time. You will still choose the movements yourself on the next screens.");
 
         LinearLayout lengthCard = card();
         lengthCard.addView(heading("Workout length", 19, ink));
@@ -5882,8 +5938,11 @@ public final class MainActivity extends FragmentActivity {
         } else if ("Daily".equals(planMode)) {
             session = sessionWithScheduledAddOns(selectedWeekDate(dailyScheduledDay), session);
         }
-        LinearLayout body = planPage();
-        planTitle(body, "PLAN READY", "Your " + focusSummary(activeTargets()).toLowerCase(Locale.ROOT) + " plan is ready", session.size() + " selected movements  •  " + (workoutNoTimer ? "No timer" : sessionMinutes + " min") + "  •  " + equipmentSummary());
+        LinearLayout body = coachHeroWorkoutWizardPage("Workout plan ready", "PLAN READY · STEP 7",
+                "Your plan\nis ready", session.size() + " selected movements · "
+                        + (workoutNoTimer ? "No timer" : sessionMinutes + " min") + " · " + equipmentSummary(),
+                "Review", "07  ·  REVIEW", "Ready to train",
+                "Review your movements, recovery, and schedule before Coach " + coachName() + " starts your guided workout.");
         LinearLayout schedule = card();
         schedule.addView(heading("Weekly".equals(planMode) ? "Your weekly templates" : "Scheduled workout", 18, ink));
         schedule.addView(text("Ready when you are  •  " + planSchedule(), 14, muted));
@@ -6206,55 +6265,40 @@ public final class MainActivity extends FragmentActivity {
         energyHeader.addView(energyBadge, new LinearLayout.LayoutParams(dp(42), dp(42)));
         energy.addView(energyHeader);
         energy.addView(heading("This week", 20, ink));
+        View energyFill = null;
         if (WeightStore.configured(this) && WeightStore.latest(this) > 0f) {
+            int combinedLow = totals.enduranceLowCalories + totals.guidedLowCalories;
+            int combinedHigh = totals.enduranceHighCalories + totals.guidedHighCalories;
             addWorkoutReportMetric(energy, "Endurance", totals.enduranceLowCalories + "–" + totals.enduranceHighCalories + " kcal");
             addWorkoutReportMetric(energy, "Guided workouts", totals.guidedLowCalories + "–" + totals.guidedHighCalories + " kcal");
-            addWorkoutReportMetric(energy, "Combined", (totals.enduranceLowCalories + totals.guidedLowCalories) + "–" + (totals.enduranceHighCalories + totals.guidedHighCalories) + " kcal");
+            addWorkoutReportMetric(energy, "Combined", combinedLow + "–" + combinedHigh + " kcal");
+            gap(energy, 7);
+            LinearLayout energyBar = new LinearLayout(this); energyBar.setBackground(surface(Color.rgb(221, 247, 239), 99, 0, Color.TRANSPARENT));
+            View measured = new View(this); measured.setBackground(surface(mint, 99, 0, Color.TRANSPARENT)); energyFill = measured;
+            float fillShare = Math.max(.08f, Math.min(.95f, combinedHigh / 3500f));
+            energyBar.addView(measured, new LinearLayout.LayoutParams(0, dp(10), fillShare));
+            energyBar.addView(new View(this), new LinearLayout.LayoutParams(0, dp(10), 1f - fillShare));
+            energy.addView(energyBar, new LinearLayout.LayoutParams(-1, dp(10)));
+            LinearLayout limits = new LinearLayout(this);
+            limits.addView(text(combinedLow + " kcal", 11, muted), new LinearLayout.LayoutParams(0, -2, 1));
+            TextView highLimit = text(combinedHigh + " kcal", 11, muted); highLimit.setGravity(Gravity.END);
+            limits.addView(highLimit, new LinearLayout.LayoutParams(0, -2, 1)); energy.addView(limits);
+            gap(energy, 7);
+            energy.addView(heading("WEIGHT-LOSS REFERENCE", 11, muted));
+            energy.addView(heading(activityOnlyWeightChangeEstimate(combinedLow, combinedHigh), 17, ink));
+            energy.addView(text("Activity-only energy equivalent for this week. This may not be accurate and does not predict actual scale change: food intake, fluids, digestion, sleep, medication, and body composition all matter.", 12, coral));
         } else energy.addView(text("Add a current private weight in Body to calculate separate endurance, guided-workout, and combined energy ranges.", 13, muted));
-        gap(energy, 7);
-        energy.addView(heading("WEIGHT-LOAD REFERENCE", 11, muted));
-        if (hasWeightLoadContext()) {
-            energy.addView(heading(weightLoadEstimate(), 17, ink));
-            energy.addView(text("A conservative total external-load reference for a controlled strength movement, based on your private age, height, current weight, and recent completed activity.", 12, muted));
-            energy.addView(text("This may not be accurate and is not a medical assessment or a personalized lifting prescription. Start pain-free, use good form, and adjust the load to your experience.", 12, coral));
-        } else {
-            energy.addView(text("Add age, height, and a current weight in Body to see a general weight-load reference.", 13, muted));
-            energy.addView(text("Any future reference is only an estimate—not a medical assessment or lifting prescription.", 12, coral));
-        }
         energy.addView(text("Broad activity estimates only; they are not a measurement or nutrition allowance.", 12, muted));
         body.addView(energy);
         runProgressKpiReveal(enduranceDistanceKpi, enduranceTimeKpi, endurancePaceKpi, guidedExercisesKpi, guidedSetsKpi, guidedActiveKpi);
-        runEnergyReportRevealWhenVisible(energy, energyBadge, null);
+        runEnergyReportRevealWhenVisible(energy, energyBadge, energyFill);
     }
 
-    private boolean hasWeightLoadContext() {
-        return BodyProfileStore.configured(this) && WeightStore.configured(this) && WeightStore.latest(this) > 0f;
-    }
-
-    /**
-     * A deliberately conservative orientation point, never used to alter a plan automatically.
-     * It is total external resistance, rather than a per-hand dumbbell recommendation.
-     */
-    private String weightLoadEstimate() {
-        if (!hasWeightLoadContext()) return "Add your Body context";
-        float kilograms = "lb".equalsIgnoreCase(WeightStore.unit(this))
-                ? WeightStore.latest(this) * .45359237f : WeightStore.latest(this);
-        int age = BodyProfileStore.age(this);
-        float height = BodyProfileStore.heightCm(this);
-        float ageFactor = age >= 65 ? .70f : age >= 55 ? .80f : age >= 45 ? .90f : 1f;
-        float heightFactor = Math.max(.94f, Math.min(1.06f, 1f + (height - 170f) / 1000f));
-        float activityFactor = weeklyActivityTotals().guidedSessions >= 3 ? 1.08f : 1f;
-        float lowKg = kilograms * .10f * ageFactor * heightFactor;
-        float highKg = kilograms * .20f * ageFactor * heightFactor * activityFactor;
-        boolean pounds = "lb".equalsIgnoreCase(WeightStore.unit(this));
-        float conversion = pounds ? 2.20462262f : 1f;
-        String unit = pounds ? "lb" : "kg";
-        return "Starting reference · " + formatLoadEstimate(lowKg * conversion) + "–" + formatLoadEstimate(highKg * conversion) + " " + unit + " total";
-    }
-
-    private String formatLoadEstimate(float amount) {
-        float rounded = Math.max(2.5f, Math.round(amount / 2.5f) * 2.5f);
-        return Math.abs(rounded - Math.round(rounded)) < .01f ? String.valueOf(Math.round(rounded)) : String.format(Locale.US, "%.1f", rounded);
+    /** 3,500 kcal per pound is a broad energy-equivalent convention, not a weight-loss promise. */
+    private String activityOnlyWeightChangeEstimate(int caloriesLow, int caloriesHigh) {
+        float lowPounds = Math.max(0f, caloriesLow) / 3500f;
+        float highPounds = Math.max(lowPounds, caloriesHigh / 3500f);
+        return String.format(Locale.US, "Possible activity-only equivalent · %.2f–%.2f lb", lowPounds, highPounds);
     }
 
     private void addWeeklyBreakdownRow(LinearLayout parent, String title, long activeMillis, long totalMillis, String activeLabel, String recoveryLabel) {
@@ -6811,6 +6855,8 @@ public final class MainActivity extends FragmentActivity {
         badge.setElevation(dp(3));
         ImageView icon = new ImageView(this);
         icon.setImageResource(iconResource);
+        // One dark symbol treatment keeps the endurance runner and every report KPI legible on mint.
+        icon.setImageTintList(ColorStateList.valueOf(navy));
         icon.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
         icon.setPadding(dp(9), dp(9), dp(9), dp(9));
         badge.addView(icon, new FrameLayout.LayoutParams(-1, -1));
@@ -9242,6 +9288,10 @@ public final class MainActivity extends FragmentActivity {
         controls.addView(skip, new LinearLayout.LayoutParams(0, dp(52), 1));
         body.addView(controls);
         gap(body, 12);
+        if (!betweenExercises) {
+            addRestExerciseSettings(body, index, set, exercise, remaining, running);
+            gap(body, 12);
+        }
         addSetTimesCard(body, currentExerciseSummary(exercise), false);
         gap(body, 12);
         final long activeSetMillis = currentExerciseSummary(exercise).totalActiveMillis;
@@ -9671,6 +9721,151 @@ public final class MainActivity extends FragmentActivity {
             @Override public void onTick(long millis) { int seconds = (int) Math.ceil(millis / 1000d); time.setText(format(seconds)); ring.setProgressFraction((300 - seconds) / 300f); }
             @Override public void onFinish() { ring.setProgressFraction(1f); showComplete(); }
         }.start();
+    }
+
+    /**
+     * Lets an athlete make a safe, in-session adjustment without losing the current rest state.
+     * Sets, repetitions, and the set-rest interval affect this exercise only; cooldown stays
+     * plan-wide because it begins only after the exercise finishes.
+     */
+    private void addRestExerciseSettings(LinearLayout container, int exerciseIndex, int completedSet,
+                                         Coach.Exercise exercise, int[] remaining, boolean running) {
+        LinearLayout shell = new LinearLayout(this);
+        shell.setOrientation(LinearLayout.VERTICAL);
+        shell.setPadding(dp(12), dp(10), dp(12), dp(12));
+        shell.setBackground(surface(Color.rgb(11, 48, 67), 18, 1, Color.rgb(45, 90, 102)));
+        applyPremiumTileDepth(shell, false);
+
+        Button toggle = action(restExerciseSettingsExpanded ? "Exercise settings  ▴" : "Exercise settings  ▾",
+                navyPanel, mint);
+        toggle.setTextSize(14);
+        toggle.setContentDescription((restExerciseSettingsExpanded ? "Collapse" : "Expand")
+                + " exercise settings for " + exercise.name);
+        toggle.setOnClickListener(view -> {
+            restExerciseSettingsExpanded = !restExerciseSettingsExpanded;
+            refreshRestSettingsSurface(exerciseIndex, completedSet, exercise, remaining[0], running);
+        });
+        shell.addView(toggle, new LinearLayout.LayoutParams(-1, dp(48)));
+
+        if (restExerciseSettingsExpanded) {
+            TextView note = text("Adjust this exercise now. Completed sets stay protected.", 12,
+                    Color.rgb(210, 229, 238));
+            LinearLayout.LayoutParams noteParams = new LinearLayout.LayoutParams(-1, -2);
+            noteParams.topMargin = dp(9);
+            shell.addView(note, noteParams);
+
+            boolean weighted = selectedEquipmentTypes.contains("Dumbbells")
+                    || selectedEquipmentTypes.contains("Machine-assisted")
+                    || selectedEquipmentTypes.contains("Barbell");
+            if (weighted) {
+                int minimumWeight = selectedEquipmentTypes.contains("Barbell") ? 20 : 0;
+                String label = selectedEquipmentTypes.contains("Barbell") ? "Barbell total" : "Weight";
+                addRestSettingsStepper(shell, label, workingWeightKg + " kg",
+                        () -> workingWeightKg = Math.max(minimumWeight, workingWeightKg - 2),
+                        () -> workingWeightKg += 2,
+                        () -> {
+                            // Keep an in-session load adjustment when the plan is reopened later.
+                            savePlanWithReminder();
+                            refreshRestSettingsSurface(exerciseIndex, completedSet, exercise, remaining[0], running);
+                        });
+            }
+            addRestSettingsStepper(shell, "Sets", String.valueOf(exercise.sets),
+                    () -> {
+                        if (exercise.sets <= Math.max(1, completedSet)) {
+                            toast("You already completed " + completedSet + " set" + (completedSet == 1 ? "" : "s") + ".");
+                            return;
+                        }
+                        updateRestExercise(exerciseIndex, completedSet, exercise,
+                                Coach.prescribe(exercise, exercise.sets - 1, exercise.reps, exercise.restSeconds),
+                                remaining[0], running, false);
+                    },
+                    () -> updateRestExercise(exerciseIndex, completedSet, exercise,
+                            Coach.prescribe(exercise, Math.min(8, exercise.sets + 1), exercise.reps, exercise.restSeconds),
+                            remaining[0], running, false), null);
+            addRestSettingsStepper(shell, "Reps", String.valueOf(exercise.reps),
+                    () -> updateRestExercise(exerciseIndex, completedSet, exercise,
+                            Coach.prescribe(exercise, exercise.sets, Math.max(1, exercise.reps - 1), exercise.restSeconds),
+                            remaining[0], running, false),
+                    () -> updateRestExercise(exerciseIndex, completedSet, exercise,
+                            Coach.prescribe(exercise, exercise.sets, Math.min(40, exercise.reps + 1), exercise.restSeconds),
+                            remaining[0], running, false), null);
+            addRestSettingsStepper(shell, "Set rest", restChoiceLabel(exercise.restSeconds),
+                    () -> updateRestExercise(exerciseIndex, completedSet, exercise,
+                            Coach.prescribe(exercise, exercise.sets, exercise.reps, Math.max(45, exercise.restSeconds - 15)),
+                            remaining[0], running, true),
+                    () -> updateRestExercise(exerciseIndex, completedSet, exercise,
+                            Coach.prescribe(exercise, exercise.sets, exercise.reps, Math.min(480, exercise.restSeconds + 15)),
+                            remaining[0], running, true), null);
+
+            TextView cooldownLabel = heading("Cooldown between exercises", 14, Color.WHITE);
+            LinearLayout.LayoutParams cooldownLabelParams = new LinearLayout.LayoutParams(-1, -2);
+            cooldownLabelParams.topMargin = dp(8);
+            shell.addView(cooldownLabel, cooldownLabelParams);
+            LinearLayout presets = new LinearLayout(this);
+            presets.setOrientation(LinearLayout.HORIZONTAL);
+            int[] presetsSeconds = {60, 180, 300};
+            for (int i = 0; i < presetsSeconds.length; i++) {
+                final int preset = presetsSeconds[i];
+                Button choice = planCooldownSeconds == preset
+                        ? action(restChoiceLabel(preset), mint, navy)
+                        : action(restChoiceLabel(preset), Color.rgb(35, 71, 91), Color.WHITE);
+                choice.setTextSize(11);
+                choice.setOnClickListener(view -> {
+                    planCooldownSeconds = preset;
+                    savePlanWithReminder();
+                    refreshRestSettingsSurface(exerciseIndex, completedSet, exercise, remaining[0], running);
+                });
+                LinearLayout.LayoutParams choiceParams = new LinearLayout.LayoutParams(0, dp(42), 1);
+                choiceParams.rightMargin = i == presetsSeconds.length - 1 ? 0 : dp(6);
+                presets.addView(choice, choiceParams);
+            }
+            shell.addView(presets, new LinearLayout.LayoutParams(-1, dp(42)));
+        }
+        container.addView(shell);
+    }
+
+    private void addRestSettingsStepper(LinearLayout container, String label, String value,
+                                        Runnable decrease, Runnable increase, Runnable refresh) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        TextView name = text(label, 14, Color.WHITE);
+        row.addView(name, new LinearLayout.LayoutParams(0, dp(47), 1));
+        Button minus = compactControl("−");
+        minus.setContentDescription("Decrease " + label);
+        minus.setOnClickListener(view -> { decrease.run(); if (refresh != null) refresh.run(); });
+        row.addView(minus, new LinearLayout.LayoutParams(dp(42), dp(42)));
+        TextView amount = heading(value, 13, mint);
+        amount.setGravity(Gravity.CENTER);
+        row.addView(amount, new LinearLayout.LayoutParams(dp(88), dp(42)));
+        Button plus = compactControl("+");
+        plus.setContentDescription("Increase " + label);
+        plus.setOnClickListener(view -> { increase.run(); if (refresh != null) refresh.run(); });
+        row.addView(plus, new LinearLayout.LayoutParams(dp(42), dp(42)));
+        container.addView(row);
+    }
+
+    private void updateRestExercise(int index, int completedSet, Coach.Exercise previous,
+                                    Coach.Exercise updated, int secondsRemaining, boolean running,
+                                    boolean resetCurrentRest) {
+        if (session == null || index < 0 || index >= session.size()) return;
+        if (restTimer != null) restTimer.cancel();
+        endRecoverySegment();
+        stopSpeech();
+        session.set(index, updated);
+        savePlanWithReminder();
+        showRest(index, completedSet, updated, resetCurrentRest ? updated.restSeconds : secondsRemaining,
+                running, false);
+    }
+
+    private void refreshRestSettingsSurface(int index, int completedSet, Coach.Exercise exercise,
+                                            int secondsRemaining, boolean running) {
+        if (restTimer != null) restTimer.cancel();
+        endRecoverySegment();
+        stopSpeech();
+        Coach.Exercise latest = session != null && index >= 0 && index < session.size()
+                ? session.get(index) : exercise;
+        showRest(index, completedSet, latest, secondsRemaining, running, false);
     }
 
     private List<Coach.Exercise> cooldownStretchExercises() {
