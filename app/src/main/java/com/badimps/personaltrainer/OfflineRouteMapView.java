@@ -84,11 +84,14 @@ public final class OfflineRouteMapView extends FrameLayout {
             return false;
         });
         addView(map, new FrameLayout.LayoutParams(-1, -1));
-        // MapLibre supplies the polished vector surface. Keep it invisible until its style has
-        // actually loaded so that an offline or interrupted download never becomes a blank map.
+        // MapLibre supplies the polished vector surface. INVISIBLE is intentional here: unlike
+        // GONE, it is measured and laid out before the renderer starts. A GONE MapView can
+        // successfully load its style callback yet never receive a drawable surface, leaving
+        // the older Mapsforge fallback visible with no indication that the selected visual map
+        // failed to appear.
         MapLibre.getInstance(appContext);
         vectorMap = new org.maplibre.android.maps.MapView(context);
-        vectorMap.setVisibility(GONE);
+        vectorMap.setVisibility(INVISIBLE);
         vectorMap.onCreate(null);
         vectorMap.onStart();
         vectorMap.onResume();
