@@ -3085,8 +3085,12 @@ public final class MainActivity extends FragmentActivity {
         boolean historical = isPastCalendarDate(date);
         List<SchedulerStore.Appointment> appointments = SchedulerStore.onDate(this, date);
         JourneyStore.WorkoutRecord completedEndurance = completedEnduranceOn(date);
+        JourneyStore.WorkoutRecord completedRecord = completedWorkoutOn(date);
+        boolean completed = completedRecord != null;
         boolean endurance = !appointments.isEmpty() || completedEndurance != null;
-        int base = workoutDay || endurance ? Color.rgb(224, 249, 242) : Color.rgb(232, 236, 244);
+        boolean missedPlan = historical && !completed && (workoutDay || !appointments.isEmpty());
+        int base = missedPlan ? Color.rgb(255, 235, 232)
+                : workoutDay || endurance ? Color.rgb(224, 249, 242) : Color.rgb(232, 236, 244);
         LinearLayout tile = new LinearLayout(this);
         tile.setOrientation(LinearLayout.VERTICAL);
         tile.setGravity(Gravity.CENTER_HORIZONTAL);
@@ -3095,7 +3099,7 @@ public final class MainActivity extends FragmentActivity {
         // Only today carries the active-day frame. Future plans remain legible without
         // looking selected; past days are deliberately watermark-like historical records.
         tile.setBackground(homeScheduleDaySurface(base, today));
-        tile.setAlpha(historical ? .52f : 1f);
+        tile.setAlpha(historical && !completed ? .64f : 1f);
         TextView dateLabel = text(weekDays[dayIndex] + "\n" + homeWeekDate(date, 0), 9, (workoutDay || endurance) ? navy : muted);
         dateLabel.setGravity(Gravity.CENTER);
         dateLabel.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
@@ -3136,20 +3140,44 @@ public final class MainActivity extends FragmentActivity {
         String state = workoutDay ? homeFocusForDay(dayIndex, schedule) + " workout" : confirmed ? "Rest Day" : "Open";
         if (endurance) state += ", " + (completedEndurance == null ? enduranceDayLabel(appointments) : "completed " + completedEndurance.target.replace("Endurance · ", ""));
         tile.setContentDescription(weekDays[dayIndex] + " " + homeWeekDate(date, 0) + ", " + state);
-        if (!JourneyStore.hasCompletedWorkoutOnDate(this, date)) return tile;
+        if (!completed) return tile;
         FrameLayout completedDay = new FrameLayout(this);
         completedDay.addView(tile, new FrameLayout.LayoutParams(-1, -1));
-        TextView ribbon = heading("DONE", 7, Color.WHITE);
+        TextView ribbon = heading("COMPLETED", 6, Color.WHITE);
         ribbon.setGravity(Gravity.CENTER);
         ribbon.setLetterSpacing(.08f);
         ribbon.setBackground(surface(coral, 5, 1, Color.rgb(255, 159, 146)));
         ribbon.setContentDescription(completedEndurance != null ? "Endurance completed" : "Workout completed");
-        FrameLayout.LayoutParams ribbonParams = new FrameLayout.LayoutParams(dp(38), dp(17), Gravity.TOP | Gravity.RIGHT);
-        ribbonParams.topMargin = dp(2);
-        ribbonParams.rightMargin = dp(2);
+        // A centered inner ribbon keeps the status visually balanced within the complete day outline.
+        FrameLayout.LayoutParams ribbonParams = new FrameLayout.LayoutParams(-1, dp(16), Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+        ribbonParams.topMargin = dp(5);
+        ribbonParams.leftMargin = dp(5);
+        ribbonParams.rightMargin = dp(5);
         completedDay.addView(ribbon, ribbonParams);
         completedDay.setContentDescription(tile.getContentDescription() + ", completed");
+        if (historical) {
+            JourneyStore.WorkoutRecord opened = completedRecord;
+            completedDay.setClickable(true);
+            completedDay.setFocusable(true);
+            completedDay.setOnClickListener(view -> {
+                EnduranceHistoryStore.Entry completedRoute = EnduranceHistoryStore.load(this, opened.timestamp);
+                if (completedRoute != null) showEnduranceSessionDetails(completedRoute);
+                else showWorkoutSetTimeDetails(opened, SetTimeStore.loadWorkout(this, opened.timestamp));
+            });
+        }
         return completedDay;
+    }
+
+    /** The newest local completion is the one a historical Home tile opens for review. */
+    private JourneyStore.WorkoutRecord completedWorkoutOn(Calendar date) {
+        if (date == null) return null;
+        Calendar start = (Calendar) date.clone();
+        start.set(Calendar.HOUR_OF_DAY, 0); start.set(Calendar.MINUTE, 0); start.set(Calendar.SECOND, 0); start.set(Calendar.MILLISECOND, 0);
+        Calendar end = (Calendar) start.clone(); end.add(Calendar.DAY_OF_YEAR, 1);
+        for (JourneyStore.WorkoutRecord record : JourneyStore.workouts(this)) {
+            if (record.timestamp >= start.getTimeInMillis() && record.timestamp < end.getTimeInMillis()) return record;
+        }
+        return null;
     }
 
     /** Finds a completed endurance entry for one calendar day, including unscheduled live sessions. */
@@ -5984,60 +6012,15 @@ public final class MainActivity extends FragmentActivity {
         JourneyStore.Snapshot snapshot = JourneyStore.snapshot(this);
         int planned = plannedSessionsThisWeek();
 
+        // The combined report deliberately appears before history. It answers “what did my
+        // whole week add up to?” before the member drills into individual completed sessions.
+        addWeeklyActivityReport(body);
+        gap(body, 12);
+
         LinearLayout history = card();
         history.addView(heading("This week’s completed plan history", 19, ink));
-        List<JourneyStore.WorkoutRecord> completed = JourneyStore.workoutsThisWeek(this);
-        if (completed.isEmpty()) {
-            history.addView(text("No completed guided workouts yet this week. When you finish a plan, it appears here with its focus and guided time.", 14, muted));
-        } else {
-            SimpleDateFormat dayFormat = new SimpleDateFormat("EEE, MMM d", Locale.getDefault());
-            for (JourneyStore.WorkoutRecord record : completed) {
-                SetTimeStore.WorkoutSummary timing = SetTimeStore.loadWorkout(this, record.timestamp);
-                EnduranceHistoryStore.Entry endurance = EnduranceHistoryStore.load(this, record.timestamp);
-                LinearLayout row = new LinearLayout(this);
-                row.setOrientation(LinearLayout.HORIZONTAL);
-                row.setGravity(Gravity.CENTER_VERTICAL);
-                row.setPadding(dp(9), dp(7), dp(9), dp(7));
-                row.setBackground(surface(Color.rgb(240, 244, 249), 11, 0, Color.TRANSPARENT));
-                TextView check = heading("✓", 18, navy);
-                check.setGravity(Gravity.CENTER);
-                check.setBackground(surface(mint, 99, 0, Color.TRANSPARENT));
-                LinearLayout.LayoutParams checkParams = new LinearLayout.LayoutParams(dp(30), dp(30));
-                checkParams.rightMargin = dp(9);
-                row.addView(check, checkParams);
-                LinearLayout copy = new LinearLayout(this);
-                copy.setOrientation(LinearLayout.VERTICAL);
-                copy.addView(heading(record.target, 15, ink));
-                copy.addView(text(dayFormat.format(record.timestamp) + "  •  " + record.minutes + " guided min", 12, muted));
-                if (endurance != null) {
-                    copy.addView(text(enduranceSummary(endurance) + "  •  view route", 12, mint));
-                }
-                if (timing != null && timing.totalActiveMillis > 0L) {
-                    copy.addView(text("Set time " + WorkoutTiming.formatElapsedMillis(timing.totalActiveMillis)
-                            + "  •  open leaderboard", 12, mint));
-                }
-                row.addView(copy, new LinearLayout.LayoutParams(0, -2, 1));
-                if (endurance != null) {
-                    row.setClickable(true);
-                    row.setFocusable(true);
-                    row.setContentDescription(record.target + ", completed " + dayFormat.format(record.timestamp)
-                            + ", " + enduranceSummary(endurance) + ". Open completed route.");
-                    row.setOnClickListener(view -> showEnduranceSessionDetails(endurance));
-                } else {
-                    row.setClickable(true);
-                    row.setFocusable(true);
-                    String timingDescription = timing != null && timing.totalActiveMillis > 0L
-                            ? ", " + WorkoutTiming.formatElapsedMillis(timing.totalActiveMillis) + " active set time"
-                            : "";
-                    row.setContentDescription(record.target + ", completed " + dayFormat.format(record.timestamp)
-                            + timingDescription + ". Open completed workout details.");
-                    row.setOnClickListener(view -> showWorkoutSetTimeDetails(record, timing));
-                }
-                LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(-1, -2);
-                rowParams.topMargin = dp(7);
-                history.addView(row, rowParams);
-            }
-        }
+        history.addView(text("Green = completed  •  Red = planned, not completed  •  Gray = no plan", 12, muted));
+        addWeeklyPlanHistory(history);
         body.addView(history);
         gap(body, 12);
 
@@ -6124,6 +6107,239 @@ public final class MainActivity extends FragmentActivity {
         weight.setOnClickListener(view -> showWeightTracker());
         addButton(trend, weight);
         body.addView(trend);
+    }
+
+    /** One local-only roll-up used by the combined endurance + guided-workout Progress report. */
+    private static final class WeeklyActivityTotals {
+        int enduranceSessions, guidedSessions, exercises, sets;
+        long enduranceMillis, guidedMillis, guidedActiveMillis;
+        float enduranceMeters;
+        int enduranceLowCalories, enduranceHighCalories, guidedLowCalories, guidedHighCalories;
+        final List<JourneyStore.WorkoutRecord> records = new ArrayList<>();
+    }
+
+    private Calendar progressWeekStart() {
+        Calendar week = Calendar.getInstance();
+        week.set(Calendar.DAY_OF_WEEK, Calendar.MONDAY);
+        week.set(Calendar.HOUR_OF_DAY, 0); week.set(Calendar.MINUTE, 0); week.set(Calendar.SECOND, 0); week.set(Calendar.MILLISECOND, 0);
+        return week;
+    }
+
+    private WeeklyActivityTotals weeklyActivityTotals() {
+        WeeklyActivityTotals totals = new WeeklyActivityTotals();
+        float kilograms = 0f;
+        if (WeightStore.configured(this) && WeightStore.latest(this) > 0f) kilograms = "lb".equalsIgnoreCase(WeightStore.unit(this)) ? WeightStore.latest(this) * .45359237f : WeightStore.latest(this);
+        for (JourneyStore.WorkoutRecord record : JourneyStore.workoutsThisWeek(this)) {
+            totals.records.add(record);
+            EnduranceHistoryStore.Entry endurance = EnduranceHistoryStore.load(this, record.timestamp);
+            if (endurance != null) {
+                totals.enduranceSessions++; totals.enduranceMillis += endurance.activeMillis; totals.enduranceMeters += endurance.distanceMeters;
+                if (kilograms > 0f) {
+                    float low = EndurancePlanStore.RUNNING.equals(endurance.mode) ? 7f : EndurancePlanStore.CYCLING.equals(endurance.mode) ? 4f : 3f;
+                    float high = EndurancePlanStore.RUNNING.equals(endurance.mode) ? 11.5f : EndurancePlanStore.CYCLING.equals(endurance.mode) ? 10f : 4.3f;
+                    int minutes = Math.max(1, Math.round(endurance.activeMillis / 60_000f));
+                    totals.enduranceLowCalories += Math.max(1, Math.round(low * kilograms * minutes / 60f));
+                    totals.enduranceHighCalories += Math.max(1, Math.round(high * kilograms * minutes / 60f));
+                }
+                continue;
+            }
+            totals.guidedSessions++; totals.guidedMillis += Math.max(1L, record.minutes) * 60_000L;
+            SetTimeStore.WorkoutSummary timing = SetTimeStore.loadWorkout(this, record.timestamp);
+            if (timing != null) {
+                totals.guidedActiveMillis += timing.totalActiveMillis;
+                totals.exercises += timing.exerciseSummaries.size();
+                for (SetTimeStore.ExerciseSummary exercise : timing.exerciseSummaries) totals.sets += exercise.setEntries.size();
+            }
+            if (kilograms > 0f) {
+                totals.guidedLowCalories += Math.max(1, Math.round(3.5f * kilograms * record.minutes / 60f));
+                totals.guidedHighCalories += Math.max(1, Math.round(6f * kilograms * record.minutes / 60f));
+            }
+        }
+        return totals;
+    }
+
+    /** Top-of-Progress report: endurance, guided work, combined time, then energy—before history. */
+    private void addWeeklyActivityReport(LinearLayout body) {
+        WeeklyActivityTotals totals = weeklyActivityTotals();
+        body.addView(heading("WEEKLY ACTIVITY REPORT", 11, mint));
+        LinearLayout endurance = card();
+        endurance.addView(heading("ENDURANCE", 11, muted));
+        endurance.addView(heading("This week", 20, ink));
+        endurance.addView(text(totals.enduranceSessions + " completed endurance session" + (totals.enduranceSessions == 1 ? "" : "s"), 12, muted));
+        gap(endurance, 8);
+        LinearLayout enduranceKpis = new LinearLayout(this); enduranceKpis.setGravity(Gravity.CENTER_VERTICAL);
+        enduranceKpis.setBaselineAligned(false);
+        String pace = totals.enduranceMeters < 10f ? "—" : String.format(Locale.US, "%.1f min/km", (totals.enduranceMillis / 60000d) / (totals.enduranceMeters / 1000d));
+        View enduranceDistanceKpi = addReportKpi(enduranceKpis, R.drawable.ic_nav_endurance, formatLiveDistance(totals.enduranceMeters), "Distance"); addReportKpiDivider(enduranceKpis);
+        View enduranceTimeKpi = addReportKpi(enduranceKpis, R.drawable.ic_report_stopwatch, formatLiveDuration(totals.enduranceMillis), "Time"); addReportKpiDivider(enduranceKpis);
+        View endurancePaceKpi = addReportKpi(enduranceKpis, R.drawable.ic_report_exercises, pace, "Pace");
+        endurance.addView(enduranceKpis); body.addView(endurance); gap(body, 10);
+
+        LinearLayout guided = card();
+        guided.addView(heading("GUIDED WORKOUTS", 11, muted));
+        guided.addView(heading("This week", 20, ink));
+        guided.addView(text(totals.guidedSessions + " completed guided workout" + (totals.guidedSessions == 1 ? "" : "s"), 12, muted));
+        gap(guided, 8);
+        LinearLayout guidedKpis = new LinearLayout(this); guidedKpis.setGravity(Gravity.CENTER_VERTICAL);
+        guidedKpis.setBaselineAligned(false);
+        View guidedExercisesKpi = addReportKpi(guidedKpis, R.drawable.ic_report_exercises, String.valueOf(totals.exercises), "Exercises"); addReportKpiDivider(guidedKpis);
+        View guidedSetsKpi = addReportKpi(guidedKpis, R.drawable.ic_report_sets, String.valueOf(totals.sets), "Sets"); addReportKpiDivider(guidedKpis);
+        View guidedActiveKpi = addReportKpi(guidedKpis, R.drawable.ic_report_stopwatch, totals.guidedActiveMillis > 0L ? WorkoutTiming.formatElapsedMillis(totals.guidedActiveMillis) : "—", "Active");
+        guided.addView(guidedKpis); body.addView(guided); gap(body, 10);
+
+        LinearLayout breakdown = card();
+        breakdown.addView(heading("WEEKLY TIME BREAKDOWN", 11, muted));
+        breakdown.addView(heading("Where your time went", 20, ink));
+        addWeeklyBreakdownRow(breakdown, "Endurance", totals.enduranceMillis, totals.enduranceMillis, "Moving time", "Paused / gaps");
+        addWeeklyBreakdownRow(breakdown, "Guided exercise", totals.guidedActiveMillis, totals.guidedMillis, "Active work", "Recovery + transitions");
+        long combinedTotal = totals.enduranceMillis + totals.guidedMillis;
+        long combinedActive = totals.enduranceMillis + totals.guidedActiveMillis;
+        addWeeklyBreakdownRow(breakdown, "All activity", combinedActive, combinedTotal, "Active", "Recovery + transitions");
+        body.addView(breakdown); gap(body, 10);
+
+        LinearLayout energy = card(); energy.setClipChildren(false); energy.setClipToPadding(false);
+        LinearLayout energyHeader = new LinearLayout(this); energyHeader.setGravity(Gravity.CENTER_VERTICAL);
+        energyHeader.addView(heading("ENERGY ESTIMATE", 11, muted), new LinearLayout.LayoutParams(0, -2, 1));
+        FrameLayout energyBadge = new FrameLayout(this); energyBadge.setBackground(surface(Color.rgb(220, 249, 241), 99, 1, Color.rgb(194, 239, 227))); energyBadge.setElevation(dp(6));
+        ImageView energyIcon = new ImageView(this); energyIcon.setImageResource(R.drawable.ic_report_energy); energyIcon.setScaleType(ImageView.ScaleType.CENTER_INSIDE); energyIcon.setPadding(dp(9), dp(9), dp(9), dp(9)); energyIcon.setContentDescription("Weekly possible energy used");
+        energyBadge.addView(energyIcon, new FrameLayout.LayoutParams(-1, -1));
+        energyHeader.addView(energyBadge, new LinearLayout.LayoutParams(dp(42), dp(42)));
+        energy.addView(energyHeader);
+        energy.addView(heading("This week", 20, ink));
+        if (WeightStore.configured(this) && WeightStore.latest(this) > 0f) {
+            addWorkoutReportMetric(energy, "Endurance", totals.enduranceLowCalories + "–" + totals.enduranceHighCalories + " kcal");
+            addWorkoutReportMetric(energy, "Guided workouts", totals.guidedLowCalories + "–" + totals.guidedHighCalories + " kcal");
+            addWorkoutReportMetric(energy, "Combined", (totals.enduranceLowCalories + totals.guidedLowCalories) + "–" + (totals.enduranceHighCalories + totals.guidedHighCalories) + " kcal");
+        } else energy.addView(text("Add a current private weight in Body to calculate separate endurance, guided-workout, and combined energy ranges.", 13, muted));
+        gap(energy, 7);
+        energy.addView(heading("WEIGHT-LOAD REFERENCE", 11, muted));
+        if (hasWeightLoadContext()) {
+            energy.addView(heading(weightLoadEstimate(), 17, ink));
+            energy.addView(text("A conservative total external-load reference for a controlled strength movement, based on your private age, height, current weight, and recent completed activity.", 12, muted));
+            energy.addView(text("This may not be accurate and is not a medical assessment or a personalized lifting prescription. Start pain-free, use good form, and adjust the load to your experience.", 12, coral));
+        } else {
+            energy.addView(text("Add age, height, and a current weight in Body to see a general weight-load reference.", 13, muted));
+            energy.addView(text("Any future reference is only an estimate—not a medical assessment or lifting prescription.", 12, coral));
+        }
+        energy.addView(text("Broad activity estimates only; they are not a measurement or nutrition allowance.", 12, muted));
+        body.addView(energy);
+        runProgressKpiReveal(enduranceDistanceKpi, enduranceTimeKpi, endurancePaceKpi, guidedExercisesKpi, guidedSetsKpi, guidedActiveKpi);
+        runEnergyReportRevealWhenVisible(energy, energyBadge, null);
+    }
+
+    private boolean hasWeightLoadContext() {
+        return BodyProfileStore.configured(this) && WeightStore.configured(this) && WeightStore.latest(this) > 0f;
+    }
+
+    /**
+     * A deliberately conservative orientation point, never used to alter a plan automatically.
+     * It is total external resistance, rather than a per-hand dumbbell recommendation.
+     */
+    private String weightLoadEstimate() {
+        if (!hasWeightLoadContext()) return "Add your Body context";
+        float kilograms = "lb".equalsIgnoreCase(WeightStore.unit(this))
+                ? WeightStore.latest(this) * .45359237f : WeightStore.latest(this);
+        int age = BodyProfileStore.age(this);
+        float height = BodyProfileStore.heightCm(this);
+        float ageFactor = age >= 65 ? .70f : age >= 55 ? .80f : age >= 45 ? .90f : 1f;
+        float heightFactor = Math.max(.94f, Math.min(1.06f, 1f + (height - 170f) / 1000f));
+        float activityFactor = weeklyActivityTotals().guidedSessions >= 3 ? 1.08f : 1f;
+        float lowKg = kilograms * .10f * ageFactor * heightFactor;
+        float highKg = kilograms * .20f * ageFactor * heightFactor * activityFactor;
+        boolean pounds = "lb".equalsIgnoreCase(WeightStore.unit(this));
+        float conversion = pounds ? 2.20462262f : 1f;
+        String unit = pounds ? "lb" : "kg";
+        return "Starting reference · " + formatLoadEstimate(lowKg * conversion) + "–" + formatLoadEstimate(highKg * conversion) + " " + unit + " total";
+    }
+
+    private String formatLoadEstimate(float amount) {
+        float rounded = Math.max(2.5f, Math.round(amount / 2.5f) * 2.5f);
+        return Math.abs(rounded - Math.round(rounded)) < .01f ? String.valueOf(Math.round(rounded)) : String.format(Locale.US, "%.1f", rounded);
+    }
+
+    private void addWeeklyBreakdownRow(LinearLayout parent, String title, long activeMillis, long totalMillis, String activeLabel, String recoveryLabel) {
+        gap(parent, 12);
+        LinearLayout row = new LinearLayout(this); row.setGravity(Gravity.CENTER_VERTICAL);
+        int percent = totalMillis <= 0L ? 0 : (int) Math.round(Math.min(1d, activeMillis / (double) totalMillis) * 100d);
+        WorkoutBreakdownView chart = new WorkoutBreakdownView(this, percent, Math.round(totalMillis / 60_000f));
+        LinearLayout.LayoutParams chartParams = new LinearLayout.LayoutParams(dp(112), dp(112)); chartParams.rightMargin = dp(14);
+        row.addView(chart, chartParams);
+        LinearLayout copy = new LinearLayout(this); copy.setOrientation(LinearLayout.VERTICAL); copy.setGravity(Gravity.CENTER_VERTICAL);
+        copy.addView(heading(title, 16, ink));
+        copy.addView(text(totalMillis > 0L ? formatLiveDuration(totalMillis) + " total" : "No completed time yet", 13, muted));
+        if (totalMillis <= 0L) {
+            TextView empty = text("No recorded activity", 12, muted); empty.setPadding(0, dp(5), 0, 0); copy.addView(empty);
+        } else {
+            TextView active = text(activeLabel + " · " + percent + "%", 12, mint); active.setPadding(0, dp(4), 0, 0); copy.addView(active);
+            copy.addView(text(recoveryLabel + " · " + Math.max(0, 100 - percent) + "%", 12, Color.rgb(101, 124, 158)));
+        }
+        row.addView(copy, new LinearLayout.LayoutParams(0, dp(112), 1)); parent.addView(row);
+        runProgressRingRevealWhenVisible(row, chart, percent);
+    }
+
+    /** Reuses the report KPI pop-in cadence while keeping Progress as one quiet dashboard. */
+    private void runProgressKpiReveal(View... icons) {
+        if (reducedMotion) return;
+        for (int index = 0; index < icons.length; index++) {
+            View icon = icons[index];
+            icon.setAlpha(0f); icon.setScaleX(.55f); icon.setScaleY(.55f); icon.animate().cancel();
+            icon.animate().alpha(1f).scaleX(1f).scaleY(1f).setStartDelay(110L + (index * 100L))
+                    .setDuration(360L).setInterpolator(new OvershootInterpolator(1.35f)).start();
+        }
+    }
+
+    /** A weekly ring only sweeps when it actually reaches the viewport, matching energy-card behavior. */
+    private void runProgressRingRevealWhenVisible(View row, WorkoutBreakdownView chart, int finalPercent) {
+        if (reducedMotion || finalPercent <= 0) { chart.setDisplayedPercent(finalPercent); return; }
+        chart.setDisplayedPercent(0);
+        row.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener() {
+            private boolean played;
+            @Override public boolean onPreDraw() {
+                if (played) return true;
+                Rect visible = new Rect();
+                if (!row.getGlobalVisibleRect(visible) || visible.height() < dp(45)) return true;
+                played = true;
+                if (row.getViewTreeObserver().isAlive()) row.getViewTreeObserver().removeOnPreDrawListener(this);
+                ValueAnimator sweep = ValueAnimator.ofInt(0, finalPercent);
+                sweep.setDuration(850L);
+                sweep.addUpdateListener(animation -> chart.setDisplayedPercent((Integer) animation.getAnimatedValue()));
+                sweep.start();
+                return true;
+            }
+        });
+    }
+
+    private void addWeeklyPlanHistory(LinearLayout history) {
+        Calendar start = progressWeekStart();
+        boolean confirmed = hasHomeWeekSchedule(0, start);
+        WeeklyScheduleStore.Schedule schedule = confirmed ? homeWeekSchedule(0, start, true) : null;
+        SimpleDateFormat dateFormat = new SimpleDateFormat("EEE, MMM d", Locale.getDefault());
+        for (int i = 0; i < 7; i++) {
+            Calendar day = (Calendar) start.clone(); day.add(Calendar.DAY_OF_YEAR, i);
+            JourneyStore.WorkoutRecord completed = null;
+            for (JourneyStore.WorkoutRecord record : JourneyStore.workoutsThisWeek(this)) {
+                Calendar recordDay = Calendar.getInstance(); recordDay.setTimeInMillis(record.timestamp);
+                if (recordDay.get(Calendar.YEAR) == day.get(Calendar.YEAR) && recordDay.get(Calendar.DAY_OF_YEAR) == day.get(Calendar.DAY_OF_YEAR)) { completed = record; break; }
+            }
+            EnduranceHistoryStore.Entry endurance = completed == null ? null : EnduranceHistoryStore.load(this, completed.timestamp);
+            boolean endurancePlanned = !SchedulerStore.onDate(this, day).isEmpty();
+            boolean workoutPlanned = schedule != null && schedule.workoutDays[i];
+            boolean planned = endurancePlanned || workoutPlanned;
+            int fill = completed != null ? Color.rgb(220, 249, 241) : planned ? Color.rgb(255, 235, 232) : Color.rgb(237, 241, 246);
+            LinearLayout row = new LinearLayout(this); row.setGravity(Gravity.CENTER_VERTICAL); row.setPadding(dp(9), dp(8), dp(9), dp(8)); row.setBackground(surface(fill, 12, 1, completed != null ? mint : planned ? Color.rgb(255, 188, 178) : cardLine));
+            ImageView icon = new ImageView(this); icon.setImageResource(endurance != null || (completed == null && endurancePlanned) ? R.drawable.ic_nav_endurance : R.drawable.ic_nav_workouts); icon.setImageTintList(ColorStateList.valueOf(completed != null ? Color.rgb(27, 111, 96) : planned ? coral : muted)); icon.setPadding(dp(7), dp(7), dp(7), dp(7));
+            row.addView(icon, new LinearLayout.LayoutParams(dp(38), dp(38)));
+            LinearLayout copy = new LinearLayout(this); copy.setOrientation(LinearLayout.VERTICAL); copy.setPadding(dp(9), 0, 0, 0);
+            String title = completed != null ? dateFormat.format(day.getTime()) + " · " + (endurance != null ? formatLiveDuration(endurance.activeMillis) + " endurance" : completed.minutes + " guided min") : dateFormat.format(day.getTime()) + (planned ? " · Not completed" : " · No plan");
+            copy.addView(heading(title, 14, ink));
+            String subtitle = completed != null ? completed.target.replace("Endurance · ", "") : endurancePlanned ? "Endurance planned" : workoutPlanned ? focusSummary(schedule.targets.get(i)) + " workout planned" : "No workout or endurance planned";
+            copy.addView(text(subtitle, 12, muted)); row.addView(copy, new LinearLayout.LayoutParams(0, -2, 1));
+            if (completed != null) {
+                JourneyStore.WorkoutRecord opened = completed; EnduranceHistoryStore.Entry enduranceOpened = endurance;
+                row.setClickable(true); row.setFocusable(true); row.setOnClickListener(view -> { if (enduranceOpened != null) showEnduranceSessionDetails(enduranceOpened); else showWorkoutSetTimeDetails(opened, SetTimeStore.loadWorkout(this, opened.timestamp)); });
+            } else row.setAlpha(planned ? 1f : .58f);
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2); params.topMargin = dp(7); history.addView(row, params);
+        }
     }
 
     /** A local-first progression and readiness summary; it never changes a plan automatically. */
@@ -6753,7 +6969,7 @@ public final class MainActivity extends FragmentActivity {
             paint.setTextSize(dp(18));
             Paint.FontMetrics mainMetrics = paint.getFontMetrics();
             float mainBaseline = getHeight() / 2f - dp(5) - (mainMetrics.ascent + mainMetrics.descent) / 2f;
-            canvas.drawText(minutes + " min", getWidth() / 2f, mainBaseline, paint);
+            canvas.drawText(minutes > 0 ? minutes + " min" : "—", getWidth() / 2f, mainBaseline, paint);
             paint.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL));
             paint.setColor(muted);
             paint.setTextSize(dp(10));
