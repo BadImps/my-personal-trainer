@@ -6123,7 +6123,7 @@ public final class MainActivity extends FragmentActivity {
             route.addView(heading("Your route", 19, ink));
             if (OfflineMapStore.hasAnyMap(this)) {
                 OfflineMapStore.MapRecord selectedMap = OfflineMapStore.selectedMap(this);
-                route.addView(text("Offline " + (selectedMap == null ? "country" : selectedMap.country) + " map · your coral route stays private on this phone.", 13, muted));
+                route.addView(text("MapLibre vector streets · your coral route stays private on this phone.", 13, muted));
                 try {
                     OfflineRouteMapView map = new OfflineRouteMapView(this, OfflineMapStore.mapFile(this), entry.points);
                     LinearLayout.LayoutParams mapParams = new LinearLayout.LayoutParams(-1, dp(300));
@@ -6133,7 +6133,7 @@ public final class MainActivity extends FragmentActivity {
                 gap(route, 8);
                 addTrinidadOfflineMapControl(route, () -> showEnduranceSessionDetails(entry));
             } else {
-                route.addView(text("Choose a country map in Settings to place this private route on real streets while offline.", 13, muted));
+                route.addView(text("Download the MapLibre vector pack in Settings to place this private route on detailed streets offline.", 13, muted));
                 addPrivateRouteTrace(route, entry.points, dp(235));
                 gap(route, 8);
                 addTrinidadOfflineMapControl(route, () -> showEnduranceSessionDetails(entry));
@@ -6157,83 +6157,46 @@ public final class MainActivity extends FragmentActivity {
         parent.addView(trace, traceParams);
     }
 
-    /** Offers one country map as an optional, integrity-checked local download. */
+    /** Offers the first MapLibre country vector pack without exposing legacy map-file controls. */
     private void addTrinidadOfflineMapControl(LinearLayout parent, Runnable refreshAfterChange) {
         if (OfflineMapStore.hasTrinidadAndTobago(this)) {
-            parent.addView(text("Stored on this phone · " + Math.round(OfflineMapStore.trinidadAndTobagoBytes() / 1_000_000f) + " MB · © OpenStreetMap contributors", 12, mint));
-            Button remove = secondary("Remove Trinidad & Tobago offline map");
-            remove.setOnClickListener(view -> new AlertDialog.Builder(this).setTitle("Remove offline map?")
-                    .setMessage("This removes only the downloaded street map. Your private completed routes remain on this phone.")
-                    .setNegativeButton("Cancel", null).setPositiveButton("Remove", (dialog, which) -> { OfflineMapStore.removeTrinidadAndTobago(this); refreshAfterChange.run(); }).show());
-            addButton(parent, remove);
+            MapLibreOfflinePack.ensureTrinidadAndTobago(this);
+            parent.addView(text(MapLibreOfflinePack.isTrinidadReady(this)
+                    ? "MapLibre vector streets are ready for offline routes."
+                    : "Preparing the MapLibre vector streets. Keep a connection on for the first preparation.", 12, mint));
             return;
         }
-        TextView status = text("Map data © OpenStreetMap contributors, licensed under ODbL. Download once over Wi‑Fi; it works without mobile data afterwards.", 12, muted);
+        TextView status = text("Download the Trinidad & Tobago MapLibre vector pack once. Detailed streets then remain available without mobile data.", 12, muted);
         parent.addView(status); gap(parent, 7);
-        Button download = lightAction("Download Trinidad & Tobago map · 10 MB");
+        Button download = lightAction("Download Trinidad & Tobago vector pack");
         download.setOnClickListener(view -> {
-            download.setEnabled(false); status.setText("Preparing secure map download…");
+            download.setEnabled(false); status.setText("Preparing MapLibre vector streets…");
             OfflineMapStore.downloadTrinidadAndTobago(this, new OfflineMapStore.Listener() {
-                @Override public void onProgress(long downloaded, long total) { runOnUiThread(() -> status.setText("Downloading offline map · " + Math.min(100, Math.round(downloaded * 100f / Math.max(1L, total))) + "%")); }
-                @Override public void onReady() { runOnUiThread(() -> { toast("Trinidad & Tobago is ready offline."); refreshAfterChange.run(); }); }
+                @Override public void onProgress(long downloaded, long total) { runOnUiThread(() -> status.setText("Preparing vector map · " + Math.min(100, Math.round(downloaded * 100f / Math.max(1L, total))) + "%")); }
+                @Override public void onReady() { runOnUiThread(() -> { toast("MapLibre vector streets are preparing for Trinidad & Tobago."); refreshAfterChange.run(); }); }
                 @Override public void onError(String message) { runOnUiThread(() -> { status.setText(message); download.setEnabled(true); }); }
             });
         });
         addButton(parent, download);
     }
 
-    /** Settings-owned country selector: managed downloads stay verified; other country packages are imported locally. */
+    /** Settings-owned MapLibre vector-pack page. */
     private void showOfflineMapCatalog() {
         LinearLayout body = appPage("Settings");
-        title(body, "OFFLINE MAPS", "Country maps on your phone", "Download a country once, then view your private endurance route without mobile data.");
+        title(body, "MAPLIBRE MAPS", "Offline vector maps", "Download a country once, then view your private endurance route on detailed streets without mobile data.");
         LinearLayout notice = card();
         notice.addView(heading("Your route stays private", 18, ink));
-        notice.addView(text("Map files are stored only in My Personal Trainer. Downloaded and imported files can be removed here at any time.", 14, muted));
+        notice.addView(text("MapLibre draws the map on your phone. Your location history and route trace stay only in My Personal Trainer.", 14, muted));
         body.addView(notice); gap(body, 12);
 
-        body.addView(heading("AVAILABLE COUNTRY DOWNLOAD", 11, mint));
+        body.addView(heading("AVAILABLE VECTOR PACK", 11, mint));
         LinearLayout trinidad = card();
         trinidad.addView(heading("Trinidad & Tobago", 20, ink));
-        trinidad.addView(text("Verified street map · 10 MB · works offline", 14, muted));
+        trinidad.addView(text("MapLibre Liberty streets · downloadable · works offline after preparation", 14, muted));
         gap(trinidad, 7);
         addTrinidadOfflineMapControl(trinidad, this::showOfflineMapCatalog);
         body.addView(trinidad); gap(body, 12);
-
-        body.addView(heading("YOUR COUNTRY MAPS", 11, mint));
-        List<OfflineMapStore.MapRecord> maps = OfflineMapStore.installedMaps(this);
-        if (maps.isEmpty()) {
-            LinearLayout empty = card();
-            empty.addView(text("No country map is installed yet.", 14, muted));
-            body.addView(empty);
-        } else {
-            OfflineMapStore.MapRecord selected = OfflineMapStore.selectedMap(this);
-            for (OfflineMapStore.MapRecord record : maps) {
-                LinearLayout item = card();
-                item.addView(heading(record.country, 18, ink));
-                String detail = (record.verifiedDownload ? "Verified download" : "Imported Mapsforge file") + " · " + Math.max(1, Math.round(record.bytes / 1_000_000f)) + " MB";
-                item.addView(text(detail, 13, muted)); gap(item, 8);
-                Button use = record.id.equals(selected == null ? "" : selected.id) ? secondary("Used for my routes") : lightAction("Use for my routes");
-                use.setEnabled(!record.id.equals(selected == null ? "" : selected.id));
-                use.setOnClickListener(view -> { OfflineMapStore.selectMap(this, record.id); showOfflineMapCatalog(); });
-                addButton(item, use); gap(item, 6);
-                Button remove = secondary("Remove " + record.country + " map");
-                remove.setOnClickListener(view -> new AlertDialog.Builder(this).setTitle("Remove " + record.country + "?")
-                        .setMessage("This removes only the map. Your saved routes stay on this phone.")
-                        .setNegativeButton("Cancel", null).setPositiveButton("Remove", (dialog, which) -> { OfflineMapStore.removeMap(this, record); showOfflineMapCatalog(); }).show());
-                addButton(item, remove); body.addView(item); gap(body, 10);
-            }
-        }
-        LinearLayout importCard = card();
-        importCard.addView(heading("Add another country", 19, ink));
-        importCard.addView(text("Choose a compatible Mapsforge .map country file already on your phone. It is copied into private app storage, checked before use, and then becomes available for your routes.", 14, muted));
-        gap(importCard, 10);
-        Button choose = lightAction("Choose country map file");
-        choose.setOnClickListener(view -> {
-            Intent picker = new Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("application/octet-stream").addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
-            startActivityForResult(picker, REQUEST_OFFLINE_MAP);
-        });
-        addButton(importCard, choose); body.addView(importCard); gap(body, 12);
-        body.addView(text("© OpenStreetMap contributors. Country map data may have its own open-data license. Use a country package that covers where you exercise.", 12, Color.rgb(202, 216, 234)));
+        body.addView(text("Map data © OpenStreetMap contributors. Vector styling by OpenFreeMap / MapLibre.", 12, Color.rgb(202, 216, 234)));
         gap(body, 12); Button back = secondary("Back to settings"); back.setOnClickListener(view -> showProfile()); addButton(body, back);
     }
 
@@ -7028,7 +6991,7 @@ public final class MainActivity extends FragmentActivity {
 
         body.addView(settingsGroup("APP"));
         LinearLayout appGroup = settingsPanel();
-        appGroup.addView(settingsRow("⌖", "Offline maps", OfflineMapStore.hasAnyMap(this) ? "Country map ready for routes" : "Download a country for offline routes", view -> showOfflineMapCatalog()));
+        appGroup.addView(settingsRow("⌖", "MapLibre maps", MapLibreOfflinePack.isTrinidadReady(this) ? "Vector streets ready for routes" : "Download an offline vector pack", view -> showOfflineMapCatalog()));
         appGroup.addView(settingsDivider());
         appGroup.addView(settingsRow("▶", "Coach motion packs", "Optional smooth exercise loops · download only what you need", view -> showMediaPacks()));
         appGroup.addView(settingsDivider());
@@ -10696,8 +10659,8 @@ public final class MainActivity extends FragmentActivity {
         tracker.addView(stats);
         OfflineMapStore.MapRecord selectedMap = OfflineMapStore.selectedMap(this);
         tracker.addView(text(OfflineMapStore.hasAnyMap(this)
-                ? (selectedMap == null ? "A country street map is stored on this phone." : selectedMap.country + " streets are stored on this phone.") + " Your coral route is drawn locally."
-                : "GPS route trace is local to this phone. Choose a country in Settings for a full offline map.", 13, muted));
+                ? "MapLibre vector streets are available for this private route."
+                : "GPS route trace is local to this phone. Download a MapLibre vector pack in Settings for detailed streets.", 13, muted));
         LiveRouteRenderer routeRenderer;
         if (OfflineMapStore.hasAnyMap(this)) {
             try {

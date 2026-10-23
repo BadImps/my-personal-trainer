@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 90,
-  "versionName": "5.48",
-  "publishedAt": "2026-10-23T13:40:59Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.48/app-release.apk",
-  "sha256": "128e8b8802c2e507c482975a22766ae0c3e8c1bd2dbd40f50c39b0f77f1de326",
+  "versionCode": 91,
+  "versionName": "5.49",
+  "publishedAt": "2026-10-23T13:51:20Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.49/app-release.apk",
+  "sha256": "6668be54be471a2a91d7604028bcd126c3158e543be47e9722a86ce2e8d575ea",
   "sizeBytes": 257034563,
-  "notes": "Adds a polished MapLibre vector-map surface for Trinidad & Tobago with a resumable country download and a reliable on-device fallback."
+  "notes": "Replaces legacy offline-map wording and file controls with one clean MapLibre vector-pack experience."
 }
