@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 98,
-  "versionName": "5.56",
-  "publishedAt": "2026-10-23T18:00:00Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.56/app-release.apk",
-  "sha256": "f0b58fcc7afa1befbeddacec2260c20a7fc93f650fe03eb1e23e9589083782c1",
+  "versionCode": 99,
+  "versionName": "5.57",
+  "publishedAt": "2026-10-23T18:20:00Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.57/app-release.apk",
+  "sha256": "441d4f67e8d0d0df6e96d4d57b8a5981f7650c77556e7377132d09564a88c61b",
   "sizeBytes": 257050943,
-  "notes": "Adds guided warm-up and cool-down choices, filtered custom exercises, accurate Weekly validation, historical Home days, and coach recovery guidance."
+  "notes": "Hotfix: every completed guided session can now open its tailored five-minute cool-down and stretch collage."
 }

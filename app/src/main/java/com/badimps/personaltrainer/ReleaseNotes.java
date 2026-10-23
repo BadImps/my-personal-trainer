@@ -15,6 +15,7 @@ public final class ReleaseNotes {
     }
 
     public static final Entry[] HISTORY = {
+            new Entry("5.57", "Guaranteed cool-down access", "Every completed guided session now exposes the five-minute tailored cool-down if it was not shown before the completion report, without repeating it after completion."),
             new Entry("5.56", "Guided workout preparation", "Custom exercise selection now has Library search and filters; Home clearly distinguishes today from historical days; guided workouts offer optional five-minute warm-up and cool-down flows, recovery recommendations, and a coach suggestion staged for Scheduler approval."),
             new Entry("5.55", "Route camera and pan controls", "Offline route maps now frame the route more tightly, support direct one-finger panning and zoom gestures, and stop auto-centering after you take control."),
             new Entry("5.54", "Every endurance completion reported", "Live, guided, scheduled, and timer-only endurance completions now all open the same endurance report; GPS sessions additionally replay their private route."),

@@ -154,6 +154,8 @@ public final class MainActivity extends FragmentActivity {
     /** Optional preparation/recovery selected immediately before a guided session. */
     private boolean guidedWarmupEnabled;
     private boolean guidedFinishCooldownEnabled;
+    /** Prevents the completion report from offering the same end cooldown twice. */
+    private boolean guidedFinishCooldownShown;
     /** Coach recommendation is deliberately staged in Scheduler until the member applies it. */
     private String pendingCoachRecommendation;
     private final Handler workoutHandler = new Handler(Looper.getMainLooper());
@@ -8379,6 +8381,7 @@ public final class MainActivity extends FragmentActivity {
         stopWorkoutRemainingClock();
         guidedSessionRecorded = false;
         guidedWorkoutAborted = false;
+        guidedFinishCooldownShown = false;
         activeWorkoutExerciseIndex = 0;
         activeWorkoutSet = 1;
         activeWorkoutPhase = "countdown";
@@ -9411,9 +9414,10 @@ public final class MainActivity extends FragmentActivity {
     /** Optional five-minute end cooldown with still, target-aware Strength Level stretch cards. */
     private void showGuidedFinishCooldown() {
         if (guidedWorkoutAborted) return;
+        guidedFinishCooldownShown = true;
         activeWorkoutPhase = "finish_cooldown";
         activeWorkoutPaused = false;
-        syncWorkoutService();
+        if (!guidedSessionRecorded) syncWorkoutService();
         LinearLayout body = guidedWorkoutPage();
         addWorkoutRemainingHeader(body);
         title(body, "FIVE-MINUTE COOL-DOWN", "Recover with purpose", "Coach " + coachName() + " selected gentle mobility for your " + focusSummary(activeTargets()) + " session.");
@@ -11880,6 +11884,18 @@ public final class MainActivity extends FragmentActivity {
         linked.addView(text("This week  •  " + snapshot.fuelDaysThisWeek + " nutrition check-in days", 14, muted));
         body.addView(linked);
         gap(body, 12);
+        if (!guidedFinishCooldownShown) {
+            LinearLayout cooldown = card();
+            cooldown.addView(heading("OPTIONAL FIVE-MINUTE COOL-DOWN", 11, mint));
+            cooldown.addView(heading("Stretch and reset", 19, ink));
+            cooldown.addView(text("Open the guided recovery timer with coach-selected, still Strength Level stretch cards for this workout.", 13, muted));
+            gap(cooldown, 10);
+            Button beginCooldown = action("Start 5-minute cool-down", coral, Color.WHITE);
+            beginCooldown.setOnClickListener(view -> showGuidedFinishCooldown());
+            cooldown.addView(beginCooldown, new LinearLayout.LayoutParams(-1, dp(50)));
+            body.addView(cooldown);
+            gap(body, 10);
+        }
         LinearLayout recovery = card();
         recovery.addView(heading("RECOVER WELL", 11, mint));
         recovery.addView(heading(recoveryFuelRecommendation(), 18, ink));
