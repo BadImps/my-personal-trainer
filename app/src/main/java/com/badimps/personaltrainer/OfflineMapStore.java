@@ -110,7 +110,11 @@ public final class OfflineMapStore {
                 if (downloaded != TT_BYTES || !TT_SHA256.equalsIgnoreCase(hex(digest.digest()))) throw new IllegalStateException("The offline map did not pass its integrity check.");
                 if (destination.exists() && !destination.delete()) throw new IllegalStateException("Could not replace the previous offline map.");
                 if (!temporary.renameTo(destination)) throw new IllegalStateException("Could not store the offline map.");
-                prefs(app).edit().putBoolean(KEY_TT_READY, true).putString(KEY_SELECTED, TT_ID).apply(); listener.onReady();
+                prefs(app).edit().putBoolean(KEY_TT_READY, true).putString(KEY_SELECTED, TT_ID).apply();
+                // The compact local map is usable immediately. In parallel, prepare the richer
+                // MapLibre vector pack; it resumes safely if Android pauses the download.
+                MapLibreOfflinePack.ensureTrinidadAndTobago(app);
+                listener.onReady();
             } catch (Exception error) { temporary.delete(); listener.onError(error.getMessage() == null ? "Could not download the offline map." : error.getMessage()); }
         }, "offline-map-download").start();
     }
