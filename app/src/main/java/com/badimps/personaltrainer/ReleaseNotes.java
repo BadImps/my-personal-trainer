@@ -15,6 +15,7 @@ public final class ReleaseNotes {
     }
 
     public static final Entry[] HISTORY = {
+            new Entry("5.55", "Route camera and pan controls", "Offline route maps now frame the route more tightly, support direct one-finger panning and zoom gestures, and stop auto-centering after you take control."),
             new Entry("5.54", "Every endurance completion reported", "Live, guided, scheduled, and timer-only endurance completions now all open the same endurance report; GPS sessions additionally replay their private route."),
             new Entry("5.53", "Completed endurance reports", "Completed walks, runs, and cycles now receive an animated endurance report, calorie range, Home Done ribbon, and private route replay."),
             new Entry("5.52", "Private training intelligence", "Adds local recovery guidance, transparent progression suggestions, and a symmetrical barbell plate guide without automatically changing your plan."),

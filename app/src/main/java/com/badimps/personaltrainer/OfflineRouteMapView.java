@@ -48,6 +48,10 @@ public final class OfflineRouteMapView extends FrameLayout {
     private Runnable pendingReplay;
     private boolean positioned;
     private boolean vectorStyleReady;
+    /** Once a member touches the map, live updates never move their camera again. */
+    private boolean userNavigated;
+    private boolean routeCameraFramed;
+    private boolean vectorCameraFramed;
 
     /** Receives normalized replay time without sending the private route anywhere. */
     public interface RouteReplayListener {
@@ -88,11 +92,12 @@ public final class OfflineRouteMapView extends FrameLayout {
         route = new Polyline(routePaint, AndroidGraphicFactory.INSTANCE);
         map.getLayerManager().getLayers().add(route);
 
-        // A two-finger map gesture belongs to the map, rather than the surrounding scroll page.
+        // Map touches belong to the map (including a one-finger pan), rather than its ScrollView.
         map.setOnTouchListener((view, event) -> {
-            boolean mapGesture = event.getPointerCount() >= 2 || event.getActionMasked() == MotionEvent.ACTION_POINTER_UP;
+            int action = event.getActionMasked();
+            if (action == MotionEvent.ACTION_MOVE || action == MotionEvent.ACTION_POINTER_DOWN) userNavigated = true;
             ViewParent parent = getParent();
-            if (parent != null) parent.requestDisallowInterceptTouchEvent(mapGesture);
+            if (parent != null) parent.requestDisallowInterceptTouchEvent(action != MotionEvent.ACTION_UP && action != MotionEvent.ACTION_CANCEL);
             return false;
         });
         addView(map, new FrameLayout.LayoutParams(-1, -1));
@@ -103,6 +108,13 @@ public final class OfflineRouteMapView extends FrameLayout {
         // failed to appear.
         MapLibre.getInstance(appContext);
         vectorMap = new org.maplibre.android.maps.MapView(context);
+        vectorMap.setOnTouchListener((view, event) -> {
+            int action = event.getActionMasked();
+            if (action == MotionEvent.ACTION_MOVE || action == MotionEvent.ACTION_POINTER_DOWN) userNavigated = true;
+            ViewParent parent = getParent();
+            if (parent != null) parent.requestDisallowInterceptTouchEvent(action != MotionEvent.ACTION_UP && action != MotionEvent.ACTION_CANCEL);
+            return false;
+        });
         vectorMap.setVisibility(INVISIBLE);
         vectorMap.onCreate(null);
         vectorMap.onStart();
@@ -112,6 +124,9 @@ public final class OfflineRouteMapView extends FrameLayout {
             loaded.getUiSettings().setCompassEnabled(true);
             loaded.getUiSettings().setLogoEnabled(true);
             loaded.getUiSettings().setAttributionEnabled(true);
+            loaded.getUiSettings().setScrollGesturesEnabled(true);
+            loaded.getUiSettings().setZoomGesturesEnabled(true);
+            loaded.getUiSettings().setDoubleTapGesturesEnabled(true);
             loaded.setStyle(MapLibreOfflinePack.styleUrl(appContext), style -> {
                 vectorStyleReady = true;
                 vectorMap.setVisibility(VISIBLE);
@@ -130,7 +145,8 @@ public final class OfflineRouteMapView extends FrameLayout {
     public void setRoute(List<LiveTrackingStore.Point> points) {
         stopRouteReplay();
         currentPoints = points == null ? new ArrayList<>() : new ArrayList<>(points);
-        renderRoute(currentPoints, true);
+        boolean shouldFrame = !userNavigated && currentPoints.size() > 0 && !routeCameraFramed;
+        renderRoute(currentPoints, shouldFrame);
     }
 
     /** Plays a compact visual time-lapse from the first recorded point to the finish. */
@@ -178,15 +194,16 @@ public final class OfflineRouteMapView extends FrameLayout {
         if (!positioned || fitCamera) {
             LatLong center = routePoints.isEmpty() ? new LatLong(10.6918d, -61.2225d) : routePoints.get(routePoints.size() - 1);
             map.setCenter(center);
-            map.setZoomLevel(routePoints.size() < 2 ? (byte) 13 : (byte) 15);
+            map.setZoomLevel(routePoints.size() < 2 ? (byte) 16 : (byte) 16);
             positioned = true;
+            if (routePoints.size() > 1) routeCameraFramed = true;
         }
         map.repaint();
         renderVectorRoute(points, fitCamera);
     }
 
     private void renderVectorRoute() {
-        renderVectorRoute(currentPoints, true);
+        renderVectorRoute(currentPoints, !userNavigated && !vectorCameraFramed && currentPoints.size() > 0);
     }
 
     private void renderVectorRoute(List<LiveTrackingStore.Point> points, boolean fitCamera) {
@@ -198,11 +215,16 @@ public final class OfflineRouteMapView extends FrameLayout {
         if (line.size() > 1 && fitCamera) {
             double north = -90d, south = 90d, east = -180d, west = 180d;
             for (LatLng point : line) { north = Math.max(north, point.getLatitude()); south = Math.min(south, point.getLatitude()); east = Math.max(east, point.getLongitude()); west = Math.min(west, point.getLongitude()); }
-            vectorController.moveCamera(CameraUpdateFactory.newLatLngBounds(LatLngBounds.from(north, east, south, west), 72));
-        } else {
+            vectorController.moveCamera(CameraUpdateFactory.newLatLngBounds(LatLngBounds.from(north, east, south, west), dp(28)));
+            vectorCameraFramed = true;
+        } else if (line.size() == 1 && fitCamera) {
+            vectorController.moveCamera(CameraUpdateFactory.newLatLngZoom(line.get(0), 16d));
+        } else if (line.isEmpty() && !vectorCameraFramed) {
             vectorController.moveCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(10.6918d, -61.2225d), 12d));
         }
     }
+
+    private int dp(int value) { return (int) (value * getResources().getDisplayMetrics().density + .5f); }
 
     @Override protected void onDetachedFromWindow() {
         stopRouteReplay();

@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 96,
-  "versionName": "5.54",
-  "publishedAt": "2026-10-23T16:45:00Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.54/app-release.apk",
-  "sha256": "695f1b3d4700f831b031c6faf24a86b91e04e39b0040f86181c32fbf62770338",
-  "sizeBytes": 257034559,
-  "notes": "Every endurance completion now has a report; live GPS sessions also replay their private route."
+  "versionCode": 97,
+  "versionName": "5.55",
+  "publishedAt": "2026-10-23T17:15:00Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.55/app-release.apk",
+  "sha256": "b08a3ca36cc009bf71076ff05e97597b0a125fc512eae057fa4c67c005fc01f3",
+  "sizeBytes": 257050943,
+  "notes": "Route maps now frame closer, pan directly, and respect your zoom position."
 }
