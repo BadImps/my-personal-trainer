@@ -97,7 +97,7 @@ public final class OfflineRouteMapView extends FrameLayout {
             loaded.getUiSettings().setCompassEnabled(true);
             loaded.getUiSettings().setLogoEnabled(true);
             loaded.getUiSettings().setAttributionEnabled(true);
-            loaded.setStyle(MapLibreOfflinePack.STYLE_URL, style -> {
+            loaded.setStyle(MapLibreOfflinePack.styleUrl(appContext), style -> {
                 vectorMap.setVisibility(VISIBLE);
                 renderVectorRoute();
             });

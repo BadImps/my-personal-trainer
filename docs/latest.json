@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 91,
-  "versionName": "5.49",
-  "publishedAt": "2026-10-23T13:51:20Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.49/app-release.apk",
-  "sha256": "6668be54be471a2a91d7604028bcd126c3158e543be47e9722a86ce2e8d575ea",
-  "sizeBytes": 257034563,
-  "notes": "Replaces legacy offline-map wording and file controls with one clean MapLibre vector-pack experience."
+  "versionCode": 92,
+  "versionName": "5.50",
+  "publishedAt": "2026-10-23T14:12:37Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.50/app-release.apk",
+  "sha256": "422ec1b81796557d05a5d568957988279b4718f687aaa36a815fd2414286c48c",
+  "sizeBytes": 257034559,
+  "notes": "MapLibre maps now offers Low Impact for a lighter download or Enhanced for richer streets, parks, water, and labels—both optional and separate from OTA size."
 }

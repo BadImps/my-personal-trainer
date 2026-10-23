@@ -6157,27 +6157,15 @@ public final class MainActivity extends FragmentActivity {
         parent.addView(trace, traceParams);
     }
 
-    /** Offers the first MapLibre country vector pack without exposing legacy map-file controls. */
+    /** Compact route-page status; the full choice belongs in Settings → MapLibre maps. */
     private void addTrinidadOfflineMapControl(LinearLayout parent, Runnable refreshAfterChange) {
-        if (OfflineMapStore.hasTrinidadAndTobago(this)) {
-            MapLibreOfflinePack.ensureTrinidadAndTobago(this);
-            parent.addView(text(MapLibreOfflinePack.isTrinidadReady(this)
-                    ? "MapLibre vector streets are ready for offline routes."
-                    : "Preparing the MapLibre vector streets. Keep a connection on for the first preparation.", 12, mint));
-            return;
-        }
-        TextView status = text("Download the Trinidad & Tobago MapLibre vector pack once. Detailed streets then remain available without mobile data.", 12, muted);
-        parent.addView(status); gap(parent, 7);
-        Button download = lightAction("Download Trinidad & Tobago vector pack");
-        download.setOnClickListener(view -> {
-            download.setEnabled(false); status.setText("Preparing MapLibre vector streets…");
-            OfflineMapStore.downloadTrinidadAndTobago(this, new OfflineMapStore.Listener() {
-                @Override public void onProgress(long downloaded, long total) { runOnUiThread(() -> status.setText("Preparing vector map · " + Math.min(100, Math.round(downloaded * 100f / Math.max(1L, total))) + "%")); }
-                @Override public void onReady() { runOnUiThread(() -> { toast("MapLibre vector streets are preparing for Trinidad & Tobago."); refreshAfterChange.run(); }); }
-                @Override public void onError(String message) { runOnUiThread(() -> { status.setText(message); download.setEnabled(true); }); }
-            });
-        });
-        addButton(parent, download);
+        MapLibreOfflinePack.Mode mode = MapLibreOfflinePack.selectedMode(this);
+        parent.addView(text(MapLibreOfflinePack.isReady(this, mode)
+                ? mode.label + " MapLibre streets are ready offline."
+                : "Choose Low Impact or Enhanced in Settings → MapLibre maps.", 12, mint));
+        Button choose = secondary("Choose MapLibre map detail");
+        choose.setOnClickListener(view -> showOfflineMapCatalog());
+        addButton(parent, choose);
     }
 
     /** Settings-owned MapLibre vector-pack page. */
@@ -6189,15 +6177,48 @@ public final class MainActivity extends FragmentActivity {
         notice.addView(text("MapLibre draws the map on your phone. Your location history and route trace stay only in My Personal Trainer.", 14, muted));
         body.addView(notice); gap(body, 12);
 
-        body.addView(heading("AVAILABLE VECTOR PACK", 11, mint));
-        LinearLayout trinidad = card();
-        trinidad.addView(heading("Trinidad & Tobago", 20, ink));
-        trinidad.addView(text("MapLibre Liberty streets · downloadable · works offline after preparation", 14, muted));
-        gap(trinidad, 7);
-        addTrinidadOfflineMapControl(trinidad, this::showOfflineMapCatalog);
-        body.addView(trinidad); gap(body, 12);
+        body.addView(heading("TRINIDAD & TOBAGO MAP DETAIL", 11, mint));
+        body.addView(text("Choose one visual pack. The chosen map downloads only to this phone when you request it—it is never included in an OTA update.", 13, muted));
+        gap(body, 8);
+        addMapLibrePackOption(body, MapLibreOfflinePack.Mode.LOW_IMPACT,
+                "Low Impact", "Cleaner streets, lighter labels, and a smaller offline download for lower data and storage use.");
+        gap(body, 10);
+        addMapLibrePackOption(body, MapLibreOfflinePack.Mode.ENHANCED,
+                "Enhanced", "Richer water, parks, road detail, and labels for a more alive route view and a larger offline download.");
+        gap(body, 12);
         body.addView(text("Map data © OpenStreetMap contributors. Vector styling by OpenFreeMap / MapLibre.", 12, Color.rgb(202, 216, 234)));
         gap(body, 12); Button back = secondary("Back to settings"); back.setOnClickListener(view -> showProfile()); addButton(body, back);
+    }
+
+    private void addMapLibrePackOption(LinearLayout parent, MapLibreOfflinePack.Mode mode, String title, String detail) {
+        boolean selected = MapLibreOfflinePack.selectedMode(this) == mode;
+        boolean ready = MapLibreOfflinePack.isReady(this, mode);
+        LinearLayout option = card();
+        option.addView(heading(title, 20, ink));
+        option.addView(text(detail, 14, muted));
+        option.addView(text(ready ? "Downloaded · works offline" : selected ? "Selected · prepare while connected" : "Available to download", 12, ready || selected ? mint : muted));
+        gap(option, 8);
+        Button action = selected && ready ? secondary("Selected") : lightAction(selected ? "Prepare selected map" : "Use " + title);
+        action.setEnabled(!(selected && ready));
+        action.setOnClickListener(view -> {
+            MapLibreOfflinePack.selectMode(this, mode);
+            action.setEnabled(false);
+            if (OfflineMapStore.hasTrinidadAndTobago(this)) {
+                action.setText("Preparing vector streets…");
+                MapLibreOfflinePack.ensureTrinidadAndTobago(this, mode);
+                toast(title + " MapLibre streets are preparing. Keep a connection on for the first download.");
+                showOfflineMapCatalog();
+            } else {
+                action.setText("Downloading base streets…");
+                OfflineMapStore.downloadTrinidadAndTobago(this, new OfflineMapStore.Listener() {
+                    @Override public void onProgress(long downloaded, long total) { runOnUiThread(() -> action.setText("Preparing · " + Math.min(100, Math.round(downloaded * 100f / Math.max(1L, total))) + "%")); }
+                    @Override public void onReady() { runOnUiThread(() -> { MapLibreOfflinePack.ensureTrinidadAndTobago(MainActivity.this, mode); toast(title + " MapLibre streets are preparing."); showOfflineMapCatalog(); }); }
+                    @Override public void onError(String message) { runOnUiThread(() -> { toast(message); action.setEnabled(true); action.setText("Use " + title); }); }
+                });
+            }
+        });
+        addButton(option, action);
+        parent.addView(option);
     }
 
     private void askForImportedMapCountry(Uri map) {

@@ -15,6 +15,7 @@ public final class ReleaseNotes {
     }
 
     public static final Entry[] HISTORY = {
+            new Entry("5.50", "Choose your Trinidad map detail", "MapLibre maps now offers Low Impact for a lighter download or Enhanced for richer streets, parks, water, and labels—both optional and separate from OTA size."),
             new Entry("5.49", "Clear MapLibre map controls", "Replaces legacy offline-map wording and file controls with one clean MapLibre vector-pack experience."),
             new Entry("5.48", "MapLibre offline vector maps", "Adds a polished MapLibre vector-map surface for Trinidad & Tobago with a resumable country download and a reliable on-device fallback."),
             new Entry("5.47", "Move placement editor", "Move to now opens one clear popup with Body Area and Equipment selectors together, followed by Save placement."),
