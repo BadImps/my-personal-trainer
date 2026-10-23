@@ -365,6 +365,25 @@ public final class MainActivity extends FragmentActivity {
             showMeals();
             return;
         }
+        if (BuildConfig.DEBUG && "com.badimps.personaltrainer.DEBUG_REFUEL_GUIDED".equals(getIntent().getAction())) {
+            showRecoveryFuelGuide(false, 45, "Upper Body", this::showPlans);
+            return;
+        }
+        if (BuildConfig.DEBUG && "com.badimps.personaltrainer.DEBUG_REFUEL_ENDURANCE".equals(getIntent().getAction())) {
+            showRecoveryFuelGuide(true, 75, "Endurance", this::showEndurance);
+            return;
+        }
+        if (BuildConfig.DEBUG && "com.badimps.personaltrainer.DEBUG_PROGRESS_WEEKLY".equals(getIntent().getAction())) {
+            WeightStore.start(this, 82.4f, 78f, "kg");
+            BodyProfileStore.save(this, 32, 175f, BodyProfileStore.GENDER_MALE);
+            long now = System.currentTimeMillis();
+            JourneyStore.recordWorkoutAt(this, "Upper Body", 45, now - 86_400_000L);
+            JourneyStore.recordWorkoutAt(this, "Endurance · Running", 52, now - 172_800_000L);
+            EnduranceHistoryStore.record(this, now - 172_800_000L, EndurancePlanStore.RUNNING,
+                    52L * 60_000L, 7_300f, Collections.emptyList());
+            showProgress();
+            return;
+        }
         if (BuildConfig.DEBUG && "com.badimps.personaltrainer.DEBUG_HOME".equals(getIntent().getAction())) {
             showHome();
             return;
@@ -6232,7 +6251,10 @@ public final class MainActivity extends FragmentActivity {
         View enduranceDistanceKpi = addReportKpi(enduranceKpis, R.drawable.ic_nav_endurance, formatLiveDistance(totals.enduranceMeters), "Distance"); addReportKpiDivider(enduranceKpis);
         View enduranceTimeKpi = addReportKpi(enduranceKpis, R.drawable.ic_report_stopwatch, formatLiveDuration(totals.enduranceMillis), "Time"); addReportKpiDivider(enduranceKpis);
         View endurancePaceKpi = addReportKpi(enduranceKpis, R.drawable.ic_report_exercises, pace, "Pace");
-        endurance.addView(enduranceKpis); body.addView(endurance); gap(body, 10);
+        endurance.addView(enduranceKpis);
+        int enduranceMinutes = Math.max(0, Math.round(totals.enduranceMillis / 60_000f));
+        addWeeklyProgressBar(endurance, "Endurance movement", enduranceMinutes + " of 150 min", enduranceMinutes, 150, mint);
+        body.addView(endurance); gap(body, 10);
 
         LinearLayout guided = card();
         guided.addView(heading("GUIDED WORKOUTS", 11, muted));
@@ -6244,7 +6266,11 @@ public final class MainActivity extends FragmentActivity {
         View guidedExercisesKpi = addReportKpi(guidedKpis, R.drawable.ic_report_exercises, String.valueOf(totals.exercises), "Exercises"); addReportKpiDivider(guidedKpis);
         View guidedSetsKpi = addReportKpi(guidedKpis, R.drawable.ic_report_sets, String.valueOf(totals.sets), "Sets"); addReportKpiDivider(guidedKpis);
         View guidedActiveKpi = addReportKpi(guidedKpis, R.drawable.ic_report_stopwatch, totals.guidedActiveMillis > 0L ? WorkoutTiming.formatElapsedMillis(totals.guidedActiveMillis) : "—", "Active");
-        guided.addView(guidedKpis); body.addView(guided); gap(body, 10);
+        guided.addView(guidedKpis);
+        int guidedMinutes = Math.max(0, Math.round(totals.guidedMillis / 60_000f));
+        int guidedTargetMinutes = Math.max(sessionMinutes, Math.max(1, plannedSessionsThisWeek()) * sessionMinutes);
+        addWeeklyProgressBar(guided, "Guided workout plan", guidedMinutes + " of " + guidedTargetMinutes + " min", guidedMinutes, guidedTargetMinutes, coral);
+        body.addView(guided); gap(body, 10);
 
         LinearLayout breakdown = card();
         breakdown.addView(heading("WEEKLY TIME BREAKDOWN", 11, muted));
@@ -6266,39 +6292,214 @@ public final class MainActivity extends FragmentActivity {
         energy.addView(energyHeader);
         energy.addView(heading("This week", 20, ink));
         View energyFill = null;
+        EnergySplitItem enduranceEnergyKpi = null;
+        EnergySplitItem guidedEnergyKpi = null;
+        EnergySplitItem combinedEnergyKpi = null;
+        WeightTrendView weightTrend = null;
         if (WeightStore.configured(this) && WeightStore.latest(this) > 0f) {
             int combinedLow = totals.enduranceLowCalories + totals.guidedLowCalories;
             int combinedHigh = totals.enduranceHighCalories + totals.guidedHighCalories;
-            addWorkoutReportMetric(energy, "Endurance", totals.enduranceLowCalories + "–" + totals.enduranceHighCalories + " kcal");
-            addWorkoutReportMetric(energy, "Guided workouts", totals.guidedLowCalories + "–" + totals.guidedHighCalories + " kcal");
-            addWorkoutReportMetric(energy, "Combined", combinedLow + "–" + combinedHigh + " kcal");
+            enduranceEnergyKpi = addEnergySplitRow(energy, R.drawable.ic_nav_endurance, "Endurance",
+                    totals.enduranceHighCalories, mint);
+            guidedEnergyKpi = addEnergySplitRow(energy, R.drawable.ic_nav_workouts, "Guided workouts",
+                    totals.guidedHighCalories, coral);
+            combinedEnergyKpi = addEnergySplitRow(energy, R.drawable.ic_report_energy, "Combined calories",
+                    combinedHigh, Color.rgb(117, 137, 169));
             gap(energy, 7);
-            LinearLayout energyBar = new LinearLayout(this); energyBar.setBackground(surface(Color.rgb(221, 247, 239), 99, 0, Color.TRANSPARENT));
-            View measured = new View(this); measured.setBackground(surface(mint, 99, 0, Color.TRANSPARENT)); energyFill = measured;
-            float fillShare = Math.max(.08f, Math.min(.95f, combinedHigh / 3500f));
-            energyBar.addView(measured, new LinearLayout.LayoutParams(0, dp(10), fillShare));
-            energyBar.addView(new View(this), new LinearLayout.LayoutParams(0, dp(10), 1f - fillShare));
-            energy.addView(energyBar, new LinearLayout.LayoutParams(-1, dp(10)));
-            LinearLayout limits = new LinearLayout(this);
-            limits.addView(text(combinedLow + " kcal", 11, muted), new LinearLayout.LayoutParams(0, -2, 1));
-            TextView highLimit = text(combinedHigh + " kcal", 11, muted); highLimit.setGravity(Gravity.END);
-            limits.addView(highLimit, new LinearLayout.LayoutParams(0, -2, 1)); energy.addView(limits);
-            gap(energy, 7);
-            energy.addView(heading("WEIGHT-LOSS REFERENCE", 11, muted));
-            energy.addView(heading(activityOnlyWeightChangeEstimate(combinedLow, combinedHigh), 17, ink));
-            energy.addView(text("Activity-only energy equivalent for this week. This may not be accurate and does not predict actual scale change: food intake, fluids, digestion, sleep, medication, and body composition all matter.", 12, coral));
+            gap(energy, 12);
+            energy.addView(heading("WEIGHT TREND", 11, muted));
+            boolean adultBmiReference = BodyProfileStore.configured(this)
+                    && BodyInsights.usesAdultReference(BodyProfileStore.age(this));
+            float bmiLow = adultBmiReference ? BodyInsights.fromKg(
+                    BodyInsights.referenceWeightLowKg(BodyProfileStore.heightCm(this)), WeightStore.unit(this)) : 0f;
+            float bmiHigh = adultBmiReference ? BodyInsights.fromKg(
+                    BodyInsights.referenceWeightHighKg(BodyProfileStore.heightCm(this)), WeightStore.unit(this)) : 0f;
+            float bmi = adultBmiReference ? BodyInsights.bmi(BodyProfileStore.heightCm(this), WeightStore.latest(this), WeightStore.unit(this)) : 0f;
+            energy.addView(heading(adultBmiReference
+                    ? String.format(Locale.US, "BMI %.1f · adult reference %s", bmi,
+                    BodyInsights.referenceRange(BodyProfileStore.heightCm(this), WeightStore.unit(this)))
+                    : "Your logged weight", 16, ink));
+            float targetWeight = WeightStore.target(this) > 0f ? WeightStore.target(this) : WeightStore.latest(this);
+            weightTrend = new WeightTrendView(this, WeightStore.history(this), WeightStore.latest(this), targetWeight,
+                    bmiLow, bmiHigh, WeightStore.unit(this));
+            LinearLayout.LayoutParams weightTrendParams = new LinearLayout.LayoutParams(-1, dp(188));
+            weightTrendParams.topMargin = dp(7);
+            energy.addView(weightTrend, weightTrendParams);
+            energy.addView(text(adultBmiReference
+                    ? "Mint band: adult BMI-based reference for your entered height. Coral: your logged check-ins. Outline: your chosen target. Projection uses your logged trend only, never exercise calories."
+                    : "Shows your logged check-ins and chosen target. Add Body details to include an adult BMI-based reference range.", 12, muted));
         } else energy.addView(text("Add a current private weight in Body to calculate separate endurance, guided-workout, and combined energy ranges.", 13, muted));
         energy.addView(text("Broad activity estimates only; they are not a measurement or nutrition allowance.", 12, muted));
         body.addView(energy);
         runProgressKpiReveal(enduranceDistanceKpi, enduranceTimeKpi, endurancePaceKpi, guidedExercisesKpi, guidedSetsKpi, guidedActiveKpi);
-        runEnergyReportRevealWhenVisible(energy, energyBadge, energyFill);
+        runEnergyReportRevealWhenVisible(energy, energyBadge, energyFill, weightTrend,
+                enduranceEnergyKpi, guidedEnergyKpi, combinedEnergyKpi);
     }
 
-    /** 3,500 kcal per pound is a broad energy-equivalent convention, not a weight-loss promise. */
-    private String activityOnlyWeightChangeEstimate(int caloriesLow, int caloriesHigh) {
-        float lowPounds = Math.max(0f, caloriesLow) / 3500f;
-        float highPounds = Math.max(lowPounds, caloriesHigh / 3500f);
-        return String.format(Locale.US, "Possible activity-only equivalent · %.2f–%.2f lb", lowPounds, highPounds);
+    /** Slim, labelled progress rail used for a weekly amount rather than a pass/fail target. */
+    private void addWeeklyProgressBar(LinearLayout parent, String label, String value, int actual, int reference, int color) {
+        gap(parent, 10);
+        LinearLayout labels = new LinearLayout(this);
+        labels.setGravity(Gravity.CENTER_VERTICAL);
+        labels.addView(text(label, 12, muted), new LinearLayout.LayoutParams(0, -2, 1));
+        TextView amount = heading(value, 12, ink); amount.setGravity(Gravity.END);
+        labels.addView(amount, new LinearLayout.LayoutParams(0, -2, 1));
+        parent.addView(labels);
+        ProgressBar bar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+        bar.setIndeterminate(false);
+        bar.setMax(Math.max(1, reference));
+        bar.setProgress(Math.max(0, Math.min(reference, actual)));
+        bar.setProgressTintList(ColorStateList.valueOf(color));
+        bar.setProgressBackgroundTintList(ColorStateList.valueOf(Color.rgb(220, 229, 238)));
+        bar.setContentDescription(label + ", " + value);
+        LinearLayout.LayoutParams barParams = new LinearLayout.LayoutParams(-1, dp(8));
+        barParams.topMargin = dp(5);
+        parent.addView(bar, barParams);
+    }
+
+    /**
+     * A personal measurement trend: baseline and current check-ins are solid; the selected
+     * target is intentionally separate. It never derives body weight from exercise calories.
+     */
+    private final class WeightTrendView extends View {
+        private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final List<WeightStore.Point> points;
+        private final float current;
+        private final float target;
+        private final float bmiLow;
+        private final float bmiHigh;
+        private final String unit;
+        private float reveal = 1f;
+
+        WeightTrendView(Context context, List<WeightStore.Point> points, float current, float target,
+                        float bmiLow, float bmiHigh, String unit) {
+            super(context);
+            this.points = points == null ? new ArrayList<>() : new ArrayList<>(points);
+            this.current = Math.max(0f, current);
+            this.target = Math.max(0f, target);
+            this.bmiLow = Math.max(0f, bmiLow);
+            this.bmiHigh = Math.max(this.bmiLow, bmiHigh);
+            this.unit = unit == null ? "kg" : unit;
+            if (this.points.isEmpty() || Math.abs(this.points.get(this.points.size() - 1).weight - this.current) >= .01f) {
+                this.points.add(new WeightStore.Point(System.currentTimeMillis(), this.current));
+            }
+            float baseline = this.points.isEmpty() ? this.current : this.points.get(0).weight;
+            setContentDescription(String.format(Locale.US,
+                    "Weight trend. Baseline %.1f %s, current %.1f %s, personal target %.1f %s.",
+                    baseline, this.unit, this.current, this.unit, this.target, this.unit));
+        }
+
+        void setReveal(float fraction) { reveal = Math.max(0f, Math.min(1f, fraction)); invalidate(); }
+
+        @Override protected void onDraw(Canvas canvas) {
+            super.onDraw(canvas);
+            float left = dp(19), right = getWidth() - dp(16), top = dp(21), bottom = getHeight() - dp(42);
+            float baseline = points.isEmpty() ? current : points.get(0).weight;
+            float min = Math.min(baseline, Math.min(current, target));
+            float max = Math.max(baseline, Math.max(current, target));
+            if (bmiLow > 0f && bmiHigh > 0f) { min = Math.min(min, bmiLow); max = Math.max(max, bmiHigh); }
+            float projection = trendProjection();
+            if (projection > 0f) { min = Math.min(min, projection); max = Math.max(max, projection); }
+            float pad = Math.max(1f, (max - min) * .28f);
+            min -= pad; max += pad;
+            if (max - min < 2f) { min -= 1f; max += 1f; }
+            float currentX = left + (right - left) * .56f, targetX = left + (right - left) * .78f, projectedX = right;
+            float currentY = weightY(current, min, max, top, bottom);
+            float targetY = weightY(target, min, max, top, bottom);
+
+            paint.setStyle(Paint.Style.STROKE); paint.setStrokeWidth(dp(1)); paint.setStrokeCap(Paint.Cap.BUTT);
+            paint.setColor(Color.rgb(224, 231, 239));
+            for (int i = 0; i < 3; i++) {
+                float y = top + (bottom - top) * i / 2f;
+                canvas.drawLine(left, y, right, y, paint);
+            }
+            if (bmiLow > 0f && bmiHigh > 0f) {
+                float referenceTop = weightY(bmiHigh, min, max, top, bottom);
+                float referenceBottom = weightY(bmiLow, min, max, top, bottom);
+                paint.setStyle(Paint.Style.FILL); paint.setColor(Color.rgb(218, 247, 239));
+                canvas.drawRect(left, referenceTop, right, referenceBottom, paint);
+                paint.setTypeface(Typeface.create("sans-serif", Typeface.BOLD)); paint.setTextSize(dp(10)); paint.setColor(Color.rgb(18, 117, 98));
+                paint.setTextAlign(Paint.Align.RIGHT); canvas.drawText("BMI reference", right - dp(4), referenceTop + dp(13), paint);
+            }
+
+            float baselineY = weightY(baseline, min, max, top, bottom);
+            float currentDrawX = left + (currentX - left) * Math.min(1f, reveal * 1.55f);
+            float currentDrawY = baselineY + (currentY - baselineY) * Math.min(1f, reveal * 1.55f);
+            paint.setStyle(Paint.Style.STROKE); paint.setStrokeWidth(dp(4)); paint.setStrokeCap(Paint.Cap.ROUND); paint.setColor(coral);
+            // The solid path is the actual logged movement from baseline to the current check-in.
+            canvas.drawLine(left, baselineY, currentDrawX, currentDrawY, paint);
+            if (points.size() > 2) {
+                float previousX = left, previousY = baselineY;
+                for (int index = 1; index < points.size(); index++) {
+                    float fraction = index / (float) (points.size() - 1);
+                    float pointX = left + (currentX - left) * fraction;
+                    float pointY = weightY(points.get(index).weight, min, max, top, bottom);
+                    canvas.drawLine(previousX, previousY, pointX, pointY, paint);
+                    previousX = pointX; previousY = pointY;
+                }
+            }
+            if (reveal > .5f) {
+                float targetFraction = (reveal - .5f) * 2f;
+                float targetDrawX = currentX + (targetX - currentX) * targetFraction;
+                float targetDrawY = currentY + (targetY - currentY) * targetFraction;
+                paint.setStrokeWidth(dp(2)); paint.setColor(Color.rgb(101, 124, 158));
+                canvas.drawLine(currentX, currentY, targetDrawX, targetDrawY, paint);
+            }
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(coral);
+            canvas.drawCircle(left, baselineY, dp(6), paint);
+            canvas.drawCircle(currentDrawX, currentDrawY, dp(7), paint);
+            if (points.size() > 2) for (int index = 1; index < points.size() - 1; index++) {
+                float fraction = index / (float) (points.size() - 1);
+                canvas.drawCircle(left + (currentX - left) * fraction,
+                        weightY(points.get(index).weight, min, max, top, bottom), dp(4), paint);
+            }
+            if (reveal > .5f) {
+                paint.setStyle(Paint.Style.STROKE); paint.setStrokeWidth(dp(3)); paint.setColor(navy);
+                canvas.drawCircle(targetX, targetY, dp(7), paint);
+                paint.setStyle(Paint.Style.FILL);
+            }
+            if (projection > 0f && reveal > .70f) {
+                float projectedY = weightY(projection, min, max, top, bottom);
+                paint.setStyle(Paint.Style.STROKE); paint.setStrokeWidth(dp(2)); paint.setColor(mint);
+                canvas.drawLine(currentX, currentY, projectedX, projectedY, paint);
+                paint.setStyle(Paint.Style.FILL); canvas.drawCircle(projectedX, projectedY, dp(6), paint);
+            }
+            paint.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
+            paint.setTextSize(dp(10)); paint.setColor(ink); paint.setTextAlign(Paint.Align.LEFT);
+            canvas.drawText(String.format(Locale.US, "%.1f %s", baseline, unit), left, Math.max(dp(12), baselineY - dp(10)), paint);
+            paint.setTextAlign(Paint.Align.CENTER); paint.setColor(coral);
+            canvas.drawText(String.format(Locale.US, "%.1f %s", current, unit), currentX, Math.max(dp(12), currentY - dp(11)), paint);
+            paint.setTextAlign(Paint.Align.RIGHT); paint.setColor(navy);
+            canvas.drawText(String.format(Locale.US, "%.1f %s", target, unit), targetX, Math.max(dp(12), targetY - dp(10)), paint);
+            if (projection > 0f && reveal > .70f) {
+                paint.setTextAlign(Paint.Align.RIGHT); paint.setColor(Color.rgb(18, 117, 98));
+                canvas.drawText(String.format(Locale.US, "%.1f %s", projection, unit), projectedX, Math.max(dp(12), weightY(projection, min, max, top, bottom) - dp(10)), paint);
+            }
+            if (bmiLow > 0f && bmiHigh > 0f) {
+                paint.setTypeface(Typeface.create("sans-serif", Typeface.BOLD)); paint.setTextSize(dp(9)); paint.setColor(Color.rgb(18, 117, 98));
+                paint.setTextAlign(Paint.Align.LEFT); canvas.drawText(String.format(Locale.US, "%.1f %s", bmiHigh, unit), left + dp(5), weightY(bmiHigh, min, max, top, bottom) + dp(12), paint);
+                paint.setTextAlign(Paint.Align.LEFT); canvas.drawText(String.format(Locale.US, "%.1f %s", bmiLow, unit), left + dp(5), weightY(bmiLow, min, max, top, bottom) - dp(4), paint);
+            }
+            paint.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL)); paint.setTextSize(dp(10)); paint.setColor(muted);
+            paint.setTextAlign(Paint.Align.LEFT); canvas.drawText("Baseline", left, getHeight() - dp(12), paint);
+            paint.setTextAlign(Paint.Align.CENTER); canvas.drawText("Current", currentX, getHeight() - dp(12), paint);
+            paint.setTextAlign(Paint.Align.CENTER); canvas.drawText("Target", targetX, getHeight() - dp(12), paint);
+            if (projection > 0f) { paint.setTextAlign(Paint.Align.RIGHT); canvas.drawText("7-day trend", projectedX, getHeight() - dp(12), paint); }
+        }
+
+        /** A transparent, check-in-only continuation. It is omitted until two dated entries exist. */
+        private float trendProjection() {
+            if (points.size() < 2) return -1f;
+            WeightStore.Point first = points.get(0), last = points.get(points.size() - 1);
+            long span = last.recordedAt - first.recordedAt;
+            if (span < 86_400_000L) return -1f;
+            return current + (current - first.weight) * (7f * 86_400_000L / (float) span);
+        }
+
+        private float weightY(float value, float min, float max, float top, float bottom) {
+            return bottom - ((value - min) / Math.max(.001f, max - min)) * (bottom - top);
+        }
     }
 
     private void addWeeklyBreakdownRow(LinearLayout parent, String title, long activeMillis, long totalMillis, String activeLabel, String recoveryLabel) {
@@ -6523,6 +6724,11 @@ public final class MainActivity extends FragmentActivity {
 
         gap(body, 12);
         addEnduranceEnergyCard(body, entry, sessionMinutes);
+        gap(body, 10);
+        Button refuel = primary("Open my endurance refuel guide");
+        refuel.setOnClickListener(view -> showRecoveryFuelGuide(true, sessionMinutes, "Endurance",
+                () -> showEnduranceSessionDetails(entry)));
+        addButton(body, refuel);
         runWorkoutReportReveal(distanceKpi, durationKpi, paceKpi, chart, movementPercent, pausePercent, 100);
 
         if (!entry.points.isEmpty()) {
@@ -6873,6 +7079,53 @@ public final class MainActivity extends FragmentActivity {
         return badge;
     }
 
+    /** One approved Energy Split row: icon + label + amount, rail, then percentage at the lower right. */
+    private EnergySplitItem addEnergySplitRow(LinearLayout parent, int iconResource, String label, int calories, int accent) {
+        gap(parent, 11);
+        LinearLayout line = new LinearLayout(this);
+        line.setGravity(Gravity.CENTER_VERTICAL);
+        FrameLayout badge = new FrameLayout(this);
+        int pale = accent == coral ? Color.rgb(255, 232, 226)
+                : accent == mint ? Color.rgb(220, 249, 241) : Color.rgb(229, 235, 244);
+        badge.setBackground(surface(pale, 99, 1, Color.rgb(204, 218, 233)));
+        badge.setElevation(dp(3));
+        ImageView icon = new ImageView(this);
+        icon.setImageResource(iconResource);
+        icon.setImageTintList(ColorStateList.valueOf(navy));
+        icon.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        icon.setPadding(dp(9), dp(9), dp(9), dp(9));
+        badge.addView(icon, new FrameLayout.LayoutParams(-1, -1));
+        line.addView(badge, new LinearLayout.LayoutParams(dp(36), dp(36)));
+        TextView name = heading(label, 13, ink);
+        LinearLayout.LayoutParams nameParams = new LinearLayout.LayoutParams(0, -2, 1);
+        nameParams.leftMargin = dp(9); line.addView(name, nameParams);
+        TextView amount = heading(String.format(Locale.US, "%d kcal", calories), 13, ink);
+        amount.setGravity(Gravity.END); line.addView(amount, new LinearLayout.LayoutParams(-2, -2));
+        parent.addView(line);
+
+        ProgressBar progress = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+        progress.setIndeterminate(false); progress.setMax(3500); progress.setProgress(0);
+        progress.setProgressTintList(ColorStateList.valueOf(accent));
+        progress.setProgressBackgroundTintList(ColorStateList.valueOf(Color.rgb(220, 229, 238)));
+        progress.setContentDescription(label + ", " + calories + " calories");
+        LinearLayout.LayoutParams railParams = new LinearLayout.LayoutParams(-1, dp(8));
+        railParams.topMargin = dp(5); parent.addView(progress, railParams);
+        int percent = Math.max(0, Math.round(100f * calories / 3500f));
+        TextView percentText = text(percent + "%", 11, muted); percentText.setGravity(Gravity.END);
+        LinearLayout.LayoutParams percentParams = new LinearLayout.LayoutParams(-1, -2);
+        percentParams.topMargin = dp(3); parent.addView(percentText, percentParams);
+        return new EnergySplitItem(badge, progress, Math.min(3500, Math.max(0, calories)));
+    }
+
+    private static final class EnergySplitItem {
+        final View badge;
+        final ProgressBar rail;
+        final int finalProgress;
+        EnergySplitItem(View badge, ProgressBar rail, int finalProgress) {
+            this.badge = badge; this.rail = rail; this.finalProgress = finalProgress;
+        }
+    }
+
     private void addReportKpiDivider(LinearLayout row) {
         View divider = new View(this);
         divider.setBackgroundColor(cardLine);
@@ -6938,12 +7191,20 @@ public final class MainActivity extends FragmentActivity {
     }
 
     /** The energy reveal belongs to its tile, so it waits until that tile enters the viewport. */
+    /** Compatibility entry point for the individual workout/endurance report energy tiles. */
     private void runEnergyReportRevealWhenVisible(View energyCard, View energyIcon, View energyFill) {
+        runEnergyReportRevealWhenVisible(energyCard, energyIcon, energyFill, null);
+    }
+
+    private void runEnergyReportRevealWhenVisible(View energyCard, View energyIcon, View energyFill,
+                                                   WeightTrendView weightTrend, EnergySplitItem... energyKpis) {
         if (reducedMotion) {
             energyIcon.setAlpha(1f);
             energyIcon.setScaleX(1f);
             energyIcon.setScaleY(1f);
             if (energyFill != null) energyFill.setScaleX(1f);
+            if (weightTrend != null) weightTrend.setReveal(1f);
+            for (EnergySplitItem item : energyKpis) if (item != null) item.rail.setProgress(item.finalProgress);
             return;
         }
         energyIcon.setAlpha(0f);
@@ -6952,6 +7213,11 @@ public final class MainActivity extends FragmentActivity {
         if (energyFill != null) {
             energyFill.setPivotX(0f);
             energyFill.setScaleX(0f);
+        }
+        if (weightTrend != null) weightTrend.setReveal(0f);
+        for (EnergySplitItem item : energyKpis) {
+            if (item == null) continue;
+            item.badge.setAlpha(0f); item.badge.setScaleX(.55f); item.badge.setScaleY(.55f);
         }
         energyCard.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener() {
             private boolean played;
@@ -6971,6 +7237,25 @@ public final class MainActivity extends FragmentActivity {
                 if (energyFill != null) {
                     energyFill.animate().cancel();
                     energyFill.animate().scaleX(1f).setStartDelay(180L).setDuration(920L).start();
+                }
+                for (int index = 0; index < energyKpis.length; index++) {
+                    EnergySplitItem item = energyKpis[index];
+                    if (item == null) continue;
+                    item.badge.animate().cancel();
+                    item.badge.animate().alpha(1f).scaleX(1f).scaleY(1f).setStartDelay(90L + (index * 100L))
+                            .setDuration(360L).setInterpolator(new OvershootInterpolator(1.35f)).start();
+                    ValueAnimator fillRail = ValueAnimator.ofInt(0, item.finalProgress);
+                    fillRail.setStartDelay(210L + (index * 120L)); fillRail.setDuration(760L);
+                    fillRail.addUpdateListener(animation -> item.rail.setProgress((Integer) animation.getAnimatedValue()));
+                    fillRail.start();
+                }
+                if (weightTrend != null) {
+                    WeightTrendView trend = weightTrend;
+                    ValueAnimator drawTrend = ValueAnimator.ofFloat(0f, 1f);
+                    drawTrend.setStartDelay(410L);
+                    drawTrend.setDuration(920L);
+                    drawTrend.addUpdateListener(animation -> trend.setReveal((Float) animation.getAnimatedValue()));
+                    drawTrend.start();
                 }
                 return true;
             }
@@ -6999,7 +7284,8 @@ public final class MainActivity extends FragmentActivity {
 
         @Override protected void onDraw(Canvas canvas) {
             super.onDraw(canvas);
-            float stroke = dp(16);
+            // Progress has several rings on one dashboard; a slimmer stroke keeps the report airy.
+            float stroke = dp(10);
             RectF arc = new RectF(stroke, stroke, getWidth() - stroke, getHeight() - stroke);
             paint.setStyle(Paint.Style.STROKE);
             paint.setStrokeWidth(stroke);
@@ -12324,7 +12610,11 @@ public final class MainActivity extends FragmentActivity {
         LinearLayout recovery = card();
         recovery.addView(heading("RECOVER WELL", 11, mint));
         recovery.addView(heading(recoveryFuelRecommendation(), 18, ink));
-        recovery.addView(text("A simple post-workout choice based on the session you just completed. Adjust it to your dietary needs and preferences.", 13, muted));
+        recovery.addView(text("Open a food-first refuel guide with meal, drink, and protein choices matched to this guided session. Adjust it for allergies, preferences, culture, and medical needs.", 13, muted));
+        gap(recovery, 9);
+        Button refuel = action("Open my refuel guide", coral, Color.WHITE);
+        refuel.setOnClickListener(view -> showRecoveryFuelGuide(false, Math.max(1, sessionMinutes), target, this::showComplete));
+        recovery.addView(refuel, new LinearLayout.LayoutParams(-1, dp(48)));
         body.addView(recovery);
         gap(body, 10);
         LinearLayout nextCoach = card();
@@ -12338,7 +12628,7 @@ public final class MainActivity extends FragmentActivity {
         coachDecide.setOnClickListener(view -> { pendingCoachRecommendation = recommendation; showScheduler(); });
         addButton(body, coachDecide);
         gap(body, 8);
-        Button fuel = primary("Log recovery fuel");
+        Button fuel = primary("Open nutrition check-in");
         fuel.setOnClickListener(view -> showMeals());
         addButton(body, fuel);
         gap(body, 8);
@@ -12358,6 +12648,66 @@ public final class MainActivity extends FragmentActivity {
         if (focus.contains("lower") || focus.contains("leg")) return "Water, electrolytes, and a carb + protein meal";
         if (focus.contains("endurance")) return "Water, electrolytes, and a balanced recovery meal";
         return "Water and a protein-forward meal or snack";
+    }
+
+    /**
+     * Completion-only recovery guidance. It remains food-first: protein powders and sports drinks
+     * are optional conveniences, not requirements. Endurance copy adds fluid/electrolyte context
+     * only when the session was long enough that sweat loss is more likely to matter.
+     */
+    private void showRecoveryFuelGuide(boolean endurance, int durationMinutes, String focus, Runnable backAction) {
+        LinearLayout body = appPage("Nutrition");
+        String sessionName = endurance ? "endurance" : "guided strength";
+        title(body, "RECOVERY REFUEL", endurance ? "Refuel your " + sessionName : "Refuel after strength",
+                "Food-first ideas for the " + Math.max(1, durationMinutes) + " minute session you completed. They support recovery; they are not medical or weight-loss advice.");
+
+        LinearLayout priority = card();
+        priority.addView(heading("RECOVERY PRIORITIES", 11, muted));
+        priority.addView(heading(endurance ? "Fluid + carbohydrate + protein" : "Protein + carbohydrate + fluid", 20, ink));
+        priority.addView(text(endurance
+                ? "After a longer or very sweaty walk, run, or ride, begin with fluid. A carbohydrate-containing meal helps replenish fuel; include a protein food alongside it. Electrolyte drinks are useful when sweat losses are substantial, not mandatory after every session."
+                : "Choose a meal or snack with a protein food plus a carbohydrate you enjoy, then rehydrate normally. Whole foods are the default; a protein drink is simply a convenient alternative when a meal is not practical.", 14, muted));
+        body.addView(priority);
+        gap(body, 12);
+
+        NutritionRecommendation.Day day = todayNutritionDay();
+        NutritionRecommendation.Meal meal = day.lunch;
+        LinearLayout mealCard = card();
+        mealCard.addView(heading("MOST SUITABLE MEAL TODAY", 11, mint));
+        mealCard.addView(heading(meal.title, 21, ink));
+        mealCard.addView(text(meal.detail, 14, muted));
+        mealCard.addView(text(String.format(Locale.US, "%d kcal  •  Protein %.1f g  •  Carbs %.1f g", meal.kcal(), meal.protein(), meal.carbs()), 13, Color.rgb(28, 112, 96)));
+        gap(mealCard, 9);
+        Button facts = lightAction("View meal nutrition facts");
+        facts.setOnClickListener(view -> showMealNutritionFacts("Recovery meal", meal));
+        mealCard.addView(facts, new LinearLayout.LayoutParams(-1, dp(46)));
+        body.addView(mealCard);
+        gap(body, 12);
+
+        LinearLayout drink = card();
+        drink.addView(heading("DRINK", 11, muted));
+        drink.addView(heading(endurance && durationMinutes >= 60 ? "Water + electrolytes if sweat was heavy" : "Water with your meal", 18, ink));
+        drink.addView(text(endurance && durationMinutes >= 60
+                ? "A carbohydrate-electrolyte drink can be a practical option after a long, hot, or high-sweat session. For shorter/easier sessions, water and a regular meal are usually enough."
+                : "Drink to thirst and have fluid with your meal. Use an electrolyte drink only when your individual conditions—heat, duration, or heavy sweating—make it useful.", 13, muted));
+        body.addView(drink);
+        gap(body, 12);
+
+        LinearLayout protein = card();
+        protein.addView(heading("PROTEIN OPTION", 11, muted));
+        protein.addView(heading("Choose a familiar protein food", 18, ink));
+        protein.addView(text("Examples: Greek yogurt or milk, eggs, fish, chicken, tofu, beans, or lentils. A protein shake can help when a meal is delayed, but it does not replace a balanced eating pattern.", 13, muted));
+        body.addView(protein);
+        gap(body, 12);
+        body.addView(text("This guidance is informed by sports-nutrition recovery principles: prioritize fluid, carbohydrate, and protein after demanding training, and keep food-first choices central. For a condition, medication, pregnancy, kidney disease, or a personalised sport plan, consult a qualified dietitian or clinician.", 12, muted));
+        gap(body, 12);
+        Button nutrition = primary("Open today’s nutrition");
+        nutrition.setOnClickListener(view -> showMeals());
+        addButton(body, nutrition);
+        gap(body, 8);
+        Button back = secondary("Back to completion");
+        back.setOnClickListener(view -> backAction.run());
+        addButton(body, back);
     }
 
     private String coachNextWorkoutRecommendation() {

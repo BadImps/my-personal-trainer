@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 102,
-  "versionName": "5.60",
-  "publishedAt": "2026-10-23T20:25:00Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.60/app-release.apk",
-  "sha256": "df11eb6966ec958ee9e47f7cfab927b1fdb1553def6f3fc995789101c1cd10ba",
-  "sizeBytes": 257050947,
-  "notes": "Coach Hero workout flow refinement: unified duration and plan-ready screens, plus protected in-session exercise settings for weight, sets, reps, set rest, and cooldown."
+  "versionCode": 103,
+  "versionName": "5.61",
+  "publishedAt": "2026-10-23T21:11:00Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.61/app-release.apk",
+  "sha256": "ecf5a83637f65cdc4515b12b5f245986cc7963c954c50d1146e7ec26363f5413",
+  "sizeBytes": 257067327,
+  "notes": "Weekly Energy Split now shows clear Endurance, Guided Workouts, and Combined progress rails. Progress adds a BMI-reference weight chart with logged check-ins, personal target, and a check-in-only trend projection."
 }
