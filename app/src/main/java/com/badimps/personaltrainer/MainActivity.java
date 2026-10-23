@@ -156,6 +156,9 @@ public final class MainActivity extends FragmentActivity {
     private boolean guidedFinishCooldownEnabled;
     /** Prevents the completion report from offering the same end cooldown twice. */
     private boolean guidedFinishCooldownShown;
+    private static final String GUIDED_RECOVERY_PREFS = "guided_recovery_choice";
+    private static final String GUIDED_COOLDOWN_REQUESTED = "finish_cooldown_requested";
+    private static final String GUIDED_COOLDOWN_SHOWN = "finish_cooldown_shown";
     /** Coach recommendation is deliberately staged in Scheduler until the member applies it. */
     private String pendingCoachRecommendation;
     private final Handler workoutHandler = new Handler(Looper.getMainLooper());
@@ -8382,6 +8385,8 @@ public final class MainActivity extends FragmentActivity {
         guidedSessionRecorded = false;
         guidedWorkoutAborted = false;
         guidedFinishCooldownShown = false;
+        getSharedPreferences(GUIDED_RECOVERY_PREFS, MODE_PRIVATE).edit()
+                .remove(GUIDED_COOLDOWN_REQUESTED).remove(GUIDED_COOLDOWN_SHOWN).apply();
         activeWorkoutExerciseIndex = 0;
         activeWorkoutSet = 1;
         activeWorkoutPhase = "countdown";
@@ -8420,6 +8425,9 @@ public final class MainActivity extends FragmentActivity {
         choice.setOnClickListener(view -> {
             guidedWarmupEnabled = warmup;
             guidedFinishCooldownEnabled = cooldown;
+            getSharedPreferences(GUIDED_RECOVERY_PREFS, MODE_PRIVATE).edit()
+                    .putBoolean(GUIDED_COOLDOWN_REQUESTED, cooldown)
+                    .putBoolean(GUIDED_COOLDOWN_SHOWN, false).apply();
             dialog.dismiss();
             if (warmup) showWarmupCountdown(); else showSetCountIn(0, 1, true);
         });
@@ -9408,13 +9416,17 @@ public final class MainActivity extends FragmentActivity {
     }
 
     private void finishGuidedWorkout() {
-        if (guidedFinishCooldownEnabled) showGuidedFinishCooldown(); else showComplete();
+        boolean requested = guidedFinishCooldownEnabled || getSharedPreferences(GUIDED_RECOVERY_PREFS, MODE_PRIVATE)
+                .getBoolean(GUIDED_COOLDOWN_REQUESTED, false);
+        if (requested) showGuidedFinishCooldown(); else showComplete();
     }
 
     /** Optional five-minute end cooldown with still, target-aware Strength Level stretch cards. */
     private void showGuidedFinishCooldown() {
         if (guidedWorkoutAborted) return;
         guidedFinishCooldownShown = true;
+        getSharedPreferences(GUIDED_RECOVERY_PREFS, MODE_PRIVATE).edit()
+                .putBoolean(GUIDED_COOLDOWN_SHOWN, true).apply();
         activeWorkoutPhase = "finish_cooldown";
         activeWorkoutPaused = false;
         if (!guidedSessionRecorded) syncWorkoutService();
@@ -11884,7 +11896,9 @@ public final class MainActivity extends FragmentActivity {
         linked.addView(text("This week  •  " + snapshot.fuelDaysThisWeek + " nutrition check-in days", 14, muted));
         body.addView(linked);
         gap(body, 12);
-        if (!guidedFinishCooldownShown) {
+        boolean cooldownAlreadyShown = guidedFinishCooldownShown || getSharedPreferences(GUIDED_RECOVERY_PREFS, MODE_PRIVATE)
+                .getBoolean(GUIDED_COOLDOWN_SHOWN, false);
+        if (!cooldownAlreadyShown) {
             LinearLayout cooldown = card();
             cooldown.addView(heading("OPTIONAL FIVE-MINUTE COOL-DOWN", 11, mint));
             cooldown.addView(heading("Stretch and reset", 19, ink));
