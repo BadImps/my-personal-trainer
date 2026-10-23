@@ -2998,7 +2998,8 @@ public final class MainActivity extends FragmentActivity {
         if (date == null) return cell;
         boolean planned = isMonthWorkoutDay(date);
         List<SchedulerStore.Appointment> appointments = SchedulerStore.onDate(this, date);
-        boolean endurance = !appointments.isEmpty();
+        JourneyStore.WorkoutRecord completedEndurance = completedEnduranceOn(date);
+        boolean endurance = !appointments.isEmpty() || completedEndurance != null;
         int fill = endurance && !planned ? coral : planned ? mint : Color.rgb(238, 242, 247);
         boolean today = SchedulerStore.dateKey(date).equals(SchedulerStore.dateKey(Calendar.getInstance()));
         cell.setPadding(dp(2), dp(3), dp(2), dp(2));
@@ -3013,7 +3014,9 @@ public final class MainActivity extends FragmentActivity {
             cell.addView(plan, new LinearLayout.LayoutParams(-1, endurance ? dp(16) : dp(28)));
         }
         if (endurance) {
-            TextView activity = text(enduranceDayLabel(appointments), 8, navy);
+            String enduranceLabel = completedEndurance == null ? enduranceDayLabel(appointments)
+                    : completedEndurance.target.replace("Endurance · ", "").toUpperCase(Locale.ROOT);
+            TextView activity = text(enduranceLabel, 8, navy);
             activity.setGravity(Gravity.CENTER);
             activity.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
             activity.setBackground(surface(coral, 5, 0, Color.TRANSPARENT));
@@ -3070,7 +3073,8 @@ public final class MainActivity extends FragmentActivity {
     private View homeScheduleDayTile(Calendar date, int dayIndex, boolean workoutDay, boolean confirmed,
                                                WeeklyScheduleStore.Schedule schedule, boolean today) {
         List<SchedulerStore.Appointment> appointments = SchedulerStore.onDate(this, date);
-        boolean endurance = !appointments.isEmpty();
+        JourneyStore.WorkoutRecord completedEndurance = completedEnduranceOn(date);
+        boolean endurance = !appointments.isEmpty() || completedEndurance != null;
         int base = workoutDay || endurance ? Color.rgb(224, 249, 242) : Color.rgb(232, 236, 244);
         LinearLayout tile = new LinearLayout(this);
         tile.setOrientation(LinearLayout.VERTICAL);
@@ -3093,7 +3097,9 @@ public final class MainActivity extends FragmentActivity {
             tile.addView(rest, new LinearLayout.LayoutParams(-1, dp(24)));
         }
         if (endurance) {
-            TextView activity = text(enduranceDayLabel(appointments), 8, navy);
+            String enduranceLabel = completedEndurance == null ? enduranceDayLabel(appointments)
+                    : completedEndurance.target.replace("Endurance · ", "").toUpperCase(Locale.ROOT);
+            TextView activity = text(enduranceLabel, 8, navy);
             activity.setGravity(Gravity.CENTER);
             activity.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
             LinearLayout.LayoutParams activityParams = new LinearLayout.LayoutParams(-1, workoutDay ? dp(12) : dp(24));
@@ -3114,7 +3120,7 @@ public final class MainActivity extends FragmentActivity {
             tile.addView(icons, new LinearLayout.LayoutParams(-1, 0, 1));
         }
         String state = workoutDay ? homeFocusForDay(dayIndex, schedule) + " workout" : confirmed ? "Rest Day" : "Open";
-        if (endurance) state += ", " + enduranceDayLabel(appointments);
+        if (endurance) state += ", " + (completedEndurance == null ? enduranceDayLabel(appointments) : "completed " + completedEndurance.target.replace("Endurance · ", ""));
         tile.setContentDescription(weekDays[dayIndex] + " " + homeWeekDate(date, 0) + ", " + state);
         if (!JourneyStore.hasCompletedWorkoutOnDate(this, date)) return tile;
         FrameLayout completedDay = new FrameLayout(this);
@@ -3123,13 +3129,25 @@ public final class MainActivity extends FragmentActivity {
         ribbon.setGravity(Gravity.CENTER);
         ribbon.setLetterSpacing(.08f);
         ribbon.setBackground(surface(coral, 5, 1, Color.rgb(255, 159, 146)));
-        ribbon.setContentDescription("Workout completed");
+        ribbon.setContentDescription(completedEndurance != null ? "Endurance completed" : "Workout completed");
         FrameLayout.LayoutParams ribbonParams = new FrameLayout.LayoutParams(dp(38), dp(17), Gravity.TOP | Gravity.RIGHT);
         ribbonParams.topMargin = dp(2);
         ribbonParams.rightMargin = dp(2);
         completedDay.addView(ribbon, ribbonParams);
         completedDay.setContentDescription(tile.getContentDescription() + ", completed");
         return completedDay;
+    }
+
+    /** Finds a completed endurance entry for one calendar day, including unscheduled live sessions. */
+    private JourneyStore.WorkoutRecord completedEnduranceOn(Calendar date) {
+        if (date == null) return null;
+        Calendar start = (Calendar) date.clone(); start.set(Calendar.HOUR_OF_DAY, 0); start.set(Calendar.MINUTE, 0); start.set(Calendar.SECOND, 0); start.set(Calendar.MILLISECOND, 0);
+        Calendar end = (Calendar) start.clone(); end.add(Calendar.DAY_OF_YEAR, 1);
+        for (JourneyStore.WorkoutRecord record : JourneyStore.workouts(this)) {
+            if (record.timestamp >= start.getTimeInMillis() && record.timestamp < end.getTimeInMillis()
+                    && record.target != null && record.target.startsWith("Endurance · ")) return record;
+        }
+        return null;
     }
 
     /** Past local calendar dates are historical records and cannot be edited or rescheduled. */
@@ -6159,42 +6177,125 @@ public final class MainActivity extends FragmentActivity {
         Button back = secondary("Back to Progress"); back.setOnClickListener(view -> showProgress()); addButton(body, back);
     }
 
-    /** Full local record for a finished walk, run, or ride; no third-party map or account is involved. */
+    /** Executive-style local report for a finished walk, run, or ride. */
     private void showEnduranceSessionDetails(EnduranceHistoryStore.Entry entry) {
         LinearLayout body = appPage("Progress");
-        title(body, "COMPLETED ENDURANCE", entry.mode + " route", "A private, on-device record of this completed session.");
+        String completed = new SimpleDateFormat("EEEE, MMMM d · h:mm a", Locale.getDefault()).format(entry.timestamp);
+        String pace = entry.distanceMeters < 10f ? "—" : String.format(Locale.US, "%.1f min/km", (entry.activeMillis / 60000d) / (entry.distanceMeters / 1000d));
+        int sessionMinutes = Math.max(1, Math.round(entry.activeMillis / 60_000f));
+        title(body, "ENDURANCE REPORT", entry.mode + " complete", completed + "  •  " + formatLiveDuration(entry.activeMillis) + " total endurance");
+
         LinearLayout overview = card();
-        overview.addView(heading(enduranceSummary(entry), 22, ink));
-        overview.addView(text(new SimpleDateFormat("EEEE, MMMM d · h:mm a", Locale.getDefault()).format(entry.timestamp), 14, muted));
-        overview.addView(text(entry.points.isEmpty() ? "No route points were captured for this session." : entry.points.size() + " route points saved locally", 13, muted));
-        body.addView(overview);
+        overview.addView(heading("TOTAL ENDURANCE", 11, muted));
+        overview.addView(heading(formatLiveDuration(entry.activeMillis), 34, ink));
+        overview.addView(text(enduranceSummary(entry), 14, muted));
+        gap(overview, 12);
+        View rule = new View(this); rule.setBackgroundColor(cardLine); overview.addView(rule, new LinearLayout.LayoutParams(-1, dp(1)));
+        gap(overview, 10);
+        LinearLayout kpis = new LinearLayout(this); kpis.setGravity(Gravity.CENTER_VERTICAL);
+        View distanceKpi = addReportKpi(kpis, R.drawable.ic_nav_endurance, formatLiveDistance(entry.distanceMeters), "Distance");
+        addReportKpiDivider(kpis);
+        View durationKpi = addReportKpi(kpis, R.drawable.ic_report_stopwatch, formatLiveDuration(entry.activeMillis), "Time");
+        addReportKpiDivider(kpis);
+        View paceKpi = addReportKpi(kpis, R.drawable.ic_report_exercises, pace, "Pace");
+        overview.addView(kpis); body.addView(overview);
+
         gap(body, 12);
+        LinearLayout breakdown = card();
+        breakdown.addView(heading("TIME BREAKDOWN", 11, muted));
+        gap(breakdown, 8);
+        LinearLayout breakdownContent = new LinearLayout(this); breakdownContent.setGravity(Gravity.CENTER_VERTICAL);
+        WorkoutBreakdownView chart = new WorkoutBreakdownView(this, 100, sessionMinutes);
+        breakdownContent.addView(chart, new LinearLayout.LayoutParams(dp(126), dp(126)));
+        LinearLayout breakdownCopy = new LinearLayout(this); breakdownCopy.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams copyParams = new LinearLayout.LayoutParams(0, -2, 1); copyParams.leftMargin = dp(14); breakdownContent.addView(breakdownCopy, copyParams);
+        TextView movementPercent = addBreakdownMetric(breakdownCopy, mint, reducedMotion ? "100%" : "0%", "Moving time", formatLiveDuration(entry.activeMillis));
+        TextView pausePercent = addBreakdownMetric(breakdownCopy, Color.rgb(101, 124, 158), reducedMotion ? "0%" : "100%", "Paused / gaps", "0:00");
+        gap(breakdownCopy, 6);
+        addWorkoutReportMetric(breakdownCopy, "Recorded route points", String.valueOf(entry.points.size()));
+        addWorkoutReportMetric(breakdownCopy, "Average pace", pace);
+        breakdown.addView(breakdownContent); body.addView(breakdown);
+
+        gap(body, 12);
+        addEnduranceEnergyCard(body, entry, sessionMinutes);
+        runWorkoutReportReveal(distanceKpi, durationKpi, paceKpi, chart, movementPercent, pausePercent, 100);
+
         if (!entry.points.isEmpty()) {
+            gap(body, 12);
             LinearLayout route = card();
-            route.addView(heading("Your route", 19, ink));
+            route.addView(heading("FULL ROUTE REPLAY", 11, muted));
+            route.addView(heading("Your " + entry.mode.toLowerCase(Locale.ROOT) + " from start to finish", 19, ink));
+            TextView replayTime = text("0:00 / " + formatLiveDuration(entry.activeMillis), 14, mint);
+            route.addView(replayTime);
             if (OfflineMapStore.hasAnyMap(this)) {
-                OfflineMapStore.MapRecord selectedMap = OfflineMapStore.selectedMap(this);
-                route.addView(text("MapLibre vector streets · your coral route stays private on this phone.", 13, muted));
+                route.addView(text("MapLibre vector streets · lime route replay stays private on this phone.", 13, muted));
                 try {
                     OfflineRouteMapView map = new OfflineRouteMapView(this, OfflineMapStore.mapFile(this), entry.points);
-                    LinearLayout.LayoutParams mapParams = new LinearLayout.LayoutParams(-1, dp(300));
-                    mapParams.topMargin = dp(10);
-                    route.addView(map, mapParams);
+                    LinearLayout.LayoutParams mapParams = new LinearLayout.LayoutParams(-1, dp(300)); mapParams.topMargin = dp(10); route.addView(map, mapParams);
+                    Button replay = lightAction("Replay route");
+                    replay.setOnClickListener(view -> playEnduranceRouteReplay(map, entry, replayTime));
+                    addButton(route, replay);
+                    startEnduranceReplayWhenVisible(route, map, entry, replayTime);
                 } catch (RuntimeException error) { addPrivateRouteTrace(route, entry.points, dp(235)); }
                 gap(route, 8);
                 addTrinidadOfflineMapControl(route, () -> showEnduranceSessionDetails(entry));
             } else {
-                route.addView(text("Download the MapLibre vector pack in Settings to place this private route on detailed streets offline.", 13, muted));
+                route.addView(text("Download the MapLibre vector pack in Settings to replay this private route on detailed streets offline.", 13, muted));
                 addPrivateRouteTrace(route, entry.points, dp(235));
                 gap(route, 8);
                 addTrinidadOfflineMapControl(route, () -> showEnduranceSessionDetails(entry));
             }
             body.addView(route);
-            gap(body, 12);
         }
-        Button back = secondary("Back to completed sessions");
-        back.setOnClickListener(view -> showWorkoutHistory());
-        addButton(body, back);
+        gap(body, 14);
+        Button back = secondary("Back to completed sessions"); back.setOnClickListener(view -> showWorkoutHistory()); addButton(body, back);
+    }
+
+    private void addEnduranceEnergyCard(LinearLayout body, EnduranceHistoryStore.Entry entry, int minutes) {
+        LinearLayout energy = card(); energy.setClipChildren(false); energy.setClipToPadding(false);
+        LinearLayout header = new LinearLayout(this); header.setGravity(Gravity.CENTER_VERTICAL);
+        header.addView(heading("POSSIBLE ENERGY USED", 11, muted), new LinearLayout.LayoutParams(0, -2, 1));
+        FrameLayout badge = new FrameLayout(this); badge.setBackground(surface(Color.rgb(220, 249, 241), 99, 1, Color.rgb(194, 239, 227))); badge.setElevation(dp(6));
+        ImageView icon = new ImageView(this); icon.setImageResource(R.drawable.ic_report_energy); icon.setScaleType(ImageView.ScaleType.CENTER_INSIDE); icon.setPadding(dp(9), dp(9), dp(9), dp(9)); icon.setContentDescription("Possible energy used");
+        badge.addView(icon, new FrameLayout.LayoutParams(-1, -1)); header.addView(badge, new LinearLayout.LayoutParams(dp(42), dp(42))); energy.addView(header);
+        View fill = null;
+        if (WeightStore.configured(this) && WeightStore.latest(this) > 0f) {
+            float kilograms = "lb".equalsIgnoreCase(WeightStore.unit(this)) ? WeightStore.latest(this) * .45359237f : WeightStore.latest(this);
+            float lowMet = EndurancePlanStore.RUNNING.equals(entry.mode) ? 7f : EndurancePlanStore.CYCLING.equals(entry.mode) ? 4f : 3f;
+            float highMet = EndurancePlanStore.RUNNING.equals(entry.mode) ? 11.5f : EndurancePlanStore.CYCLING.equals(entry.mode) ? 10f : 4.3f;
+            int lower = Math.max(1, Math.round(lowMet * kilograms * minutes / 60f)); int upper = Math.max(lower, Math.round(highMet * kilograms * minutes / 60f));
+            energy.addView(heading(lower + "–" + upper + " kcal", 27, ink)); gap(energy, 8);
+            LinearLayout bar = new LinearLayout(this); bar.setBackground(surface(Color.rgb(221, 247, 239), 99, 0, Color.TRANSPARENT));
+            View measured = new View(this); measured.setBackground(surface(mint, 99, 0, Color.TRANSPARENT)); fill = measured;
+            bar.addView(measured, new LinearLayout.LayoutParams(0, dp(10), .42f)); bar.addView(new View(this), new LinearLayout.LayoutParams(0, dp(10), .58f)); energy.addView(bar, new LinearLayout.LayoutParams(-1, dp(10)));
+            energy.addView(text("Estimated from " + String.format(Locale.US, "%.1f kg", kilograms) + ", " + minutes + " active min, and a " + lowMet + "–" + highMet + " MET " + entry.mode.toLowerCase(Locale.ROOT) + " range.", 13, muted));
+        } else {
+            energy.addView(heading("Add your current weight", 21, ink)); energy.addView(text("A private weight entry is needed before the app can calculate a personalized calorie range.", 13, muted));
+        }
+        energy.addView(text("This is a broad activity estimate, not a measurement or nutrition allowance. Actual energy use varies with pace, terrain, effort, fitness, and body composition.", 12, muted));
+        body.addView(energy); runEnergyReportRevealWhenVisible(energy, badge, fill);
+    }
+
+    private void playEnduranceRouteReplay(OfflineRouteMapView map, EnduranceHistoryStore.Entry entry, TextView replayTime) {
+        map.playRouteReplay(entry.activeMillis, new OfflineRouteMapView.RouteReplayListener() {
+            @Override public void onReplayFrame(long elapsedMillis, float fraction) { replayTime.setText(formatLiveDuration(elapsedMillis) + " / " + formatLiveDuration(entry.activeMillis)); }
+            @Override public void onReplayFinished() { replayTime.setText(formatLiveDuration(entry.activeMillis) + " / " + formatLiveDuration(entry.activeMillis) + "  •  complete"); }
+        });
+    }
+
+    private void startEnduranceReplayWhenVisible(View routeCard, OfflineRouteMapView map, EnduranceHistoryStore.Entry entry, TextView replayTime) {
+        routeCard.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener() {
+            private boolean played;
+            @Override public boolean onPreDraw() {
+                if (played) return true;
+                Rect visible = new Rect();
+                if (!routeCard.getGlobalVisibleRect(visible) || visible.height() < dp(60)) return true;
+                played = true;
+                if (routeCard.getViewTreeObserver().isAlive()) routeCard.getViewTreeObserver().removeOnPreDrawListener(this);
+                playEnduranceRouteReplay(map, entry, replayTime);
+                return true;
+            }
+        });
     }
 
     private String enduranceSummary(EnduranceHistoryStore.Entry entry) {

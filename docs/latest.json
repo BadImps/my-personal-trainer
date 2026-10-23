@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 94,
-  "versionName": "5.52",
-  "publishedAt": "2026-10-23T15:30:00Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.52/app-release.apk",
-  "sha256": "faa3279ab311cdde8f13af1cc39ca3fada6c6f48dfcae41eb565d05074921788",
+  "versionCode": 95,
+  "versionName": "5.53",
+  "publishedAt": "2026-10-23T16:15:00Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.53/app-release.apk",
+  "sha256": "6e369075d40480035a68548110abaa69155536d1316653f4c3a0cdc0cba0d4b0",
   "sizeBytes": 257034559,
-  "notes": "Adds private training intelligence: recovery guidance, transparent progression suggestions, and a barbell plate guide."
+  "notes": "Adds completed endurance reports, Home Done ribbons, calorie estimates, and private route replays."
 }

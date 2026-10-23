@@ -1,6 +1,8 @@
 package com.badimps.personaltrainer;
 
 import android.content.Context;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.MotionEvent;
 import android.view.ViewParent;
 import android.widget.FrameLayout;
@@ -41,7 +43,17 @@ public final class OfflineRouteMapView extends FrameLayout {
     private final org.maplibre.android.maps.MapView vectorMap;
     private org.maplibre.android.maps.MapLibreMap vectorController;
     private List<LiveTrackingStore.Point> currentPoints = new ArrayList<>();
+    private final Handler replayHandler = new Handler(Looper.getMainLooper());
+    private Runnable replayRunnable;
+    private Runnable pendingReplay;
     private boolean positioned;
+    private boolean vectorStyleReady;
+
+    /** Receives normalized replay time without sending the private route anywhere. */
+    public interface RouteReplayListener {
+        void onReplayFrame(long elapsedMillis, float fraction);
+        void onReplayFinished();
+    }
 
     public OfflineRouteMapView(Context context, File mapFile, List<LiveTrackingStore.Point> points) {
         super(context);
@@ -101,8 +113,14 @@ public final class OfflineRouteMapView extends FrameLayout {
             loaded.getUiSettings().setLogoEnabled(true);
             loaded.getUiSettings().setAttributionEnabled(true);
             loaded.setStyle(MapLibreOfflinePack.styleUrl(appContext), style -> {
+                vectorStyleReady = true;
                 vectorMap.setVisibility(VISIBLE);
                 renderVectorRoute();
+                if (pendingReplay != null) {
+                    Runnable next = pendingReplay;
+                    pendingReplay = null;
+                    next.run();
+                }
             });
         });
         addView(vectorMap, new FrameLayout.LayoutParams(-1, -1));
@@ -110,27 +128,74 @@ public final class OfflineRouteMapView extends FrameLayout {
     }
 
     public void setRoute(List<LiveTrackingStore.Point> points) {
+        stopRouteReplay();
         currentPoints = points == null ? new ArrayList<>() : new ArrayList<>(points);
+        renderRoute(currentPoints, true);
+    }
+
+    /** Plays a compact visual time-lapse from the first recorded point to the finish. */
+    public void playRouteReplay(long sessionMillis, RouteReplayListener listener) {
+        if (vectorController == null || !vectorStyleReady) {
+            pendingReplay = () -> playRouteReplay(sessionMillis, listener);
+            return;
+        }
+        stopRouteReplay();
+        if (currentPoints.size() < 2) {
+            if (listener != null) { listener.onReplayFrame(Math.max(0L, sessionMillis), 1f); listener.onReplayFinished(); }
+            return;
+        }
+        final List<LiveTrackingStore.Point> fullRoute = new ArrayList<>(currentPoints);
+        final long totalMillis = Math.max(1L, sessionMillis);
+        final long replayDuration = Math.max(2800L, Math.min(6500L, fullRoute.size() * 34L));
+        final long startedAt = android.os.SystemClock.elapsedRealtime();
+        replayRunnable = new Runnable() {
+            @Override public void run() {
+                float fraction = Math.min(1f, (android.os.SystemClock.elapsedRealtime() - startedAt) / (float) replayDuration);
+                int end = Math.max(1, Math.min(fullRoute.size(), 1 + Math.round(fraction * (fullRoute.size() - 1))));
+                renderRoute(fullRoute.subList(0, end), false);
+                if (listener != null) listener.onReplayFrame(Math.round(totalMillis * fraction), fraction);
+                if (fraction < 1f) replayHandler.postDelayed(this, 33L);
+                else {
+                    replayRunnable = null;
+                    renderRoute(fullRoute, false);
+                    if (listener != null) listener.onReplayFinished();
+                }
+            }
+        };
+        replayHandler.post(replayRunnable);
+    }
+
+    public void stopRouteReplay() {
+        if (replayRunnable != null) replayHandler.removeCallbacks(replayRunnable);
+        replayRunnable = null;
+        pendingReplay = null;
+    }
+
+    private void renderRoute(List<LiveTrackingStore.Point> points, boolean fitCamera) {
         ArrayList<LatLong> routePoints = new ArrayList<>();
         if (points != null) for (LiveTrackingStore.Point point : points) routePoints.add(new LatLong(point.latitude, point.longitude));
         route.setPoints(routePoints);
-        if (!positioned || !routePoints.isEmpty()) {
+        if (!positioned || fitCamera) {
             LatLong center = routePoints.isEmpty() ? new LatLong(10.6918d, -61.2225d) : routePoints.get(routePoints.size() - 1);
             map.setCenter(center);
             map.setZoomLevel(routePoints.size() < 2 ? (byte) 13 : (byte) 15);
             positioned = true;
         }
         map.repaint();
-        renderVectorRoute();
+        renderVectorRoute(points, fitCamera);
     }
 
     private void renderVectorRoute() {
+        renderVectorRoute(currentPoints, true);
+    }
+
+    private void renderVectorRoute(List<LiveTrackingStore.Point> points, boolean fitCamera) {
         if (vectorController == null) return;
         vectorController.clear();
         ArrayList<LatLng> line = new ArrayList<>();
-        for (LiveTrackingStore.Point point : currentPoints) line.add(new LatLng(point.latitude, point.longitude));
+        for (LiveTrackingStore.Point point : points) line.add(new LatLng(point.latitude, point.longitude));
         if (line.size() > 1) vectorController.addPolyline(new PolylineOptions().addAll(line).color(0xFFADFF2F).width(6f));
-        if (line.size() > 1) {
+        if (line.size() > 1 && fitCamera) {
             double north = -90d, south = 90d, east = -180d, west = 180d;
             for (LatLng point : line) { north = Math.max(north, point.getLatitude()); south = Math.min(south, point.getLatitude()); east = Math.max(east, point.getLongitude()); west = Math.min(west, point.getLongitude()); }
             vectorController.moveCamera(CameraUpdateFactory.newLatLngBounds(LatLngBounds.from(north, east, south, west), 72));
@@ -140,6 +205,7 @@ public final class OfflineRouteMapView extends FrameLayout {
     }
 
     @Override protected void onDetachedFromWindow() {
+        stopRouteReplay();
         vectorMap.onPause();
         vectorMap.onStop();
         vectorMap.onDestroy();
