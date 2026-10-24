@@ -838,8 +838,8 @@ public final class MainActivity extends FragmentActivity {
         // These are in the exact order members travel through the live wizard.
         // The previous Weekly/Daily ordering showed calendar/time as complete before
         // the member had selected their training area.
-        if ("Weekly".equals(planMode)) return new String[]{"Plan", "Train", "Week", "Equipment", "Exercises", "Sets", "Review"};
-        if ("Daily".equals(planMode)) return new String[]{"Plan", "Train", "Day", "Equipment", "Exercises", "Sets", "Review"};
+        if ("Weekly".equals(planMode)) return new String[]{"Plan", "Train", "Week", "Time", "Equipment", "Exercises", "Sets", "Review"};
+        if ("Daily".equals(planMode)) return new String[]{"Plan", "Train", "Day", "Time", "Equipment", "Exercises", "Sets", "Review"};
         return new String[]{"Plan", "Train", "Time", "Equipment", "Exercises", "Sets", "Review"};
     }
 
@@ -3848,7 +3848,7 @@ public final class MainActivity extends FragmentActivity {
         content.setBackgroundColor(paper);
         root.addView(content, new LinearLayout.LayoutParams(-1, -2));
 
-        TextView scheduleLabel = heading(weekly ? "01  ·  TRAINING WEEK" : "01  ·  WORKOUT DAY", 11, muted); scheduleLabel.setLetterSpacing(.12f);
+        TextView scheduleLabel = heading(weekly ? "03  ·  TRAINING WEEK" : "03  ·  WORKOUT DAY", 11, muted); scheduleLabel.setLetterSpacing(.12f);
         content.addView(scheduleLabel);
         content.addView(heading(weekly ? "Place your training days" : "Pick your workout date", 23, ink));
         content.addView(text(weekly ? "Tap dates to switch between Train and Rest." : "Tap the one day you want to train.", 13, muted));
@@ -3928,7 +3928,7 @@ public final class MainActivity extends FragmentActivity {
             icon.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
             LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(-1, dp(22)); iconParams.leftMargin = dp(6); iconParams.rightMargin = dp(6); detail.addView(icon, iconParams);
             TextView label = heading(scheduledFocus, 9, selected ? Color.WHITE : Color.rgb(180, 200, 220)); label.setGravity(Gravity.CENTER); label.setSingleLine(true); detail.addView(label, new LinearLayout.LayoutParams(-1, dp(19)));
-            TextView minutes = text(selected ? "45 min" : "Recover", 8, selected ? Color.rgb(180, 235, 222) : Color.rgb(132, 159, 188)); minutes.setGravity(Gravity.CENTER); detail.addView(minutes, new LinearLayout.LayoutParams(-1, dp(17)));
+            TextView minutes = text(selected ? sessionMinutes + " min" : "Recover", 8, selected ? Color.rgb(180, 235, 222) : Color.rgb(132, 159, 188)); minutes.setGravity(Gravity.CENTER); detail.addView(minutes, new LinearLayout.LayoutParams(-1, dp(17)));
             detail.setOnClickListener(view -> {
                 if (isPastCalendarDate(selectedWeekDate(dayIndex))) { toast("Past dates are locked and cannot be changed."); return; }
                 if (weekly) { weeklyWorkoutDays[dayIndex] = !weeklyWorkoutDays[dayIndex]; if (weeklyWorkoutDays[dayIndex] && weeklyDayTargets.get(dayIndex).isEmpty()) weeklyDayTargets.get(dayIndex).addAll(selectedTargets); activeScheduleDay = dayIndex; syncTrainingDays(); persistCurrentWeekSchedule(); }
@@ -3961,11 +3961,11 @@ public final class MainActivity extends FragmentActivity {
             content.addView(rhythm);
         }
         gap(content, 17);
-        Button continueButton = action("Next: choose equipment  →", coral, Color.WHITE);
+        Button continueButton = action("Next: choose workout length  →", coral, Color.WHITE);
         continueButton.setOnClickListener(view -> {
             if (weekly && trainingDays == 0) { toast("Choose at least one workout day."); return; }
             if (weekly) persistCurrentWeekSchedule();
-            showPlanEquipment();
+            showPlanDuration();
         });
         content.addView(continueButton, new LinearLayout.LayoutParams(-1, dp(54)));
         Button back = new Button(this); back.setText("Back"); back.setTextColor(mint); back.setTextSize(14); back.setAllCaps(false); back.setBackgroundColor(Color.TRANSPARENT);
@@ -4207,14 +4207,14 @@ public final class MainActivity extends FragmentActivity {
         selected.addView(text(focusSummary(focuses), 15, ink)); content.addView(selected);
         gap(content, 15);
         boolean schedulerDaily = schedulerWorkoutDateLocked && "Daily".equals(planMode);
-        Button next = action(schedulerDaily ? "Next: choose equipment  →" : (weekly || "Daily".equals(planMode)) ? "Next: choose training week  →" : "Next: choose workout length  →", coral, Color.WHITE);
+        Button next = action(schedulerDaily ? "Next: choose workout length  →" : (weekly || "Daily".equals(planMode)) ? "Next: choose training week  →" : "Next: choose workout length  →", coral, Color.WHITE);
         next.setOnClickListener(view -> {
             // Weekly starts with a shared training pool. Individual days receive an
             // assignment on the following calendar screen, so checking activeTargets()
             // here incorrectly rejected an already-selected weekly focus.
             if ((weekly ? selectedTargets : activeTargets()).isEmpty()) { toast("Choose at least one training area."); return; }
             syncPrimaryTarget();
-            if (schedulerDaily) showPlanEquipment();
+            if (schedulerDaily) showPlanDuration();
             else if (weekly || "Daily".equals(planMode)) showPlanSchedule(); else showPlanDuration();
         });
         content.addView(next, new LinearLayout.LayoutParams(-1, dp(54)));
@@ -4271,15 +4271,14 @@ public final class MainActivity extends FragmentActivity {
         selection.addView(text("Selected: " + focusSummary(focuses), 13, muted));
         body.addView(selection);
         gap(body, 10);
-        Button next = planPrimary(("Daily".equals(planMode) || "Custom".equals(planMode)) ? "Next: choose workout length" : "Next: choose equipment");
+        Button next = planPrimary("Next: choose workout length");
         next.setOnClickListener(view -> {
             if (activeTargets().isEmpty()) {
                 toast("Choose at least one training area.");
                 return;
             }
             syncPrimaryTarget();
-            if ("Daily".equals(planMode) || "Custom".equals(planMode)) showPlanDuration();
-            else showPlanEquipment();
+            showPlanDuration();
         });
         addPlanButton(body, next);
         Button back = planBack();
@@ -4407,14 +4406,18 @@ public final class MainActivity extends FragmentActivity {
         return tile;
     }
 
-    /** Step 3: only equipment choices. This keeps the requested Machine-assisted category distinct and discoverable. */
-    /** Daily and Custom plans size the recommendation before choosing equipment. */
+    /** Workout length comes before equipment for every plan mode, including Daily and Weekly. */
     private void showPlanDuration() {
+        boolean scheduledDaily = schedulerWorkoutDateLocked && "Daily".equals(planMode);
+        String stepLabel = "Weekly".equals(planMode) ? "WEEKLY PLAN · STEP 4"
+                : "Daily".equals(planMode) ? "DAILY PLAN · STEP 4" : "CUSTOM PLAN · STEP 3";
+        String sectionLabel = "Weekly".equals(planMode) || "Daily".equals(planMode)
+                ? "04  ·  WORKOUT LENGTH" : "03  ·  WORKOUT LENGTH";
         LinearLayout body = coachHeroWorkoutWizardPage("Workout duration",
-                planMode.toUpperCase(Locale.ROOT) + " PLAN · STEP 3",
+                stepLabel,
                 "How long do you\nwant to train?",
                 "We’ll recommend a balanced range of movements that fits your time without rushing recovery.",
-                "Time", "03  ·  WORKOUT LENGTH", "Shape your session",
+                "Time", sectionLabel, "Shape your session",
                 "Choose your available time. You will still choose the movements yourself on the next screens.");
 
         LinearLayout lengthCard = card();
@@ -4474,7 +4477,11 @@ public final class MainActivity extends FragmentActivity {
         next.setOnClickListener(view -> showPlanEquipment());
         addPlanButton(body, next);
         Button back = planBack();
-        back.setOnClickListener(view -> showPlanTarget());
+        back.setOnClickListener(view -> {
+            if (scheduledDaily) showPlanTarget();
+            else if ("Weekly".equals(planMode) || "Daily".equals(planMode)) showPlanSchedule();
+            else showPlanTarget();
+        });
         addPlanBack(body, back);
     }
 
@@ -4507,7 +4514,7 @@ public final class MainActivity extends FragmentActivity {
 
         FrameLayout hero = coachHeroBackdrop("Workouts equipment"); root.addView(hero, new LinearLayout.LayoutParams(-1, dp(260)));
         LinearLayout copy = new LinearLayout(this); copy.setOrientation(LinearLayout.VERTICAL);
-        TextView eyebrow = heading("PLAN YOUR WORKOUT · STEP 4", 10, mint); eyebrow.setLetterSpacing(.14f); copy.addView(eyebrow);
+        TextView eyebrow = heading("PLAN YOUR WORKOUT · STEP " + wizardStep("Equipment"), 10, mint); eyebrow.setLetterSpacing(.14f); copy.addView(eyebrow);
         TextView title = heading("Choose your\nequipment", 29, Color.WHITE); title.setLineSpacing(0, .93f); copy.addView(title);
         TextView subtitle = text("Select one or two categories. We’ll shape movements around your training area.", 13, Color.rgb(226, 236, 247));
         LinearLayout.LayoutParams subtitleParams = new LinearLayout.LayoutParams(dp(258), -2); subtitleParams.topMargin = dp(8); copy.addView(subtitle, subtitleParams);
@@ -4515,7 +4522,7 @@ public final class MainActivity extends FragmentActivity {
         addWorkoutWizardProgress(hero, "Equipment");
 
         LinearLayout content = new LinearLayout(this); content.setOrientation(LinearLayout.VERTICAL); content.setPadding(dp(16), dp(20), dp(16), dp(36)); content.setBackgroundColor(paper); content.setClipChildren(false); content.setClipToPadding(false); root.addView(content, new LinearLayout.LayoutParams(-1, -2));
-        TextView section = heading("04  ·  EQUIPMENT", 11, muted); section.setLetterSpacing(.12f); content.addView(section);
+        TextView section = heading(String.format(Locale.US, "%02d  ·  EQUIPMENT", wizardStep("Equipment")), 11, muted); section.setLetterSpacing(.12f); content.addView(section);
         content.addView(heading("Train with what you have", 23, ink));
         content.addView(text("Pick up to two categories. Every exercise on the next page will fit your selection.", 13, muted));
         gap(content, 14);
@@ -4552,11 +4559,7 @@ public final class MainActivity extends FragmentActivity {
             machines.addView(heading("MACHINE-ASSISTED OPTIONS", 10, mint)); machines.addView(text(machineOptionsSummary(), 11, Color.rgb(221, 236, 239))); content.addView(machines);
         }
         gap(content, 15); Button next = action("Next: choose exercises  →", coral, Color.WHITE); next.setOnClickListener(view -> showExerciseSelection()); content.addView(next, new LinearLayout.LayoutParams(-1, dp(54)));
-        Button back = new Button(this); back.setText("Back"); back.setTextColor(mint); back.setTextSize(14); back.setAllCaps(false); back.setBackgroundColor(Color.TRANSPARENT); back.setOnClickListener(view -> {
-            if (schedulerWorkoutDateLocked && "Daily".equals(planMode)) showPlanTarget();
-            else if ("Weekly".equals(planMode) || "Daily".equals(planMode)) showPlanSchedule();
-            else showPlanDuration();
-        }); content.addView(back, new LinearLayout.LayoutParams(-1, dp(46)));
+        Button back = new Button(this); back.setText("Back"); back.setTextColor(mint); back.setTextSize(14); back.setAllCaps(false); back.setBackgroundColor(Color.TRANSPARENT); back.setOnClickListener(view -> showPlanDuration()); content.addView(back, new LinearLayout.LayoutParams(-1, dp(46)));
     }
 
     /** Retained until the legacy wizard shell is removed. */
@@ -4622,10 +4625,7 @@ public final class MainActivity extends FragmentActivity {
         next.setOnClickListener(view -> showExerciseSelection());
         addPlanButton(body, next);
         Button back = planBack();
-        back.setOnClickListener(view -> {
-            if ("Daily".equals(planMode) || "Custom".equals(planMode)) showPlanDuration();
-            else showPlanTarget();
-        });
+        back.setOnClickListener(view -> showPlanDuration());
         addPlanBack(body, back);
     }
 
@@ -5026,7 +5026,7 @@ public final class MainActivity extends FragmentActivity {
 
         FrameLayout hero = coachHeroBackdrop("Workouts exercises"); root.addView(hero, new LinearLayout.LayoutParams(-1, dp(266)));
         LinearLayout copy = new LinearLayout(this); copy.setOrientation(LinearLayout.VERTICAL);
-        TextView eyebrow = heading(planMode.toUpperCase(Locale.ROOT) + " PLAN · STEP 5", 10, mint); eyebrow.setLetterSpacing(.14f); copy.addView(eyebrow);
+        TextView eyebrow = heading(planMode.toUpperCase(Locale.ROOT) + " PLAN · STEP " + wizardStep("Exercises"), 10, mint); eyebrow.setLetterSpacing(.14f); copy.addView(eyebrow);
         TextView title = heading("Choose your\nexercises", 29, Color.WHITE); title.setLineSpacing(0, .93f); copy.addView(title);
         TextView subtitle = text((workoutNoTimer ? "Open-ended session" : sessionMinutes + " minutes")
                 + ", made for " + focusSummary(activeTargets()).toLowerCase(Locale.ROOT)
@@ -5036,7 +5036,7 @@ public final class MainActivity extends FragmentActivity {
         addWorkoutWizardProgress(hero, "Exercises");
 
         LinearLayout content = new LinearLayout(this); content.setOrientation(LinearLayout.VERTICAL); content.setPadding(dp(16), dp(20), dp(16), dp(36)); content.setBackgroundColor(paper); root.addView(content, new LinearLayout.LayoutParams(-1, -2));
-        TextView section = heading("05  ·  EXERCISES", 11, muted); section.setLetterSpacing(.12f); content.addView(section);
+        TextView section = heading(String.format(Locale.US, "%02d  ·  EXERCISES", wizardStep("Exercises")), 11, muted); section.setLetterSpacing(.12f); content.addView(section);
         content.addView(heading("Make the session your own", 23, ink));
         content.addView(text("Your recommended movements are selected. Keep them all, or tailor the session one card at a time.", 13, muted));
         gap(content, 11);
@@ -5781,7 +5781,7 @@ public final class MainActivity extends FragmentActivity {
 
         FrameLayout hero = coachHeroBackdrop("Workouts setup"); root.addView(hero, new LinearLayout.LayoutParams(-1, dp(260)));
         LinearLayout copy = new LinearLayout(this); copy.setOrientation(LinearLayout.VERTICAL);
-        TextView eyebrow = heading(planMode.toUpperCase(Locale.ROOT) + " PLAN · STEP 6", 10, mint); eyebrow.setLetterSpacing(.14f); copy.addView(eyebrow);
+        TextView eyebrow = heading(planMode.toUpperCase(Locale.ROOT) + " PLAN · STEP " + wizardStep("Sets"), 10, mint); eyebrow.setLetterSpacing(.14f); copy.addView(eyebrow);
         TextView title = heading("Set up your\nplan", 29, Color.WHITE); title.setLineSpacing(0, .93f); copy.addView(title);
         TextView subtitle = text("Tailor your schedule, working targets, recovery, and reminder before you build.", 13, Color.rgb(226, 236, 247));
         LinearLayout.LayoutParams subtitleParams = new LinearLayout.LayoutParams(dp(270), -2); subtitleParams.topMargin = dp(8); copy.addView(subtitle, subtitleParams);
@@ -5789,7 +5789,7 @@ public final class MainActivity extends FragmentActivity {
         addWorkoutWizardProgress(hero, "Sets");
 
         LinearLayout body = new LinearLayout(this); body.setOrientation(LinearLayout.VERTICAL); body.setPadding(dp(16), dp(20), dp(16), dp(36)); body.setBackgroundColor(paper); root.addView(body, new LinearLayout.LayoutParams(-1, -2));
-        TextView section = heading("06  ·  SET UP", 11, muted); section.setLetterSpacing(.12f); body.addView(section);
+        TextView section = heading(String.format(Locale.US, "%02d  ·  SET UP", wizardStep("Sets")), 11, muted); section.setLetterSpacing(.12f); body.addView(section);
         body.addView(heading("Make this plan yours", 23, ink));
         body.addView(text("Choose comfortable targets now. You can fine-tune every setting later.", 13, muted));
         gap(body, 14);
@@ -6080,10 +6080,10 @@ public final class MainActivity extends FragmentActivity {
         } else if ("Daily".equals(planMode)) {
             session = sessionWithScheduledAddOns(selectedWeekDate(dailyScheduledDay), session);
         }
-        LinearLayout body = coachHeroWorkoutWizardPage("Workout plan ready", "PLAN READY · STEP 7",
+        LinearLayout body = coachHeroWorkoutWizardPage("Workout plan ready", "PLAN READY · STEP " + wizardStep("Review"),
                 "Your plan\nis ready", session.size() + " selected movements · "
                         + (workoutNoTimer ? "No timer" : sessionMinutes + " min") + " · " + equipmentSummary(),
-                "Review", "07  ·  REVIEW", "Ready to train",
+                "Review", String.format(Locale.US, "%02d  ·  REVIEW", wizardStep("Review")), "Ready to train",
                 "Review your movements, recovery, and schedule before Coach " + coachName() + " starts your guided workout.");
         LinearLayout schedule = card();
         schedule.addView(heading("Weekly".equals(planMode) ? "Your weekly templates" : "Scheduled workout", 18, ink));
@@ -9029,7 +9029,7 @@ public final class MainActivity extends FragmentActivity {
 
         FrameLayout hero = coachHeroBackdrop("Workouts review"); root.addView(hero, new LinearLayout.LayoutParams(-1, dp(260)));
         LinearLayout copy = new LinearLayout(this); copy.setOrientation(LinearLayout.VERTICAL);
-        TextView eyebrow = heading(planMode.toUpperCase(Locale.ROOT) + " PLAN · STEP 7", 10, mint); eyebrow.setLetterSpacing(.14f); copy.addView(eyebrow);
+        TextView eyebrow = heading(planMode.toUpperCase(Locale.ROOT) + " PLAN · STEP " + wizardStep("Review"), 10, mint); eyebrow.setLetterSpacing(.14f); copy.addView(eyebrow);
         TextView title = heading("Review your\nplan", 29, Color.WHITE); title.setLineSpacing(0, .93f); copy.addView(title);
         TextView subtitle = text("Your tailored session is ready. Check the details, then save and start when you are ready.", 13, Color.rgb(226, 236, 247));
         LinearLayout.LayoutParams subtitleParams = new LinearLayout.LayoutParams(dp(270), -2); subtitleParams.topMargin = dp(8); copy.addView(subtitle, subtitleParams);
@@ -9037,7 +9037,7 @@ public final class MainActivity extends FragmentActivity {
         addWorkoutWizardProgress(hero, "Review");
 
         LinearLayout body = new LinearLayout(this); body.setOrientation(LinearLayout.VERTICAL); body.setPadding(dp(16), dp(20), dp(16), dp(36)); body.setBackgroundColor(paper); root.addView(body, new LinearLayout.LayoutParams(-1, -2));
-        TextView section = heading("07  ·  REVIEW", 11, muted); section.setLetterSpacing(.12f); body.addView(section);
+        TextView section = heading(String.format(Locale.US, "%02d  ·  REVIEW", wizardStep("Review")), 11, muted); section.setLetterSpacing(.12f); body.addView(section);
         body.addView(heading("Your plan is ready", 23, ink));
         body.addView(text("Review it before you begin. You can revisit these choices whenever you need.", 13, muted));
         gap(body, 12);

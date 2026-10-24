@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 105,
-  "versionName": "5.63",
-  "publishedAt": "2026-10-23T22:00:00Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.63/app-release.apk",
-  "sha256": "b77cd2a156f6b245e784b51395e46388da97a3475796291892f3c5d9b7e6b132",
+  "versionCode": 106,
+  "versionName": "5.64",
+  "publishedAt": "2026-10-24T01:53:18Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.64/app-release.apk",
+  "sha256": "71acd81e8571990c093f4f23ffafe7de5f633036295aa765aa8f8e888276b64a",
   "sizeBytes": 257067327,
-  "notes": "Guided workout plans now use your selected duration, sets, reps, rest, and cooldown to build enough exercise blocks. The coach repeats selected movements in order when needed, while manual plans that run long show a clear red overage warning."
+  "notes": "Daily and Weekly planners now include Workout Length before equipment. Choose 45 minutes, 60 minutes, 1 hour 50 minutes, a custom duration, or an untimed session before Coach builds the exercise sequence."
 }
