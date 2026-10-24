@@ -23,6 +23,7 @@ public final class AccountStore {
         }
     }
     public static boolean exists(Context c) { return c.getSharedPreferences(FILE,Context.MODE_PRIVATE).getBoolean("created",false); }
+    public static boolean usesRemoteAuth(Context c) { return c.getSharedPreferences(FILE,Context.MODE_PRIVATE).getBoolean("remote_auth", false); }
     public static Profile get(Context c) {
         SharedPreferences p=c.getSharedPreferences(FILE,Context.MODE_PRIVATE);
         String gender=p.getString("trainer","Female");
@@ -36,6 +37,25 @@ public final class AccountStore {
     public static void create(Context c,String email,String username,String password,String trainer) {
         byte[] salt=new byte[16]; new SecureRandom().nextBytes(salt);
         c.getSharedPreferences(FILE,Context.MODE_PRIVATE).edit().putBoolean("created",true).putString("email",email.trim()).putString("username",username.trim()).putString("trainer",trainer).putString("coach_name",CoachPreferences.defaultCoach(trainer)).putString("dialogue_mode",CoachPreferences.FULL_DIALOGUE).putBoolean("keep_phone_awake",false).putBoolean("remember_sign_in",false).putBoolean("biometric_unlock",false).putString("photo_uri", "").putString("salt",hex(salt)).putString("password_scheme", PASSWORD_SCHEME).putString("passwordHash",passwordHash(salt,password)).apply();
+    }
+    /** Creates only the private on-device profile after Supabase has verified the identity. */
+    public static void createRemote(Context c, String email, String username, String trainer) {
+        c.getSharedPreferences(FILE,Context.MODE_PRIVATE).edit()
+                .putBoolean("created", true).putBoolean("remote_auth", true)
+                .putString("email", email == null ? "" : email.trim())
+                .putString("username", username == null || username.trim().isEmpty() ? "Athlete" : username.trim())
+                .putString("trainer", trainer)
+                .putString("coach_name", CoachPreferences.defaultCoach(trainer))
+                .putString("dialogue_mode", CoachPreferences.FULL_DIALOGUE)
+                .putBoolean("keep_phone_awake", false).putBoolean("remember_sign_in", false)
+                .putBoolean("biometric_unlock", false).putString("photo_uri", "")
+                .remove("salt").remove("password_scheme").remove("passwordHash")
+                .apply();
+    }
+
+    public static void markRemoteAuthenticated(Context c) {
+        c.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit().putBoolean("remote_auth", true)
+                .remove("salt").remove("password_scheme").remove("passwordHash").apply();
     }
     public static void updateCoachPreferences(Context c,String coachName,String dialogueMode,boolean keepPhoneAwake) {
         CoachPreferences.CoachOption coach=CoachPreferences.coach(coachName);
@@ -69,14 +89,14 @@ public final class AccountStore {
         SharedPreferences p=c.getSharedPreferences(FILE,Context.MODE_PRIVATE);
         SharedPreferences.Editor edit=p.edit().putString("username", username.trim()).putString("photo_uri", photoUri == null ? "" : photoUri).putBoolean("remember_sign_in",remember).putBoolean("biometric_unlock",biometric);
         if (newPassword != null && !newPassword.isEmpty()) {
-            if (newPassword.length() < 8) throw new IllegalArgumentException("Use a password with at least 8 characters.");
+            if (!PasswordPolicy.isValid(newPassword)) throw new IllegalArgumentException(PasswordPolicy.requirements());
             byte[] salt=new byte[16]; new SecureRandom().nextBytes(salt);
             edit.putString("salt",hex(salt)).putString("password_scheme", PASSWORD_SCHEME).putString("passwordHash",passwordHash(salt,newPassword));
         }
         edit.apply();
     }
     public static boolean resetPassword(Context c, String email, String password) {
-        if (!exists(c) || !get(c).email.equalsIgnoreCase(email == null ? "" : email.trim()) || password == null || password.length() < 8) return false;
+        if (!exists(c) || !get(c).email.equalsIgnoreCase(email == null ? "" : email.trim()) || !PasswordPolicy.isValid(password)) return false;
         byte[] salt=new byte[16]; new SecureRandom().nextBytes(salt);
         c.getSharedPreferences(FILE,Context.MODE_PRIVATE).edit().putString("salt",hex(salt)).putString("password_scheme", PASSWORD_SCHEME).putString("passwordHash",passwordHash(salt,password)).putBoolean("remember_sign_in",false).apply();
         return true;
@@ -84,7 +104,7 @@ public final class AccountStore {
     /** Changes a local password only after the existing password has been verified. */
     public static boolean changePassword(Context c, String currentPassword, String newPassword) {
         Profile profile = get(c);
-        if (!authenticate(c, profile.email, currentPassword) || newPassword == null || newPassword.length() < 8) return false;
+        if (!authenticate(c, profile.email, currentPassword) || !PasswordPolicy.isValid(newPassword)) return false;
         byte[] salt = new byte[16]; new SecureRandom().nextBytes(salt);
         c.getSharedPreferences(FILE,Context.MODE_PRIVATE).edit()
                 .putString("salt", hex(salt)).putString("password_scheme", PASSWORD_SCHEME)

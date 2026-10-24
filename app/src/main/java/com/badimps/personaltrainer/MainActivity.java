@@ -323,8 +323,17 @@ public final class MainActivity extends FragmentActivity {
         }
         initialisePlanSelections();
         restoreSavedPlan();
+        if (handleSupabaseAuthRedirect(getIntent())) return;
         // Local AVD-only visual QA entry point. This branch is excluded from release builds
         // and avoids weakening the protected sign-in flow just to inspect a composition.
+        if (BuildConfig.DEBUG && "com.badimps.personaltrainer.DEBUG_REGISTRATION".equals(getIntent().getAction())) {
+            showRegistration();
+            return;
+        }
+        if (BuildConfig.DEBUG && "com.badimps.personaltrainer.DEBUG_RECOVERY_CODE".equals(getIntent().getAction())) {
+            showRecoveryCode("athlete@example.com");
+            return;
+        }
         if (BuildConfig.DEBUG && "com.badimps.personaltrainer.DEBUG_COACH_COLLECTION".equals(getIntent().getAction())) {
             showCoachProfiles();
             return;
@@ -525,6 +534,7 @@ public final class MainActivity extends FragmentActivity {
         super.onNewIntent(intent);
         setIntent(intent);
         if (intent == null) return;
+        if (handleSupabaseAuthRedirect(intent)) return;
         if (GuidedWorkoutService.ACTION_END.equals(intent.getAction()) && hasActiveGuidedWorkout()) {
             showEmergencyStopConfirmation(activeWorkoutExerciseIndex, activeWorkoutSet, this::resumeActiveWorkoutSurface);
         } else if (GuidedWorkoutService.ACTION_OPEN.equals(intent.getAction()) && hasActiveGuidedWorkout()) {
@@ -853,6 +863,14 @@ public final class MainActivity extends FragmentActivity {
     private void addWorkoutWizardProgress(FrameLayout hero, String currentStep) {
         int active = Math.max(0, wizardStep(currentStep) - 1);
         addCoachHeroWizardSteps(hero, wizardLabels(), active);
+    }
+
+    private boolean handleSupabaseAuthRedirect(Intent intent) {
+        SupabaseAuthClient.AuthResult verified = intent == null ? null : SupabaseAuthClient.fromRedirect(intent.getData());
+        if (verified == null) return false;
+        completeRemoteSignIn(verified, true);
+        toast("Email verified. Your account is ready.");
+        return true;
     }
 
     /** Shared full-bleed Coach Hero composition for every Workout wizard step. */
@@ -2248,6 +2266,24 @@ public final class MainActivity extends FragmentActivity {
         content.addView(accountRow);
         Button signIn = action("Sign in  →", coral, Color.WHITE);
         signIn.setOnClickListener(view -> {
+            if (SupabaseConfig.isConfigured()) {
+                if (AccountStore.exists(this) && !AccountStore.usesRemoteAuth(this)
+                        && AccountStore.authenticate(this, email.getText().toString(), password.getText().toString())) {
+                    AccountStore.Profile current = profile();
+                    AccountStore.updatePersonalProfile(this, current.username, current.photoUri, remember.isChecked(), current.biometricUnlock, "");
+                    commitCredentialAutofill(); openSignedInHome();
+                    toast("This is a legacy device-only account. Register the email to enable secure recovery.");
+                    return;
+                }
+                signIn.setEnabled(false);
+                signIn.setText("Signing in…");
+                SupabaseAuthClient.signIn(email.getText().toString(), password.getText().toString(), (result, error) -> runOnUiThread(() -> {
+                    signIn.setEnabled(true); signIn.setText("Sign in  →");
+                    if (error != null) { toast(error); return; }
+                    completeRemoteSignIn(result, remember.isChecked());
+                }));
+                return;
+            }
             if (AccountStore.authenticate(this, email.getText().toString(), password.getText().toString())) {
                 AccountStore.Profile current = profile();
                 AccountStore.updatePersonalProfile(this, current.username, current.photoUri, remember.isChecked(), current.biometricUnlock, "");
@@ -2334,6 +2370,21 @@ public final class MainActivity extends FragmentActivity {
         View forgotTarget = lockedArtworkTarget("Forgot password", view -> showForgotPassword());
         addArtworkOverlay(hero, forgotTarget, Math.round(216 * scale), Math.round(402 * scale), Math.round(130 * scale), Math.round(35 * scale));
         View signInTarget = lockedArtworkTarget("Sign in", view -> {
+            if (SupabaseConfig.isConfigured()) {
+                if (AccountStore.exists(this) && !AccountStore.usesRemoteAuth(this)
+                        && AccountStore.authenticate(this, email.getText().toString(), password.getText().toString())) {
+                    AccountStore.Profile current = profile();
+                    AccountStore.updatePersonalProfile(this, current.username, current.photoUri, remember[0], current.biometricUnlock, "");
+                    commitCredentialAutofill(); openSignedInHome();
+                    toast("This is a legacy device-only account. Register the email to enable secure recovery.");
+                    return;
+                }
+                SupabaseAuthClient.signIn(email.getText().toString(), password.getText().toString(), (result, error) -> runOnUiThread(() -> {
+                    if (error != null) { toast(error); return; }
+                    completeRemoteSignIn(result, remember[0]);
+                }));
+                return;
+            }
             if (AccountStore.authenticate(this, email.getText().toString(), password.getText().toString())) {
                 AccountStore.Profile current = profile();
                 AccountStore.updatePersonalProfile(this, current.username, current.photoUri, remember[0], current.biometricUnlock, "");
@@ -2402,17 +2453,91 @@ public final class MainActivity extends FragmentActivity {
         showHome();
     }
 
+    private void completeRemoteSignIn(SupabaseAuthClient.AuthResult result, boolean remember) {
+        if (result == null || result.session() == null || !result.session().isUsable()) {
+            toast("Secure sign-in did not return a valid session.");
+            return;
+        }
+        AuthSessionStore.save(this, result.session());
+        if (!AccountStore.exists(this) || !profile().email.equalsIgnoreCase(result.email)) {
+            String username = PendingAccountStore.matches(this, result.email)
+                    ? PendingAccountStore.username(this) : defaultUsername(result.email);
+            String trainer = PendingAccountStore.matches(this, result.email)
+                    ? PendingAccountStore.trainer(this) : selectedTrainer;
+            AccountStore.createRemote(this, result.email, username, trainer);
+        } else AccountStore.markRemoteAuthenticated(this);
+        PendingAccountStore.clear(this);
+        AccountStore.Profile current = profile();
+        AccountStore.updatePersonalProfile(this, current.username, current.photoUri, remember, current.biometricUnlock, "");
+        commitCredentialAutofill();
+        openSignedInHome();
+    }
+
+    private String defaultUsername(String email) {
+        if (email == null || email.trim().isEmpty()) return "Athlete";
+        String local = email.trim().split("@", 2)[0].replaceAll("[^A-Za-z0-9 _-]", "");
+        return local.length() >= 3 ? local : "Athlete";
+    }
+
     private void showForgotPassword() {
-        LinearLayout form = new LinearLayout(this); form.setOrientation(LinearLayout.VERTICAL); form.setPadding(dp(20), 0, dp(20), 0);
-        EditText email = input("Email address", InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
+        if (!SupabaseConfig.isConfigured()) {
+            toast("Secure email recovery is not configured on this build yet.");
+            return;
+        }
+        LinearLayout body = signedOutPage();
+        title(body, "ACCOUNT RECOVERY", "Reset your password", "Enter your verified email. We’ll send a six-digit recovery code.");
+        EditText email = input("Email address", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
         if (AccountStore.exists(this)) email.setText(profile().email);
-        EditText password = input("New password — at least 8 characters", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
-        form.addView(email); gap(form, 8); form.addView(password);
-        new AlertDialog.Builder(this).setTitle("Reset password").setMessage("This profile is stored only on this device. Confirm its email and choose a new password.")
-                .setView(form).setNegativeButton("Cancel", null).setPositiveButton("Reset", (dialog, which) -> {
-                    if (AccountStore.resetPassword(this, email.getText().toString(), password.getText().toString())) { toast("Password updated."); showLogin(); }
-                    else toast("Check the email and use at least 8 characters.");
-                }).show();
+        body.addView(email); gap(body, 12);
+        TextView privacy = text("For privacy, the result looks the same whether or not an account exists for that email.", 13, Color.rgb(202, 216, 234));
+        body.addView(privacy); gap(body, 18);
+        Button send = primary("Send recovery code");
+        send.setOnClickListener(view -> {
+            String address = email.getText().toString().trim();
+            if (!android.util.Patterns.EMAIL_ADDRESS.matcher(address).matches()) { toast("Enter a valid email address."); return; }
+            send.setEnabled(false); send.setText("Sending…");
+            SupabaseAuthClient.requestPasswordRecovery(address, (sent, error) -> runOnUiThread(() -> {
+                send.setEnabled(true); send.setText("Send recovery code");
+                if (error != null) { toast(error); return; }
+                showRecoveryCode(address);
+            }));
+        });
+        addButton(body, send); gap(body, 9);
+        Button back = secondary("Back to sign in"); back.setOnClickListener(view -> showLogin()); addButton(body, back);
+    }
+
+    private void showRecoveryCode(String email) {
+        LinearLayout body = signedOutPage();
+        title(body, "VERIFY RECOVERY", "Check your email", "Enter the six-digit code sent to:\n" + email + "\nIt expires after 10 minutes.");
+        EditText code = input("Six-digit code", InputType.TYPE_CLASS_NUMBER);
+        code.setFilters(new android.text.InputFilter[]{new android.text.InputFilter.LengthFilter(6)});
+        body.addView(code); gap(body, 10);
+        EditText password = input("New password", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        body.addView(password); gap(body, 5);
+        addPasswordRequirements(body, password); gap(body, 10);
+        EditText confirm = input("Confirm new password", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        body.addView(confirm); gap(body, 16);
+        Button reset = primary("Verify code and reset password");
+        reset.setOnClickListener(view -> {
+            String token = code.getText().toString().trim();
+            String next = password.getText().toString();
+            if (token.length() != 6) { toast("Enter the complete six-digit code."); return; }
+            if (!PasswordPolicy.isValid(next)) { toast(PasswordPolicy.validationMessage(next)); return; }
+            if (!next.equals(confirm.getText().toString())) { toast("The new passwords do not match."); return; }
+            reset.setEnabled(false); reset.setText("Verifying…");
+            SupabaseAuthClient.verifyRecoveryCode(email, token, (auth, verifyError) -> {
+                if (verifyError != null) { runOnUiThread(() -> { reset.setEnabled(true); reset.setText("Verify code and reset password"); toast(verifyError); }); return; }
+                SupabaseAuthClient.updatePassword(auth.accessToken, next, (updated, updateError) -> runOnUiThread(() -> {
+                    reset.setEnabled(true); reset.setText("Verify code and reset password");
+                    if (updateError != null) { toast(updateError); return; }
+                    AuthSessionStore.clear(this);
+                    toast("Password updated. Sign in with your new password.");
+                    showLogin();
+                }));
+            });
+        });
+        addButton(body, reset); gap(body, 9);
+        Button back = secondary("Request another code"); back.setOnClickListener(view -> showForgotPassword()); addButton(body, back);
     }
 
     private void authenticateWithBiometrics() {
@@ -2425,7 +2550,18 @@ public final class MainActivity extends FragmentActivity {
         BiometricPrompt prompt = new BiometricPrompt(this, ContextCompat.getMainExecutor(this), new BiometricPrompt.AuthenticationCallback() {
             @Override public void onAuthenticationSucceeded(BiometricPrompt.AuthenticationResult result) {
                 super.onAuthenticationSucceeded(result);
-                openSignedInHome();
+                if (AccountStore.usesRemoteAuth(MainActivity.this) && SupabaseConfig.isConfigured()) {
+                    AuthSessionStore.Session saved = AuthSessionStore.load(MainActivity.this);
+                    if (saved == null) { toast("Sign in with your password to renew this device."); showLogin(false); return; }
+                    SupabaseAuthClient.refresh(saved.refreshToken, (fresh, error) -> runOnUiThread(() -> {
+                        if (error != null || fresh == null || !fresh.session().isUsable()) {
+                            AuthSessionStore.clear(MainActivity.this);
+                            toast("Your secure session expired. Sign in again."); showLogin(false); return;
+                        }
+                        AuthSessionStore.save(MainActivity.this, fresh.session());
+                        openSignedInHome();
+                    }));
+                } else openSignedInHome();
             }
             @Override public void onAuthenticationError(int code, CharSequence message) {
                 super.onAuthenticationError(code, message);
@@ -2442,15 +2578,20 @@ public final class MainActivity extends FragmentActivity {
 
     private void showRegistration() {
         LinearLayout body = signedOutPage();
-        title(body, "CREATE ACCOUNT", "Set up your coach", "Your account stays on this device. You can adjust your plan at any time.");
+        title(body, "CREATE ACCOUNT", "Set up your coach", "Your email secures your account. Personal and fitness information stays on this phone.");
         EditText email = input("Email address", InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
         body.addView(email);
         gap(body, 10);
         EditText username = input("Username", InputType.TYPE_CLASS_TEXT);
         body.addView(username);
         gap(body, 10);
-        EditText password = input("Password — at least 8 characters", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        EditText password = input("Password", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
         body.addView(password);
+        gap(body, 5);
+        addPasswordRequirements(body, password);
+        gap(body, 10);
+        EditText confirmPassword = input("Confirm password", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        body.addView(confirmPassword);
         gap(body, 18);
         body.addView(heading("Your trainer", 18, Color.WHITE));
         gap(body, 7);
@@ -2476,15 +2617,27 @@ public final class MainActivity extends FragmentActivity {
                 toast("Choose a username with at least 3 characters.");
                 return;
             }
-            if (passwordValue.length() < 8) {
-                toast("Use a password with at least 8 characters.");
+            if (!PasswordPolicy.isValid(passwordValue)) {
+                toast(PasswordPolicy.validationMessage(passwordValue));
+                return;
+            }
+            if (!passwordValue.equals(confirmPassword.getText().toString())) {
+                toast("The passwords do not match.");
                 return;
             }
             selectedTrainer = trainers.getCheckedRadioButtonId() == R.id.trainer_male ? "Male" : "Female";
             configureSpeechVoices();
-            AccountStore.create(this, enteredEmail, usernameValue, passwordValue, selectedTrainer);
-            LauncherIconManager.apply(this, AccountStore.get(this).coachName);
-            showBodyProfileSetup(true);
+            if (!SupabaseConfig.isConfigured()) {
+                toast("Secure account registration is not configured on this build yet.");
+                return;
+            }
+            create.setEnabled(false); create.setText("Creating account…");
+            PendingAccountStore.save(this, enteredEmail, usernameValue, selectedTrainer);
+            SupabaseAuthClient.signUp(enteredEmail, passwordValue, (created, error) -> runOnUiThread(() -> {
+                create.setEnabled(true); create.setText("Create my profile");
+                if (error != null) { toast(error); return; }
+                showVerificationPending(enteredEmail);
+            }));
         });
         addButton(body, create);
         gap(body, 10);
@@ -7207,6 +7360,32 @@ public final class MainActivity extends FragmentActivity {
         addButton(body, back);
     }
 
+    private void showVerificationPending(String email) {
+        LinearLayout body = signedOutPage();
+        title(body, "VERIFY YOUR EMAIL", "One more step", "We sent a verification email to " + email + ". Open it and approve your account before signing in.");
+        LinearLayout notice = card();
+        notice.addView(heading("Access stays locked until verification", 18, ink));
+        notice.addView(text("After approving the email, return here and sign in. Your private profile will then be created only on this phone.", 14, muted));
+        body.addView(notice); gap(body, 16);
+        Button login = primary("I verified my email — sign in"); login.setOnClickListener(view -> showLogin()); addButton(body, login); gap(body, 9);
+        Button change = secondary("Use a different email"); change.setOnClickListener(view -> { PendingAccountStore.clear(this); showRegistration(); }); addButton(body, change);
+    }
+
+    private void addPasswordRequirements(LinearLayout parent, EditText field) {
+        TextView requirements = text(PasswordPolicy.requirements(), 12, Color.rgb(202, 216, 234));
+        requirements.setContentDescription("Password requirements: " + PasswordPolicy.requirements());
+        parent.addView(requirements);
+        field.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence value, int start, int count, int after) { }
+            @Override public void onTextChanged(CharSequence value, int start, int before, int count) {
+                boolean ready = PasswordPolicy.isValid(value == null ? "" : value.toString());
+                requirements.setText(ready ? "✓  Password meets every requirement" : PasswordPolicy.validationMessage(value == null ? "" : value.toString()));
+                requirements.setTextColor(ready ? mint : Color.rgb(202, 216, 234));
+            }
+            @Override public void afterTextChanged(Editable value) { }
+        });
+    }
+
     private View addReportKpi(LinearLayout row, int iconResource, String value, String label) {
         LinearLayout item = new LinearLayout(this);
         item.setOrientation(LinearLayout.VERTICAL);
@@ -7921,6 +8100,10 @@ public final class MainActivity extends FragmentActivity {
         gap(body, 18);
         Button signOut = secondary("Sign out and clear this device");
         signOut.setOnClickListener(view -> {
+            AuthSessionStore.Session remoteSession = AuthSessionStore.load(this);
+            if (remoteSession != null) SupabaseAuthClient.signOut(remoteSession.accessToken, (ignored, error) -> { });
+            AuthSessionStore.clear(this);
+            PendingAccountStore.clear(this);
             AccountStore.clear(this);
             PlanStore.clear(this);
             WeeklyScheduleStore.clear(this);
@@ -8089,20 +8272,35 @@ public final class MainActivity extends FragmentActivity {
 
     private void showSecuritySettings() {
         LinearLayout body = appPage("Settings");
-        title(body, "SECURITY", "Protect your account", "Confirm your current password before choosing a new one. Your password stays on this device.");
+        title(body, "SECURITY", "Protect your account", "Confirm your current password before choosing a new one. Supabase securely hashes account passwords; the app never stores the plaintext.");
         LinearLayout notice = card();
         notice.addView(heading("Change password", 18, ink));
-        notice.addView(text("Use at least 8 characters. Your current password is required to continue.", 14, muted));
+        notice.addView(text(PasswordPolicy.requirements() + ". Your current password is required to continue.", 14, muted));
         body.addView(notice); gap(body, 12);
         EditText current = input("Current password", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD); body.addView(current); gap(body, 9);
-        EditText updated = input("New password — at least 8 characters", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD); body.addView(updated); gap(body, 9);
+        EditText updated = input("New password", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD); body.addView(updated); gap(body, 5);
+        addPasswordRequirements(body, updated); gap(body, 9);
         EditText confirm = input("Confirm new password", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD); body.addView(confirm); gap(body, 14);
         Button save = primary("Change password");
         save.setOnClickListener(view -> {
             String next = updated.getText().toString();
             if (!next.equals(confirm.getText().toString())) { toast("The new passwords do not match."); return; }
+            if (!PasswordPolicy.isValid(next)) { toast(PasswordPolicy.validationMessage(next)); return; }
+            if (AccountStore.usesRemoteAuth(this) && SupabaseConfig.isConfigured()) {
+                save.setEnabled(false); save.setText("Verifying…");
+                SupabaseAuthClient.signIn(profile().email, current.getText().toString(), (auth, signInError) -> {
+                    if (signInError != null) { runOnUiThread(() -> { save.setEnabled(true); save.setText("Change password"); toast(signInError); }); return; }
+                    SupabaseAuthClient.updatePassword(auth.accessToken, next, (changed, updateError) -> runOnUiThread(() -> {
+                        save.setEnabled(true); save.setText("Change password");
+                        if (updateError != null) { toast(updateError); return; }
+                        AuthSessionStore.save(this, auth.session());
+                        toast("Password changed securely."); showProfile();
+                    }));
+                });
+                return;
+            }
             if (AccountStore.changePassword(this, current.getText().toString(), next)) { toast("Password changed."); showProfile(); }
-            else toast("Check your current password and use at least 8 characters.");
+            else toast("Check your current password and meet every password requirement.");
         });
         addButton(body, save); gap(body, 9);
         Button back = secondary("Back to settings"); back.setOnClickListener(view -> showProfile()); addButton(body, back);

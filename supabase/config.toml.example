@@ -1,0 +1,17 @@
+[auth]
+site_url = "com.badimps.personaltrainer://auth"
+additional_redirect_urls = ["com.badimps.personaltrainer://auth/verified"]
+minimum_password_length = 6
+password_requirements = "lower_upper_letters_digits_symbols"
+
+[auth.email]
+enable_signup = true
+enable_confirmations = true
+double_confirm_changes = true
+secure_password_change = true
+max_frequency = "60s"
+otp_length = 6
+otp_expiry = 600
+
+# Hosted Supabase projects must configure the same values in Authentication settings.
+# The recovery email template must display {{ .Token }} so the app can accept the code.

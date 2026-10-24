@@ -2,6 +2,7 @@
 build/
 app/build/
 local.properties
+supabase/.temp/
 *.iml
 .idea/
 tools/*.class
