@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 104,
-  "versionName": "5.62",
+  "versionCode": 105,
+  "versionName": "5.63",
   "publishedAt": "2026-10-23T22:00:00Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.62/app-release.apk",
-  "sha256": "9a67812433df653206d2a78392339236608c42f57449f089711ccf45e4224e73",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.63/app-release.apk",
+  "sha256": "b77cd2a156f6b245e784b51395e46388da97a3475796291892f3c5d9b7e6b132",
   "sizeBytes": 257067327,
-  "notes": "Progress report spacing is refined. Weight Trend now adds a private possible seven-day estimate when two dated check-ins are available; it never treats activity calories as a scale-weight promise."
+  "notes": "Guided workout plans now use your selected duration, sets, reps, rest, and cooldown to build enough exercise blocks. The coach repeats selected movements in order when needed, while manual plans that run long show a clear red overage warning."
 }

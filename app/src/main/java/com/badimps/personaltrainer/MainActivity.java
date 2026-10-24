@@ -4847,9 +4847,7 @@ public final class MainActivity extends FragmentActivity {
                     ? java.util.Arrays.asList(days[i].split("\\|", -1)) : Collections.emptyList();
             List<Coach.Exercise> restored = prescribeNames(names, choices);
             if (restored.isEmpty()) {
-                for (Coach.Exercise exercise : Coach.recommendedForDuration(choices, sessionMinutes)) {
-                    restored.add(Coach.prescribe(exercise, planSets, planReps, planRestSeconds));
-                }
+                restored.addAll(fitExercisesToDuration(recommendedUniqueExercisesForDuration(choices)));
             }
             weeklySessions.get(i).addAll(restored);
         }
@@ -4881,7 +4879,125 @@ public final class MainActivity extends FragmentActivity {
         if (key.equals(selectionKey) && !availableExercises.isEmpty()) return;
         selectionKey = key;
         availableExercises = permanentlyPlacedPlanOptions(activeTargets(), selectedEquipmentTypes);
-        selectedExercises = Coach.recommendedForDuration(availableExercises, sessionMinutes);
+        // Choose only the unique movements that comfortably fit first. The completed session is
+        // then extended in a predictable rotation, rather than silently overflowing its timer.
+        selectedExercises = recommendedUniqueExercisesForDuration(availableExercises);
+    }
+
+    /** Estimates planned time from the member's actual volume and recovery choices. */
+    private long estimatedExerciseSeconds(Coach.Exercise exercise) {
+        if (exercise == null) return 0L;
+        // Four seconds per rep is a deliberately gentle planning pace, with a minimum set length
+        // for lower-rep strength work. Live set timing remains the real recorded duration.
+        long activePerSet = Math.max(35L, exercise.reps * 4L);
+        return activePerSet * Math.max(1, exercise.sets)
+                + (long) Math.max(0, exercise.sets - 1) * WorkoutTiming.clampRestSeconds(exercise.restSeconds);
+    }
+
+    private long estimatedSessionSeconds(List<Coach.Exercise> exercises) {
+        if (exercises == null || exercises.isEmpty()) return 0L;
+        long seconds = 0L;
+        for (int i = 0; i < exercises.size(); i++) {
+            seconds += estimatedExerciseSeconds(exercises.get(i));
+            if (i > 0) seconds += WorkoutTiming.normalizeCooldownSeconds(planCooldownSeconds);
+        }
+        return seconds;
+    }
+
+    private String estimatedMinutesLabel(long seconds) {
+        return Math.max(1L, Math.round(seconds / 60f)) + " min";
+    }
+
+    /** The unique choices shown to the member; they never start out beyond the chosen session. */
+    private List<Coach.Exercise> recommendedUniqueExercisesForDuration(List<Coach.Exercise> options) {
+        ArrayList<Coach.Exercise> selected = new ArrayList<>();
+        if (options == null || options.isEmpty()) return selected;
+        if (workoutNoTimer) return new ArrayList<>(options);
+        long targetSeconds = Math.max(1, sessionMinutes) * 60L;
+        for (Coach.Exercise option : options) {
+            ArrayList<Coach.Exercise> candidate = new ArrayList<>(selected);
+            candidate.add(Coach.prescribe(option, planSets, planReps, planRestSeconds));
+            if (selected.isEmpty() || estimatedSessionSeconds(candidate) <= targetSeconds) selected.add(option);
+            else break;
+        }
+        if (selected.isEmpty()) selected.add(options.get(0));
+        return selected;
+    }
+
+    /**
+     * Turns the chosen movements into a duration-aware session. If unique choices run out, the
+     * coach repeats them in their selected order and only shortens the final repeat when needed.
+     */
+    private List<Coach.Exercise> fitExercisesToDuration(List<Coach.Exercise> choices) {
+        ArrayList<Coach.Exercise> sessionDraft = new ArrayList<>(prescribeExercises(choices));
+        if (workoutNoTimer || sessionDraft.isEmpty()) return sessionDraft;
+        long targetSeconds = Math.max(1, sessionMinutes) * 60L;
+        if (estimatedSessionSeconds(sessionDraft) >= targetSeconds) return sessionDraft;
+        int cursor = 0;
+        int guard = 0;
+        while (estimatedSessionSeconds(sessionDraft) < targetSeconds && guard++ < 80) {
+            Coach.Exercise source = choices.get(cursor++ % choices.size());
+            long current = estimatedSessionSeconds(sessionDraft);
+            long transition = sessionDraft.isEmpty() ? 0L : WorkoutTiming.normalizeCooldownSeconds(planCooldownSeconds);
+            long remaining = targetSeconds - current - transition;
+            int bestSets = 0;
+            for (int sets = Math.max(1, planSets); sets >= 1; sets--) {
+                Coach.Exercise candidate = Coach.prescribe(source, sets, planReps, planRestSeconds);
+                if (estimatedExerciseSeconds(candidate) <= remaining) { bestSets = sets; break; }
+            }
+            if (bestSets == 0) break;
+            sessionDraft.add(Coach.prescribe(source, bestSets, planReps, planRestSeconds));
+        }
+        return sessionDraft;
+    }
+
+    /** A manual selection can be retained, but must plainly disclose its duration overage. */
+    private long manualSelectionOverageSeconds() {
+        if (workoutNoTimer || selectedExercises.isEmpty()) return 0L;
+        return Math.max(0L, estimatedSessionSeconds(prescribeExercises(selectedExercises)) - sessionMinutes * 60L);
+    }
+
+    private void addDurationSelectionNotice(LinearLayout parent) {
+        if (workoutNoTimer || selectedExercises.isEmpty()) return;
+        long overage = manualSelectionOverageSeconds();
+        LinearLayout notice = new LinearLayout(this);
+        notice.setOrientation(LinearLayout.VERTICAL);
+        notice.setPadding(dp(12), dp(10), dp(12), dp(10));
+        if (overage > 0L) {
+            notice.setBackground(surface(Color.rgb(255, 238, 238), 13, 1, Color.rgb(216, 67, 67)));
+            notice.addView(heading("⚠  TIME FRAME EXCEEDED", 11, Color.rgb(183, 36, 36)));
+            notice.addView(text("Your selected exercises are estimated to run " + estimatedMinutesLabel(overage)
+                    + " over the " + sessionMinutes + " minute guided workout. Remove a movement or reduce sets, reps, or recovery.", 12, Color.rgb(157, 39, 39)));
+        } else {
+            List<Coach.Exercise> fitted = fitExercisesToDuration(selectedExercises);
+            notice.setBackground(surface(Color.rgb(231, 249, 243), 13, 1, Color.rgb(189, 236, 222)));
+            notice.addView(heading("COACH TIMING", 11, Color.rgb(18, 117, 98)));
+            notice.addView(text("Coach will sequence " + fitted.size() + " exercise blocks for about "
+                    + estimatedMinutesLabel(estimatedSessionSeconds(fitted)) + " of your " + sessionMinutes
+                    + " minute session, repeating your selected movements in order only when needed.", 12, Color.rgb(30, 93, 82)));
+        }
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
+        params.bottomMargin = dp(12);
+        parent.addView(notice, params);
+    }
+
+    private void addBuiltPlanTimingCard(LinearLayout parent) {
+        if (workoutNoTimer || session.isEmpty()) return;
+        long estimate = estimatedSessionSeconds(session);
+        long targetSeconds = sessionMinutes * 60L;
+        long overage = Math.max(0L, estimate - targetSeconds);
+        LinearLayout timing = card();
+        if (overage > 0L) {
+            timing.setBackground(surface(Color.rgb(255, 238, 238), 16, 1, Color.rgb(216, 67, 67)));
+            timing.addView(heading("⚠  PLAN RUNS " + estimatedMinutesLabel(overage) + " OVER", 15, Color.rgb(183, 36, 36)));
+            timing.addView(text("This plan is estimated at " + estimatedMinutesLabel(estimate) + " for your " + sessionMinutes
+                    + " minute guided workout. Edit exercises or recovery before starting if you want to stay within the timer.", 13, Color.rgb(157, 39, 39)));
+        } else {
+            timing.addView(heading("COACH TIMING ESTIMATE", 15, ink));
+            timing.addView(text(estimatedMinutesLabel(estimate) + " planned across " + session.size()
+                    + " exercise blocks. Repeated movements are intentionally sequenced in the order you selected them.", 13, muted));
+        }
+        parent.addView(timing);
     }
 
     private boolean isSelected(Coach.Exercise exercise) {
@@ -4924,6 +5040,7 @@ public final class MainActivity extends FragmentActivity {
         content.addView(heading("Make the session your own", 23, ink));
         content.addView(text("Your recommended movements are selected. Keep them all, or tailor the session one card at a time.", 13, muted));
         gap(content, 11);
+        addDurationSelectionNotice(content);
         Button addCustom = action("＋  Add custom exercises", navyPanel, mint);
         addCustom.setContentDescription("Open the complete exercise library and add multiple exercises to this workout");
         addCustom.setOnClickListener(view -> showCustomExerciseLibrary());
@@ -5385,6 +5502,7 @@ public final class MainActivity extends FragmentActivity {
         selectionStatus.addView(text("Use the same library search and filters to narrow the movements you add. Hold for the full demonstration.", 13, muted));
         content.addView(selectionStatus);
         gap(content, 12);
+        addDurationSelectionNotice(content);
 
         EditText search = input("Search exercises", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
         search.setText(workoutLibrarySearch);
@@ -5675,6 +5793,7 @@ public final class MainActivity extends FragmentActivity {
         body.addView(heading("Make this plan yours", 23, ink));
         body.addView(text("Choose comfortable targets now. You can fine-tune every setting later.", 13, muted));
         gap(body, 14);
+        addDurationSelectionNotice(body);
         if ("Weekly".equals(planMode)) {
             LinearLayout schedule = card();
             schedule.addView(heading("Weekly schedule", 21, ink));
@@ -5900,7 +6019,7 @@ public final class MainActivity extends FragmentActivity {
             buildWeeklySessions();
             session = new ArrayList<>(weeklySessions.get(activeScheduleDay));
         } else {
-            session = prescribeExercises(selectedExercises);
+            session = fitExercisesToDuration(selectedExercises);
         }
         persistCurrentWeekSchedule();
         savePlanWithReminder();
@@ -5942,8 +6061,8 @@ public final class MainActivity extends FragmentActivity {
             if (!weeklyWorkoutDays[i]) continue;
             List<Coach.Exercise> choices;
             if (i == activeScheduleDay) choices = selectedExercises;
-            else choices = Coach.recommendedForDuration(permanentlyPlacedPlanOptions(weeklyDayTargets.get(i), selectedEquipmentTypes), sessionMinutes);
-            weeklySessions.get(i).addAll(sessionWithScheduledAddOns(selectedWeekDate(i), prescribeExercises(choices)));
+            else choices = recommendedUniqueExercisesForDuration(permanentlyPlacedPlanOptions(weeklyDayTargets.get(i), selectedEquipmentTypes));
+            weeklySessions.get(i).addAll(sessionWithScheduledAddOns(selectedWeekDate(i), fitExercisesToDuration(choices)));
         }
     }
 
@@ -5972,6 +6091,8 @@ public final class MainActivity extends FragmentActivity {
         schedule.addView(text(planReminderEnabled ? "Coach reminder · " + WorkoutReminderScheduler.timeLabel(planReminderHour, planReminderMinute) : "No coach reminder set", 13, planReminderEnabled ? Color.rgb(50, 116, 103) : muted));
         body.addView(schedule);
         gap(body, 10);
+        addBuiltPlanTimingCard(body);
+        if (!workoutNoTimer) gap(body, 10);
         if (selectedEquipmentTypes.contains("Barbell")) {
             addBarbellPlateCard(body);
             gap(body, 10);
