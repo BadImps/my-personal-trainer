@@ -37,6 +37,7 @@ import android.text.InputType;
 import android.text.TextWatcher;
 import android.view.Gravity;
 import android.view.HapticFeedbackConstants;
+import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewTreeObserver;
@@ -332,6 +333,11 @@ public final class MainActivity extends FragmentActivity {
         }
         if (BuildConfig.DEBUG && "com.badimps.personaltrainer.DEBUG_RECOVERY_CODE".equals(getIntent().getAction())) {
             showRecoveryCode("athlete@example.com");
+            return;
+        }
+        if (BuildConfig.DEBUG && "com.badimps.personaltrainer.DEBUG_RECOVERY_PASSWORD".equals(getIntent().getAction())) {
+            showNewRecoveryPassword("athlete@example.com",
+                    new SupabaseAuthClient.AuthResult("preview-token", "preview-refresh", "preview-user", "athlete@example.com"));
             return;
         }
         if (BuildConfig.DEBUG && "com.badimps.personaltrainer.DEBUG_COACH_COLLECTION".equals(getIntent().getAction())) {
@@ -2509,35 +2515,94 @@ public final class MainActivity extends FragmentActivity {
     private void showRecoveryCode(String email) {
         LinearLayout body = signedOutPage();
         title(body, "VERIFY RECOVERY", "Check your email", "Enter the six-digit code sent to:\n" + email + "\nIt expires after 10 minutes.");
-        EditText code = input("Six-digit code", InputType.TYPE_CLASS_NUMBER);
-        code.setFilters(new android.text.InputFilter[]{new android.text.InputFilter.LengthFilter(6)});
-        body.addView(code); gap(body, 10);
+        EditText[] digits = recoveryCodeFields(body);
+        gap(body, 18);
+        Button verify = primary("Verify code");
+        verify.setOnClickListener(view -> {
+            StringBuilder entered = new StringBuilder(6);
+            for (EditText digit : digits) entered.append(digit.getText().toString().trim());
+            String token = entered.toString();
+            if (token.length() != 6) { toast("Enter the complete six-digit code."); return; }
+            verify.setEnabled(false); verify.setText("Verifying…");
+            SupabaseAuthClient.verifyRecoveryCode(email, token, (auth, verifyError) -> runOnUiThread(() -> {
+                verify.setEnabled(true); verify.setText("Verify code");
+                if (verifyError != null) { toast(verifyError); return; }
+                showNewRecoveryPassword(email, auth);
+            }));
+        });
+        addButton(body, verify); gap(body, 9);
+        Button back = secondary("Request another code"); back.setOnClickListener(view -> showForgotPassword()); addButton(body, back);
+        digits[0].requestFocus();
+    }
+
+    private EditText[] recoveryCodeFields(LinearLayout body) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER);
+        EditText[] digits = new EditText[6];
+        for (int i = 0; i < digits.length; i++) {
+            final int index = i;
+            EditText digit = input("", InputType.TYPE_CLASS_NUMBER);
+            digit.setGravity(Gravity.CENTER);
+            digit.setTextSize(22);
+            digit.setSingleLine(true);
+            digit.setContentDescription("Recovery code digit " + (i + 1) + " of 6");
+            digit.setFilters(new android.text.InputFilter[]{new android.text.InputFilter.LengthFilter(1)});
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(58), 1f);
+            params.setMargins(i == 0 ? 0 : dp(4), 0, i == digits.length - 1 ? 0 : dp(4), 0);
+            row.addView(digit, params);
+            digits[i] = digit;
+            digit.addTextChangedListener(new TextWatcher() {
+                @Override public void beforeTextChanged(CharSequence value, int start, int count, int after) { }
+                @Override public void onTextChanged(CharSequence value, int start, int before, int count) {
+                    if (value.length() == 1 && index < digits.length - 1) digits[index + 1].requestFocus();
+                }
+                @Override public void afterTextChanged(Editable value) { }
+            });
+            digit.setOnKeyListener((view, keyCode, event) -> {
+                if (keyCode == KeyEvent.KEYCODE_DEL && event.getAction() == KeyEvent.ACTION_DOWN
+                        && digit.getText().length() == 0 && index > 0) {
+                    digits[index - 1].requestFocus();
+                    digits[index - 1].setSelection(digits[index - 1].length());
+                    return true;
+                }
+                return false;
+            });
+        }
+        body.addView(row, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        return digits;
+    }
+
+    private void showNewRecoveryPassword(String email, SupabaseAuthClient.AuthResult auth) {
+        if (auth == null || auth.accessToken == null || auth.accessToken.trim().isEmpty()) {
+            toast("Your recovery verification expired. Request a new code.");
+            showForgotPassword();
+            return;
+        }
+        LinearLayout body = signedOutPage();
+        title(body, "SECURE YOUR ACCOUNT", "New password", "Your email is verified. Choose a new password for:\n" + email);
         EditText password = input("New password", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
         body.addView(password); gap(body, 5);
         addPasswordRequirements(body, password); gap(body, 10);
         EditText confirm = input("Confirm new password", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
         body.addView(confirm); gap(body, 16);
-        Button reset = primary("Verify code and reset password");
-        reset.setOnClickListener(view -> {
-            String token = code.getText().toString().trim();
+        Button update = primary("Update password and continue");
+        update.setOnClickListener(view -> {
             String next = password.getText().toString();
-            if (token.length() != 6) { toast("Enter the complete six-digit code."); return; }
             if (!PasswordPolicy.isValid(next)) { toast(PasswordPolicy.validationMessage(next)); return; }
             if (!next.equals(confirm.getText().toString())) { toast("The new passwords do not match."); return; }
-            reset.setEnabled(false); reset.setText("Verifying…");
-            SupabaseAuthClient.verifyRecoveryCode(email, token, (auth, verifyError) -> {
-                if (verifyError != null) { runOnUiThread(() -> { reset.setEnabled(true); reset.setText("Verify code and reset password"); toast(verifyError); }); return; }
-                SupabaseAuthClient.updatePassword(auth.accessToken, next, (updated, updateError) -> runOnUiThread(() -> {
-                    reset.setEnabled(true); reset.setText("Verify code and reset password");
-                    if (updateError != null) { toast(updateError); return; }
-                    AuthSessionStore.clear(this);
-                    toast("Password updated. Sign in with your new password.");
-                    showLogin();
-                }));
-            });
+            update.setEnabled(false); update.setText("Updating…");
+            SupabaseAuthClient.updatePassword(auth.accessToken, next, (updated, updateError) -> runOnUiThread(() -> {
+                update.setEnabled(true); update.setText("Update password and continue");
+                if (updateError != null) { toast(updateError); return; }
+                toast("Password updated. Welcome back.");
+                completeRemoteSignIn(auth, true);
+            }));
         });
-        addButton(body, reset); gap(body, 9);
-        Button back = secondary("Request another code"); back.setOnClickListener(view -> showForgotPassword()); addButton(body, back);
+        addButton(body, update); gap(body, 9);
+        Button cancel = secondary("Cancel and return to sign in");
+        cancel.setOnClickListener(view -> showLogin());
+        addButton(body, cancel);
     }
 
     private void authenticateWithBiometrics() {

@@ -41,6 +41,8 @@ The confirmation template should retain `{{ .ConfirmationURL }}`. The recovery t
 
 Supabase supports email OTP lengths from 6–10 digits. A four-digit recovery code is intentionally not used because it is unsupported and substantially weaker against guessing attacks.
 
+Password recovery uses three separate screens: email request, six individual OTP fields, and new-password creation. The request response deliberately does not reveal whether an email is registered, which prevents account enumeration.
+
 ## Privacy boundary
 
 Supabase receives the account email, password hash managed by Supabase Auth, authentication identifiers, and Auth audit metadata. Username, profile photo, gender/body context, measurements, workouts, endurance routes, nutrition, schedules, progress, coach choice, and dialogue preferences remain on the phone.
