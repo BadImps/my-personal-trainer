@@ -523,7 +523,14 @@ public final class MainActivity extends FragmentActivity {
     @Override protected void onResume() {
         super.onResume();
         WorkoutSessionStore.State workoutState = WorkoutSessionStore.get(this);
-        if (hasActiveGuidedWorkout() && workoutState.active) activeWorkoutPaused = workoutState.paused;
+        if (hasActiveGuidedWorkout() && workoutState.active) {
+            activeWorkoutPaused = workoutState.paused;
+            if (!session.isEmpty()) {
+                activeWorkoutExerciseIndex = Math.max(0, Math.min(session.size() - 1,
+                        workoutState.exerciseIndex));
+                activeWorkoutSet = Math.max(1, workoutState.set);
+            }
+        }
         if (pendingOtaInstall != null) {
             if (Build.VERSION.SDK_INT >= 26 && !getPackageManager().canRequestPackageInstalls()) return;
             UpdateManager.Info ready = pendingOtaInstall;
@@ -1284,9 +1291,28 @@ public final class MainActivity extends FragmentActivity {
         Coach.Exercise exercise = session.get(activeWorkoutExerciseIndex);
         String workoutTitle = ("Custom".equalsIgnoreCase(planMode) ? "Custom · " : "") + target + " workout";
         WorkoutSessionStore.save(this, workoutTitle, exercise.name, activeWorkoutExerciseIndex,
-                session.size(), Math.max(1, activeWorkoutSet), exercise.sets, activeWorkoutPaused);
+                session.size(), Math.max(1, activeWorkoutSet), exercise.sets, activeWorkoutPaused,
+                workoutExerciseNames(), workoutExerciseSetCounts());
         Intent service = new Intent(this, GuidedWorkoutService.class).setAction(GuidedWorkoutService.ACTION_REFRESH);
         ContextCompat.startForegroundService(this, service);
+    }
+
+    private String workoutExerciseNames() {
+        StringBuilder values = new StringBuilder();
+        for (Coach.Exercise exercise : session) {
+            if (values.length() > 0) values.append('\u001f');
+            values.append(exercise.name);
+        }
+        return values.toString();
+    }
+
+    private String workoutExerciseSetCounts() {
+        StringBuilder values = new StringBuilder();
+        for (Coach.Exercise exercise : session) {
+            if (values.length() > 0) values.append(',');
+            values.append(Math.max(1, exercise.sets));
+        }
+        return values.toString();
     }
 
     private void stopWorkoutService() {

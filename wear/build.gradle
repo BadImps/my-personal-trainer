@@ -1,0 +1,20 @@
+plugins { id 'com.android.application' }
+
+android {
+    namespace 'com.badimps.personaltrainer'
+    compileSdk 36
+    defaultConfig {
+        applicationId 'com.badimps.personaltrainer'
+        minSdk 30
+        targetSdk 36
+        versionCode 106
+        versionName '5.64'
+    }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+}
+
+dependencies {
+    implementation 'androidx.core:core:1.17.0'
+    implementation 'androidx.wear:wear:1.3.0'
+    implementation 'com.google.android.gms:play-services-wearable:20.0.1'
+}

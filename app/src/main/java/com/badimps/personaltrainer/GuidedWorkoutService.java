@@ -8,8 +8,6 @@ import android.app.Service;
 import android.content.Intent;
 import android.os.Build;
 import android.os.IBinder;
-import android.widget.RemoteViews;
-
 import androidx.core.app.NotificationCompat;
 
 /** Keeps guided workout timing alive and exposes compact icon-only notification controls. */
@@ -18,6 +16,8 @@ public final class GuidedWorkoutService extends Service {
     public static final String ACTION_TOGGLE = "com.badimps.personaltrainer.workout.TOGGLE";
     public static final String ACTION_OPEN = "com.badimps.personaltrainer.workout.OPEN";
     public static final String ACTION_END = "com.badimps.personaltrainer.workout.END";
+    public static final String ACTION_COMPLETE = "com.badimps.personaltrainer.workout.COMPLETE";
+    public static final String ACTION_PREVIOUS = "com.badimps.personaltrainer.workout.PREVIOUS";
     private static final String CHANNEL = "guided_workout";
     private static final int ID = 7301;
 
@@ -37,6 +37,12 @@ public final class GuidedWorkoutService extends Service {
         if (ACTION_TOGGLE.equals(action)) {
             WorkoutSessionStore.State state = WorkoutSessionStore.get(this);
             WorkoutSessionStore.setPaused(this, !state.paused);
+        } else if (ACTION_COMPLETE.equals(action)) {
+            WorkoutSessionStore.completeCurrentSet(this);
+        } else if (ACTION_PREVIOUS.equals(action)) {
+            WorkoutSessionStore.previousExercise(this);
+        } else if (ACTION_END.equals(action)) {
+            WorkoutSessionStore.clear(this);
         }
         WorkoutSessionStore.State state = WorkoutSessionStore.get(this);
         if (!state.active) {
@@ -45,30 +51,12 @@ public final class GuidedWorkoutService extends Service {
             return START_NOT_STICKY;
         }
         startForeground(ID, notification(state));
+        WearWorkoutSync.publish(this, state);
         return START_STICKY;
     }
 
     private Notification notification(WorkoutSessionStore.State state) {
         int progress = Math.max(0, Math.min(state.exerciseCount, state.exerciseIndex + 1));
-        RemoteViews controls = new RemoteViews(getPackageName(), R.layout.notification_guided_workout);
-        controls.setTextViewText(R.id.workout_notification_title,
-                state.paused ? "Workout paused" : state.title);
-        controls.setTextViewText(R.id.workout_notification_detail,
-                state.exercise + "  •  Set " + state.set + " of " + state.sets
-                        + "  •  " + progress + " of " + state.exerciseCount);
-        controls.setProgressBar(R.id.workout_notification_progress,
-                Math.max(1, state.exerciseCount), progress, false);
-        controls.setImageViewResource(R.id.workout_notification_toggle,
-                state.paused ? R.drawable.ic_notification_play : R.drawable.ic_notification_pause);
-        controls.setContentDescription(R.id.workout_notification_toggle,
-                state.paused ? "Resume workout" : "Pause workout");
-        controls.setOnClickPendingIntent(R.id.workout_notification_toggle,
-                serviceIntent(ACTION_TOGGLE, 7303));
-        controls.setOnClickPendingIntent(R.id.workout_notification_open,
-                activityIntent(ACTION_OPEN, 7304));
-        controls.setOnClickPendingIntent(R.id.workout_notification_end,
-                activityIntent(ACTION_END, 7305));
-
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL)
                 .setSmallIcon(R.drawable.ic_nav_workouts)
                 .setColor(CoachHeroDesign.MINT)
@@ -77,10 +65,19 @@ public final class GuidedWorkoutService extends Service {
                 .setSubText(progress + " of " + state.exerciseCount + " exercises")
                 .setProgress(Math.max(1, state.exerciseCount), progress, false)
                 .setOngoing(true).setOnlyAlertOnce(true).setSilent(true)
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                .setCategory(NotificationCompat.CATEGORY_SERVICE)
+                .setWhen(state.startedAtEpochMillis > 0L ? state.startedAtEpochMillis : System.currentTimeMillis())
+                .setUsesChronometer(true).setShowWhen(true)
                 .setContentIntent(activityIntent(ACTION_OPEN, 7302))
-                .setCustomContentView(controls)
-                .setCustomBigContentView(controls)
-                .setStyle(new NotificationCompat.DecoratedCustomViewStyle());
+                .addAction(R.drawable.ic_notification_previous, "Previous", serviceIntent(ACTION_PREVIOUS, 7303))
+                .addAction(state.paused ? R.drawable.ic_notification_play : R.drawable.ic_notification_pause,
+                        state.paused ? "Resume" : "Pause", serviceIntent(ACTION_TOGGLE, 7304))
+                .addAction(R.drawable.ic_notification_complete, "Complete set", serviceIntent(ACTION_COMPLETE, 7305))
+                .setStyle(new NotificationCompat.BigTextStyle().bigText(
+                        state.exercise + "  •  Set " + state.set + " of " + state.sets
+                                + "\nWorkout " + progress + " of " + state.exerciseCount));
+        if (Build.VERSION.SDK_INT >= 36) builder.setRequestPromotedOngoing(true);
         return builder.build();
     }
 

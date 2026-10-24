@@ -59,6 +59,7 @@ dependencies {
     implementation 'androidx.core:core:1.17.0'
     implementation 'androidx.activity:activity:1.11.0'
     implementation 'androidx.biometric:biometric:1.1.0'
+    implementation 'com.google.android.gms:play-services-wearable:20.0.1'
     implementation 'org.mapsforge:mapsforge-map-android:0.25.0'
     implementation 'org.mapsforge:mapsforge-themes:0.25.0'
     // GPU-rendered vector map surface. Country data remains app-private and is
