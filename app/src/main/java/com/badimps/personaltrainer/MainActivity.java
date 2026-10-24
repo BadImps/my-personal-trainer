@@ -3,6 +3,7 @@ package com.badimps.personaltrainer;
 import android.animation.ValueAnimator;
 import android.app.AlertDialog;
 import android.app.Dialog;
+import android.app.NotificationManager;
 import android.Manifest;
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -27,6 +28,7 @@ import android.os.CountDownTimer;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
+import android.provider.Settings;
 import android.media.AudioManager;
 import android.media.ToneGenerator;
 import android.speech.tts.TextToSpeech;
@@ -8222,6 +8224,8 @@ public final class MainActivity extends FragmentActivity {
         appGroup.addView(settingsDivider());
         appGroup.addView(settingsRow("▶", "Coach motion packs", "Optional smooth exercise loops · download only what you need", view -> showMediaPacks()));
         appGroup.addView(settingsDivider());
+        appGroup.addView(settingsRow("◉", "Live workout display", liveWorkoutSurfaceStatus(), view -> openLiveWorkoutSurfaceSettings()));
+        appGroup.addView(settingsDivider());
         appGroup.addView(settingsRow("↻", "Updates", "Check for a newer version", view -> showUpdate()));
         body.addView(appGroup);
         gap(body, 18);
@@ -9421,7 +9425,47 @@ public final class MainActivity extends FragmentActivity {
         activeWorkoutPaused = false;
         requestWorkoutNotificationPermission();
         syncWorkoutService();
+        offerLiveWorkoutSurfaceSetup();
         showGuidedPreparationChoice();
+    }
+
+    private String liveWorkoutSurfaceStatus() {
+        if (Build.VERSION.SDK_INT < 36) return "Requires Android 16 · standard workout notification remains available";
+        NotificationManager manager = getSystemService(NotificationManager.class);
+        return manager != null && manager.canPostPromotedNotifications()
+                ? "Live workout promotion enabled"
+                : "Enable lock-screen and status-bar Live Updates";
+    }
+
+    private void offerLiveWorkoutSurfaceSetup() {
+        if (Build.VERSION.SDK_INT < 36) return;
+        NotificationManager manager = getSystemService(NotificationManager.class);
+        if (manager == null || manager.canPostPromotedNotifications()) return;
+        android.content.SharedPreferences preferences = getSharedPreferences("live_workout_surface", MODE_PRIVATE);
+        if (preferences.getBoolean("setup_offered", false)) return;
+        preferences.edit().putBoolean("setup_offered", true).apply();
+        new AlertDialog.Builder(this)
+                .setTitle("Show workouts as a Live Update?")
+                .setMessage("Allow My Personal Trainer to keep the active exercise, set and elapsed time on supported lock-screen and status-bar surfaces. Your phone manufacturer controls the exact placement.")
+                .setPositiveButton("Open settings", (dialog, which) -> openLiveWorkoutSurfaceSettings())
+                .setNegativeButton("Not now", null)
+                .show();
+    }
+
+    private void openLiveWorkoutSurfaceSettings() {
+        Intent intent;
+        if (Build.VERSION.SDK_INT >= 36) {
+            intent = new Intent("android.settings.MANAGE_APP_PROMOTED_NOTIFICATIONS")
+                    .setData(Uri.parse("package:" + getPackageName()));
+        } else {
+            intent = new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                    .putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName());
+        }
+        try { startActivity(intent); }
+        catch (android.content.ActivityNotFoundException unavailable) {
+            startActivity(new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                    .putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName()));
+        }
     }
 
     /** Lets a member choose preparation and recovery without silently changing their plan. */

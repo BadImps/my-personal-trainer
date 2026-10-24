@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 108,
-  "versionName": "5.66",
-  "publishedAt": "2026-10-24T06:45:57Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.66/app-release.apk",
-  "sha256": "8b7e3e1b1b766694b479ae448bb4a23391f6612935a73bea56e959873ca45cff",
+  "versionCode": 109,
+  "versionName": "5.67",
+  "publishedAt": "2026-10-24T06:51:06Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.67/app-release.apk",
+  "sha256": "06100a7ce82eef685f24538f6cb04e9f9c0460f49807bf69a30574f6ef67de23",
   "sizeBytes": 258704352,
-  "notes": "The phone and Wear OS app now use the approved minimal mint-and-coral dumbbell on a solid Coach Hero navy tile, with full-bleed adaptive masking that prevents white launcher corners."
+  "notes": "The app now checks whether Android permits promoted Live Updates, offers the required system setting when necessary, and reports Live workout display compatibility under Settings."
 }

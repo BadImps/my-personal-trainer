@@ -15,6 +15,7 @@ public final class ReleaseNotes {
     }
 
     public static final Entry[] HISTORY = {
+            new Entry("5.67", "Live workout eligibility", "Checks whether Android actually permits promoted Live Updates, offers the required system setting when a workout starts, and adds a clear Live workout display control under Settings."),
             new Entry("5.66", "Premium dumbbell launcher", "Replaces the launcher artwork with the approved minimal mint-and-coral dumbbell on a solid Coach Hero navy tile, including full-bleed adaptive masking that prevents white corners."),
             new Entry("5.65", "Live workout surfaces", "Active guided workouts now remain visible through Android's lock-screen Live Update surface, with elapsed time, exercise progress, set controls, and a synchronized Coach Hero Wear OS companion."),
             new Entry("5.64", "Workout length for Daily & Weekly", "Daily and Weekly planning now include Workout Length before equipment, so every saved session is sized around your chosen 45-minute, 60-minute, 1-hour-50-minute, custom, or untimed format."),
