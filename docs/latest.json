@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 107,
-  "versionName": "5.65",
-  "publishedAt": "2026-10-24T06:36:53Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.65/app-release.apk",
-  "sha256": "b90307ac825e3a91a3b078425197023c06cae83c2bafa0956ca2035da9a248f1",
-  "sizeBytes": 257645012,
-  "notes": "Active guided workouts now remain visible through Android's lock-screen Live Update surface with elapsed time, exercise progress, and set controls. A synchronized Coach Hero Wear OS companion is included as a separate watch installation."
+  "versionCode": 108,
+  "versionName": "5.66",
+  "publishedAt": "2026-10-24T06:45:57Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.66/app-release.apk",
+  "sha256": "8b7e3e1b1b766694b479ae448bb4a23391f6612935a73bea56e959873ca45cff",
+  "sizeBytes": 258704352,
+  "notes": "The phone and Wear OS app now use the approved minimal mint-and-coral dumbbell on a solid Coach Hero navy tile, with full-bleed adaptive masking that prevents white launcher corners."
 }

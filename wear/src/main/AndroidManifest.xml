@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-feature android:name="android.hardware.type.watch" android:required="true" />
-    <application android:theme="@style/WearTheme" android:label="My Personal Trainer" android:allowBackup="false" android:usesCleartextTraffic="false">
+    <application android:theme="@style/WearTheme" android:label="My Personal Trainer" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher" android:allowBackup="false" android:usesCleartextTraffic="false">
         <meta-data android:name="com.google.android.wearable.standalone" android:value="false" />
         <uses-library android:name="com.google.android.wearable" android:required="true" />
         <activity android:name=".WearWorkoutActivity" android:exported="true">
