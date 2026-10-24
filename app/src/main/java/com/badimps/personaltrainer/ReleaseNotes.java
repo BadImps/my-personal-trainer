@@ -15,6 +15,7 @@ public final class ReleaseNotes {
     }
 
     public static final Entry[] HISTORY = {
+            new Entry("5.65", "Live workout surfaces", "Active guided workouts now remain visible through Android's lock-screen Live Update surface, with elapsed time, exercise progress, set controls, and a synchronized Coach Hero Wear OS companion."),
             new Entry("5.64", "Workout length for Daily & Weekly", "Daily and Weekly planning now include Workout Length before equipment, so every saved session is sized around your chosen 45-minute, 60-minute, 1-hour-50-minute, custom, or untimed format."),
             new Entry("5.63", "Duration-aware guided plans", "Coach now shapes exercise blocks around your chosen workout length, rotates selected movements when needed, and clearly flags manual plans estimated to run over time."),
             new Entry("5.62", "Clearer weight and monthly reports", "Fixes Progress report text collisions and adds a private, check-in-only possible seven-day weight trend once two dated weigh-ins are available."),

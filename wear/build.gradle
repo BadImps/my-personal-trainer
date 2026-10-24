@@ -1,16 +1,35 @@
 plugins { id 'com.android.application' }
 
+def releaseProperties = new Properties()
+def releasePropertiesFile = rootProject.file('release-signing.properties')
+if (releasePropertiesFile.exists()) {
+    releasePropertiesFile.withInputStream { releaseProperties.load(it) }
+}
+
 android {
     namespace 'com.badimps.personaltrainer'
     compileSdk 36
+    signingConfigs {
+        production {
+            storeFile file(releaseProperties.getProperty('storeFile', '../keys/my-personal-trainer-release.jks'))
+            storePassword releaseProperties.getProperty('storePassword', '')
+            keyAlias releaseProperties.getProperty('keyAlias', 'my-personal-trainer')
+            keyPassword releaseProperties.getProperty('keyPassword', '')
+        }
+    }
     defaultConfig {
         applicationId 'com.badimps.personaltrainer'
         minSdk 30
         targetSdk 36
-        versionCode 106
-        versionName '5.64'
+        versionCode 107
+        versionName '5.65'
     }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+    buildTypes {
+        release {
+            signingConfig releasePropertiesFile.exists() ? signingConfigs.production : signingConfigs.debug
+        }
+    }
 }
 
 dependencies {

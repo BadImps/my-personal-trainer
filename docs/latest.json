@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 106,
-  "versionName": "5.64",
-  "publishedAt": "2026-10-24T01:53:18Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.64/app-release.apk",
-  "sha256": "71acd81e8571990c093f4f23ffafe7de5f633036295aa765aa8f8e888276b64a",
-  "sizeBytes": 257067327,
-  "notes": "Daily and Weekly planners now include Workout Length before equipment. Choose 45 minutes, 60 minutes, 1 hour 50 minutes, a custom duration, or an untimed session before Coach builds the exercise sequence."
+  "versionCode": 107,
+  "versionName": "5.65",
+  "publishedAt": "2026-10-24T06:36:53Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.65/app-release.apk",
+  "sha256": "b90307ac825e3a91a3b078425197023c06cae83c2bafa0956ca2035da9a248f1",
+  "sizeBytes": 257645012,
+  "notes": "Active guided workouts now remain visible through Android's lock-screen Live Update surface with elapsed time, exercise progress, and set controls. A synchronized Coach Hero Wear OS companion is included as a separate watch installation."
 }
