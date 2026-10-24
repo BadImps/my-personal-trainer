@@ -144,7 +144,7 @@ public final class SupabaseAuthClient {
         if (lower.contains("already registered") || lower.contains("already been registered")) return "An account already exists for this email.";
         if (lower.contains("expired") || lower.contains("invalid token")) return "That verification code is invalid or has expired.";
         if (lower.contains("rate") || lower.contains("too many")) return "Too many attempts. Please wait before trying again.";
-        return value;
+        return "The secure account request could not be completed. Please try again.";
     }
     private static String read(InputStream input) throws Exception {
         if (input == null) return "";

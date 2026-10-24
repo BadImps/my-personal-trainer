@@ -23,7 +23,7 @@ In Authentication settings:
 
 1. Enable email/password sign-up.
 2. Require email confirmation before sign-in.
-3. Set minimum password length to 6 and require uppercase/lowercase letters, digits, and symbols. The app applies the same policy and explains every requirement while the member types.
+3. Set minimum password length to 10 and require uppercase/lowercase letters, digits, and symbols. The app applies the same policy and explains every requirement while the member types.
 4. Set email OTP length to 6 and expiry to 10 minutes.
 5. Configure custom SMTP before production. Supabase's trial mailer is rate-limited and best-effort.
 6. Add `com.badimps.personaltrainer://auth/verified` to allowed redirect URLs.
@@ -42,6 +42,10 @@ The confirmation template should retain `{{ .ConfirmationURL }}`. The recovery t
 Supabase supports email OTP lengths from 6–10 digits. A four-digit recovery code is intentionally not used because it is unsupported and substantially weaker against guessing attacks.
 
 Password recovery uses three separate screens: email request, six individual OTP fields, and new-password creation. The request response deliberately does not reveal whether an email is registered, which prevents account enumeration.
+
+The app adds device-side throttling to Supabase's server limits: recovery email resends wait at least 60 seconds, and five failed login or recovery-code attempts pause that action for 15 minutes. After a successful password reset, the temporary recovery session is revoked and replaced with a fresh password-authenticated session.
+
+Password reset, session revocation, and sign-out operate only on authentication credentials. They never erase local workouts, endurance routes, nutrition, schedules, body information, progress, achievements, or coach preferences.
 
 ## Privacy boundary
 

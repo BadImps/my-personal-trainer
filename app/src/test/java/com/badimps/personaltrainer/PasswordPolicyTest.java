@@ -6,8 +6,8 @@ import static org.junit.Assert.assertTrue;
 import org.junit.Test;
 
 public final class PasswordPolicyTest {
-    @Test public void acceptsRequiredCharacterClassesAtSixCharacters() {
-        assertTrue(PasswordPolicy.isValid("Ab1!xy"));
+    @Test public void acceptsRequiredCharacterClassesAtTenCharacters() {
+        assertTrue(PasswordPolicy.isValid("Ab1!xyz789"));
     }
 
     @Test public void rejectsMissingCapitalNumberSpecialOrLength() {
@@ -15,6 +15,6 @@ public final class PasswordPolicyTest {
         assertFalse(PasswordPolicy.isValid("Abc!xy"));
         assertFalse(PasswordPolicy.isValid("Ab12xy"));
         assertFalse(PasswordPolicy.isValid("AB1!XY"));
-        assertFalse(PasswordPolicy.isValid("A1!xy"));
+        assertFalse(PasswordPolicy.isValid("Ab1!xyz89"));
     }
 }

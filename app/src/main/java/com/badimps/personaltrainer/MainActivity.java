@@ -288,6 +288,9 @@ public final class MainActivity extends FragmentActivity {
         // before content is created.
         setTheme(R.style.AppTheme);
         super.onCreate(state);
+        // Production builds contain private health and route information. Debug remains
+        // capturable so approved AVD visual QA can continue without weakening release privacy.
+        if (!BuildConfig.DEBUG) getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);
         coachAudio = new CoachAudioClips(this);
         // Keep editable content inside the resized visible area when the IME is open.
         // The focused-field helper below also asks nested scroll containers to reveal it.
@@ -2281,11 +2284,17 @@ public final class MainActivity extends FragmentActivity {
                     toast("This is a legacy device-only account. Register the email to enable secure recovery.");
                     return;
                 }
+                String address = email.getText().toString().trim();
+                if (!AuthAttemptLimiter.allowed(this, AuthAttemptLimiter.LOGIN, address)) {
+                    toast(AuthAttemptLimiter.waitMessage(this, AuthAttemptLimiter.LOGIN, address));
+                    return;
+                }
                 signIn.setEnabled(false);
                 signIn.setText("Signing in…");
-                SupabaseAuthClient.signIn(email.getText().toString(), password.getText().toString(), (result, error) -> runOnUiThread(() -> {
+                SupabaseAuthClient.signIn(address, password.getText().toString(), (result, error) -> runOnUiThread(() -> {
                     signIn.setEnabled(true); signIn.setText("Sign in  →");
-                    if (error != null) { toast(error); return; }
+                    if (error != null) { AuthAttemptLimiter.recordFailure(this, AuthAttemptLimiter.LOGIN, address); toast(error); return; }
+                    AuthAttemptLimiter.clear(this, AuthAttemptLimiter.LOGIN, address);
                     completeRemoteSignIn(result, remember.isChecked());
                 }));
                 return;
@@ -2385,8 +2394,14 @@ public final class MainActivity extends FragmentActivity {
                     toast("This is a legacy device-only account. Register the email to enable secure recovery.");
                     return;
                 }
-                SupabaseAuthClient.signIn(email.getText().toString(), password.getText().toString(), (result, error) -> runOnUiThread(() -> {
-                    if (error != null) { toast(error); return; }
+                String address = email.getText().toString().trim();
+                if (!AuthAttemptLimiter.allowed(this, AuthAttemptLimiter.LOGIN, address)) {
+                    toast(AuthAttemptLimiter.waitMessage(this, AuthAttemptLimiter.LOGIN, address));
+                    return;
+                }
+                SupabaseAuthClient.signIn(address, password.getText().toString(), (result, error) -> runOnUiThread(() -> {
+                    if (error != null) { AuthAttemptLimiter.recordFailure(this, AuthAttemptLimiter.LOGIN, address); toast(error); return; }
+                    AuthAttemptLimiter.clear(this, AuthAttemptLimiter.LOGIN, address);
                     completeRemoteSignIn(result, remember[0]);
                 }));
                 return;
@@ -2501,10 +2516,15 @@ public final class MainActivity extends FragmentActivity {
         send.setOnClickListener(view -> {
             String address = email.getText().toString().trim();
             if (!android.util.Patterns.EMAIL_ADDRESS.matcher(address).matches()) { toast("Enter a valid email address."); return; }
+            if (!AuthAttemptLimiter.allowed(this, AuthAttemptLimiter.RECOVERY_SEND, address)) {
+                toast(AuthAttemptLimiter.waitMessage(this, AuthAttemptLimiter.RECOVERY_SEND, address));
+                return;
+            }
             send.setEnabled(false); send.setText("Sending…");
             SupabaseAuthClient.requestPasswordRecovery(address, (sent, error) -> runOnUiThread(() -> {
                 send.setEnabled(true); send.setText("Send recovery code");
                 if (error != null) { toast(error); return; }
+                AuthAttemptLimiter.recordRecoverySend(this, address);
                 showRecoveryCode(address);
             }));
         });
@@ -2523,10 +2543,15 @@ public final class MainActivity extends FragmentActivity {
             for (EditText digit : digits) entered.append(digit.getText().toString().trim());
             String token = entered.toString();
             if (token.length() != 6) { toast("Enter the complete six-digit code."); return; }
+            if (!AuthAttemptLimiter.allowed(this, AuthAttemptLimiter.RECOVERY_CODE, email)) {
+                toast(AuthAttemptLimiter.waitMessage(this, AuthAttemptLimiter.RECOVERY_CODE, email));
+                return;
+            }
             verify.setEnabled(false); verify.setText("Verifying…");
             SupabaseAuthClient.verifyRecoveryCode(email, token, (auth, verifyError) -> runOnUiThread(() -> {
                 verify.setEnabled(true); verify.setText("Verify code");
-                if (verifyError != null) { toast(verifyError); return; }
+                if (verifyError != null) { AuthAttemptLimiter.recordFailure(this, AuthAttemptLimiter.RECOVERY_CODE, email); toast(verifyError); return; }
+                AuthAttemptLimiter.clear(this, AuthAttemptLimiter.RECOVERY_CODE, email);
                 showNewRecoveryPassword(email, auth);
             }));
         });
@@ -2595,8 +2620,19 @@ public final class MainActivity extends FragmentActivity {
             SupabaseAuthClient.updatePassword(auth.accessToken, next, (updated, updateError) -> runOnUiThread(() -> {
                 update.setEnabled(true); update.setText("Update password and continue");
                 if (updateError != null) { toast(updateError); return; }
-                toast("Password updated. Welcome back.");
-                completeRemoteSignIn(auth, true);
+                // End the temporary recovery session and create a clean password session.
+                // This revokes stale sessions without deleting any local fitness information.
+                SupabaseAuthClient.signOut(auth.accessToken, (signedOut, ignored) ->
+                        SupabaseAuthClient.signIn(email, next, (fresh, signInError) -> runOnUiThread(() -> {
+                            if (signInError != null || fresh == null || !fresh.session().isUsable()) {
+                                AuthSessionStore.clear(this);
+                                toast("Password updated. Sign in again on this device.");
+                                showLogin(false);
+                                return;
+                            }
+                            toast("Password updated. Welcome back.");
+                            completeRemoteSignIn(fresh, true);
+                        })));
             }));
         });
         addButton(body, update); gap(body, 9);
