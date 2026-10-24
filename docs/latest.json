@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 103,
-  "versionName": "5.61",
-  "publishedAt": "2026-10-23T21:11:00Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.61/app-release.apk",
-  "sha256": "ecf5a83637f65cdc4515b12b5f245986cc7963c954c50d1146e7ec26363f5413",
+  "versionCode": 104,
+  "versionName": "5.62",
+  "publishedAt": "2026-10-23T22:00:00Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.62/app-release.apk",
+  "sha256": "9a67812433df653206d2a78392339236608c42f57449f089711ccf45e4224e73",
   "sizeBytes": 257067327,
-  "notes": "Weekly Energy Split now shows clear Endurance, Guided Workouts, and Combined progress rails. Progress adds a BMI-reference weight chart with logged check-ins, personal target, and a check-in-only trend projection."
+  "notes": "Progress report spacing is refined. Weight Trend now adds a private possible seven-day estimate when two dated check-ins are available; it never treats activity calories as a scale-weight promise."
 }

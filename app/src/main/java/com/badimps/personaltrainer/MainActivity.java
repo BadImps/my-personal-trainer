@@ -3476,12 +3476,14 @@ public final class MainActivity extends FragmentActivity {
             LinearLayout.LayoutParams barParams = new LinearLayout.LayoutParams(dp(25), height);
             barParams.topMargin = dp(3);
             column.addView(bar, barParams);
-            TextView label = text("W" + (i + 1), 10, muted);
+            TextView label = text("W" + (i + 1), 11, muted);
             label.setGravity(Gravity.CENTER);
+            label.setSingleLine(true);
             LinearLayout.LayoutParams labelParams = new LinearLayout.LayoutParams(-1, dp(19));
             labelParams.topMargin = dp(4);
             column.addView(label, labelParams);
-            LinearLayout.LayoutParams columnParams = new LinearLayout.LayoutParams(0, dp(121), 1);
+            // Count + tallest bar + label need separate lanes; 121dp clipped a two-digit count.
+            LinearLayout.LayoutParams columnParams = new LinearLayout.LayoutParams(0, dp(140), 1);
             columnParams.rightMargin = i == report.completedByWeek.length - 1 ? 0 : dp(4);
             graph.addView(column, columnParams);
         }
@@ -3507,12 +3509,14 @@ public final class MainActivity extends FragmentActivity {
             LinearLayout.LayoutParams barParams = new LinearLayout.LayoutParams(dp(25), height);
             barParams.topMargin = dp(3);
             column.addView(bar, barParams);
-            TextView label = text("Week " + (i + 1), 10, Color.rgb(202, 216, 234));
+            TextView label = text("W" + (i + 1), 11, Color.rgb(202, 216, 234));
             label.setGravity(Gravity.CENTER);
+            label.setSingleLine(true);
             LinearLayout.LayoutParams labelParams = new LinearLayout.LayoutParams(-1, dp(19));
             labelParams.topMargin = dp(4);
             column.addView(label, labelParams);
-            LinearLayout.LayoutParams columnParams = new LinearLayout.LayoutParams(0, dp(121), 1);
+            // Keep the Coach Hero dark chart on the same non-overlapping vertical rhythm.
+            LinearLayout.LayoutParams columnParams = new LinearLayout.LayoutParams(0, dp(140), 1);
             columnParams.rightMargin = i == report.completedByWeek.length - 1 ? 0 : dp(4);
             graph.addView(column, columnParams);
         }
@@ -6131,7 +6135,15 @@ public final class MainActivity extends FragmentActivity {
         JourneyStore.MonthReport report = JourneyStore.monthReport(this);
         LinearLayout monthly = card();
         monthly.addView(heading("Monthly progression report", 19, ink));
-        monthly.addView(text(report.completedTotal + " completed plans  •  " + report.minutesTotal + " guided min this month", 14, muted));
+        LinearLayout monthlySummary = new LinearLayout(this);
+        monthlySummary.setGravity(Gravity.CENTER_VERTICAL);
+        TextView completedPlans = text(report.completedTotal + " completed plans", 13, muted);
+        completedPlans.setSingleLine(true);
+        monthlySummary.addView(completedPlans, new LinearLayout.LayoutParams(0, -2, 1));
+        TextView guidedMinutes = text(report.minutesTotal + " guided min", 13, muted);
+        guidedMinutes.setGravity(Gravity.END); guidedMinutes.setSingleLine(true);
+        monthlySummary.addView(guidedMinutes, new LinearLayout.LayoutParams(0, -2, 1));
+        monthly.addView(monthlySummary);
         gap(monthly, 8);
         addMonthlyCompletionChart(monthly, report);
         String insight = report.completedTotal == 0
@@ -6325,6 +6337,11 @@ public final class MainActivity extends FragmentActivity {
             LinearLayout.LayoutParams weightTrendParams = new LinearLayout.LayoutParams(-1, dp(188));
             weightTrendParams.topMargin = dp(7);
             energy.addView(weightTrend, weightTrendParams);
+            TextView projectionSummary = heading(weightTrend.projectionSummary(), 12, weightTrend.hasProjection() ? Color.rgb(18, 117, 98) : muted);
+            projectionSummary.setPadding(dp(10), dp(8), dp(10), dp(8));
+            projectionSummary.setBackground(surface(weightTrend.hasProjection() ? Color.rgb(230, 249, 243) : Color.rgb(240, 244, 248), 10, 0, Color.TRANSPARENT));
+            LinearLayout.LayoutParams projectionParams = new LinearLayout.LayoutParams(-1, -2);
+            projectionParams.topMargin = dp(6); energy.addView(projectionSummary, projectionParams);
             energy.addView(text(adultBmiReference
                     ? "Mint band: adult BMI-based reference for your entered height. Coral: your logged check-ins. Outline: your chosen target. Projection uses your logged trend only, never exercise calories."
                     : "Shows your logged check-ins and chosen target. Add Body details to include an adult BMI-based reference range.", 12, muted));
@@ -6391,6 +6408,17 @@ public final class MainActivity extends FragmentActivity {
 
         void setReveal(float fraction) { reveal = Math.max(0f, Math.min(1f, fraction)); invalidate(); }
 
+        boolean hasProjection() { return trendProjection() > 0f; }
+
+        String projectionSummary() {
+            float projection = trendProjection();
+            if (projection <= 0f) return "Possible 7-day trend: add a second check-in on a different day to begin a private trend estimate.";
+            float change = projection - current;
+            String direction = change < 0f ? "lower" : change > 0f ? "higher" : "steady";
+            return String.format(Locale.US, "Possible 7-day trend: %.1f %s (%s by %.1f %s from today)",
+                    projection, unit, direction, Math.abs(change), unit);
+        }
+
         @Override protected void onDraw(Canvas canvas) {
             super.onDraw(canvas);
             float left = dp(19), right = getWidth() - dp(16), top = dp(21), bottom = getHeight() - dp(42);
@@ -6419,7 +6447,9 @@ public final class MainActivity extends FragmentActivity {
                 paint.setStyle(Paint.Style.FILL); paint.setColor(Color.rgb(218, 247, 239));
                 canvas.drawRect(left, referenceTop, right, referenceBottom, paint);
                 paint.setTypeface(Typeface.create("sans-serif", Typeface.BOLD)); paint.setTextSize(dp(10)); paint.setColor(Color.rgb(18, 117, 98));
-                paint.setTextAlign(Paint.Align.RIGHT); canvas.drawText("BMI reference", right - dp(4), referenceTop + dp(13), paint);
+                paint.setTextAlign(Paint.Align.CENTER);
+                canvas.drawText(String.format(Locale.US, "BMI reference  %.1f–%.1f %s", bmiLow, bmiHigh, unit),
+                        (left + right) / 2f, referenceBottom - dp(10), paint);
             }
 
             float baselineY = weightY(baseline, min, max, top, bottom);
@@ -6467,19 +6497,15 @@ public final class MainActivity extends FragmentActivity {
             }
             paint.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
             paint.setTextSize(dp(10)); paint.setColor(ink); paint.setTextAlign(Paint.Align.LEFT);
-            canvas.drawText(String.format(Locale.US, "%.1f %s", baseline, unit), left, Math.max(dp(12), baselineY - dp(10)), paint);
+            drawWeightCallout(canvas, left, baselineY, String.format(Locale.US, "%.1f %s", baseline, unit), Paint.Align.LEFT, ink, top, bottom);
             paint.setTextAlign(Paint.Align.CENTER); paint.setColor(coral);
-            canvas.drawText(String.format(Locale.US, "%.1f %s", current, unit), currentX, Math.max(dp(12), currentY - dp(11)), paint);
+            drawWeightCallout(canvas, currentX, currentY, String.format(Locale.US, "%.1f %s", current, unit), Paint.Align.CENTER, coral, top, bottom);
             paint.setTextAlign(Paint.Align.RIGHT); paint.setColor(navy);
-            canvas.drawText(String.format(Locale.US, "%.1f %s", target, unit), targetX, Math.max(dp(12), targetY - dp(10)), paint);
+            drawWeightCallout(canvas, targetX, targetY, String.format(Locale.US, "%.1f %s", target, unit), Paint.Align.RIGHT, navy, top, bottom);
             if (projection > 0f && reveal > .70f) {
                 paint.setTextAlign(Paint.Align.RIGHT); paint.setColor(Color.rgb(18, 117, 98));
-                canvas.drawText(String.format(Locale.US, "%.1f %s", projection, unit), projectedX, Math.max(dp(12), weightY(projection, min, max, top, bottom) - dp(10)), paint);
-            }
-            if (bmiLow > 0f && bmiHigh > 0f) {
-                paint.setTypeface(Typeface.create("sans-serif", Typeface.BOLD)); paint.setTextSize(dp(9)); paint.setColor(Color.rgb(18, 117, 98));
-                paint.setTextAlign(Paint.Align.LEFT); canvas.drawText(String.format(Locale.US, "%.1f %s", bmiHigh, unit), left + dp(5), weightY(bmiHigh, min, max, top, bottom) + dp(12), paint);
-                paint.setTextAlign(Paint.Align.LEFT); canvas.drawText(String.format(Locale.US, "%.1f %s", bmiLow, unit), left + dp(5), weightY(bmiLow, min, max, top, bottom) - dp(4), paint);
+                drawWeightCallout(canvas, projectedX, weightY(projection, min, max, top, bottom),
+                        String.format(Locale.US, "%.1f %s", projection, unit), Paint.Align.RIGHT, Color.rgb(18, 117, 98), top, bottom);
             }
             paint.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL)); paint.setTextSize(dp(10)); paint.setColor(muted);
             paint.setTextAlign(Paint.Align.LEFT); canvas.drawText("Baseline", left, getHeight() - dp(12), paint);
@@ -6499,6 +6525,14 @@ public final class MainActivity extends FragmentActivity {
 
         private float weightY(float value, float min, float max, float top, float bottom) {
             return bottom - ((value - min) / Math.max(.001f, max - min)) * (bottom - top);
+        }
+
+        /** Keeps each measurement legible even when a target or BMI band sits near it. */
+        private void drawWeightCallout(Canvas canvas, float x, float pointY, String value, Paint.Align align,
+                                       int color, float top, float bottom) {
+            float labelY = pointY - dp(12);
+            if (labelY < top + dp(14)) labelY = Math.min(bottom - dp(5), pointY + dp(19));
+            paint.setTextAlign(align); paint.setColor(color); canvas.drawText(value, x, labelY, paint);
         }
     }
 

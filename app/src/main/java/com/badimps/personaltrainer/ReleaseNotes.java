@@ -15,6 +15,7 @@ public final class ReleaseNotes {
     }
 
     public static final Entry[] HISTORY = {
+            new Entry("5.62", "Clearer weight and monthly reports", "Fixes Progress report text collisions and adds a private, check-in-only possible seven-day weight trend once two dated weigh-ins are available."),
             new Entry("5.59", "Weekly Progress refinement", "Progress now has aligned weekly Endurance, Guided Workout, activity, energy, and conservative weight-load references; report-style icon and ring motion; and Home uses centered Completed ribbons with direct historical report access."),
             new Entry("5.58", "Cool-down before report", "Selected five-minute cool-down choices now persist for the active guided session, including after navigation or app recreation, so recovery always appears before the completion report."),
             new Entry("5.57", "Guaranteed cool-down access", "Every completed guided session now exposes the five-minute tailored cool-down if it was not shown before the completion report, without repeating it after completion."),
