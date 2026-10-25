@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 110,
-  "versionName": "5.68",
-  "publishedAt": "2026-10-25T15:12:45Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.68/app-release.apk",
-  "sha256": "f0cb6366985f7ccab8cc99f24221fbcc2e85f44dff9b0fd734e89caed888b52f",
+  "versionCode": 111,
+  "versionName": "5.69",
+  "publishedAt": "2026-10-25T16:09:02Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.69/app-release.apk",
+  "sha256": "8f421ad933acc829143f46f10a4e8c049f159c42abdc90f5d9c71fdac56da531",
   "sizeBytes": 215924992,
-  "notes": "Adds live watch heart rate and measured calories to guided workouts, synchronizes completed Health Services measurements into workout and weekly reports, and adds standalone watch endurance tracking."
+  "notes": "Makes the phone authoritative for guided workouts: the watch waits for a live phone session, rejects stale or duplicate controls, disables actions while disconnected, and syncs health measurements only to the matching workout."
 }
