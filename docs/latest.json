@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 111,
-  "versionName": "5.69",
-  "publishedAt": "2026-10-25T16:09:02Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.69/app-release.apk",
-  "sha256": "8f421ad933acc829143f46f10a4e8c049f159c42abdc90f5d9c71fdac56da531",
+  "versionCode": 112,
+  "versionName": "5.70",
+  "publishedAt": "2026-10-25T16:13:46Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.70/app-release.apk",
+  "sha256": "b87ff51cb90b4c81363095e93f2c4e89a47ba3fca51b512ad692c8d6aca73213",
   "sizeBytes": 215924992,
-  "notes": "Makes the phone authoritative for guided workouts: the watch waits for a live phone session, rejects stale or duplicate controls, disables actions while disconnected, and syncs health measurements only to the matching workout."
+  "notes": "Automatically synchronizes and opens the paired watch workout screen once when a new guided workout starts on the phone, without reopening during routine workout updates."
 }
