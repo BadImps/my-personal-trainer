@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 112,
-  "versionName": "5.70",
-  "publishedAt": "2026-10-25T16:13:46Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.70/app-release.apk",
-  "sha256": "b87ff51cb90b4c81363095e93f2c4e89a47ba3fca51b512ad692c8d6aca73213",
+  "versionCode": 113,
+  "versionName": "5.71",
+  "publishedAt": "2026-10-25T16:23:55Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.71/app-release.apk",
+  "sha256": "38aa6c50a376cf0e7ae4ac8394c4aeafa68c6fb9c13f5dc6506ec2d34f1a2843",
   "sizeBytes": 215924992,
-  "notes": "Automatically synchronizes and opens the paired watch workout screen once when a new guided workout starts on the phone, without reopening during routine workout updates."
+  "notes": "Synchronizes the five-to-one guided-workout count-in and canonical set clock between phone and watch so timing remains accurate through screen sleep, pause, and watch reopening."
 }
