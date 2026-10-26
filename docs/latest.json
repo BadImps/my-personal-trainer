@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 119,
-  "versionName": "5.77",
-  "publishedAt": "2026-10-26T06:25:00Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.77/app-release.apk",
-  "sha256": "d96be611a4924558621d006f3151aefc3a965dae22413dd0115bcbac5df19021",
-  "sizeBytes": 215941763,
-  "notes": "Mintfoil achievement rewards: unlocked achievements now arrive in a premium iron-edged card with a mounted spinning badge, double foil frame, and a direct path into Apex."
+  "versionCode": 120,
+  "versionName": "5.78",
+  "publishedAt": "2026-10-26T11:03:02Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.78/app-release.apk",
+  "sha256": "5cfc191276da22f5304655ebbbdbb191da8ec8d0e46db3803950b98c4a66499eb",
+  "sizeBytes": 220044339,
+  "notes": "Canvas Mintfoil card lock: achievement collection and reward cards now use the approved full portrait mint-steel frame, recessed coin mount, navy texture, divider, and exact First Step master artwork."
 }
