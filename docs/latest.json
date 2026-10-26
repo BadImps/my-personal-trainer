@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 120,
-  "versionName": "5.78",
-  "publishedAt": "2026-10-26T11:03:02Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.78/app-release.apk",
-  "sha256": "5cfc191276da22f5304655ebbbdbb191da8ec8d0e46db3803950b98c4a66499eb",
-  "sizeBytes": 220044339,
-  "notes": "Canvas Mintfoil card lock: achievement collection and reward cards now use the approved full portrait mint-steel frame, recessed coin mount, navy texture, divider, and exact First Step master artwork."
+  "versionCode": 121,
+  "versionName": "5.79",
+  "publishedAt": "2026-10-26T11:29:13Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.79/app-release.apk",
+  "sha256": "0bd212d89a30c9592336f53aea48f292ebb8f8d617c724dc8fb45595e7b58964",
+  "sizeBytes": 222472119,
+  "notes": "Premium achievement presentation: tight Mintfoil steel-frame card crops, a navy display plinth, and a haptic halo-and-card achievement reveal."
 }
