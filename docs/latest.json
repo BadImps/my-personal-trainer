@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 125,
-  "versionName": "5.83",
-  "publishedAt": "2026-10-26T20:33:28Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.83/app-release.apk",
-  "sha256": "84fb1dafcb930b31c8727c77e35c854e72bb7d4d6988e63fef3b9b8a0690e6c3",
-  "sizeBytes": 224561915,
-  "notes": "Achievement Board composition corrected: the themed art now fills the card's one recessed Mintfoil mount, with no nested coin rim, restored portrait ratio, and transparent angled corners."
+  "versionCode": 126,
+  "versionName": "5.84",
+  "publishedAt": "2026-10-26T21:58:21Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.84/app-release.apk",
+  "sha256": "6a5cadf2fe806d06ba0fd079143498da7a9e0f8e2df755f1b9b495ee46b13ff5",
+  "sizeBytes": 225137451,
+  "notes": "Achievement cards, production finish: a single Mintfoil card mount with transparent icon-only family symbols, clear locked/unlocked states, and requirements retained on the flip-back."
 }
