@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 121,
-  "versionName": "5.79",
-  "publishedAt": "2026-10-26T11:29:13Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.79/app-release.apk",
-  "sha256": "0bd212d89a30c9592336f53aea48f292ebb8f8d617c724dc8fb45595e7b58964",
+  "versionCode": 122,
+  "versionName": "5.80",
+  "publishedAt": "2026-10-26T18:44:07Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.80/app-release.apk",
+  "sha256": "148d61e8796380c72798df721e4b0855a5c1764e9f2f5b5d902338635f5d6eb7",
   "sizeBytes": 222472119,
-  "notes": "Premium achievement presentation: tight Mintfoil steel-frame card crops, a navy display plinth, and a haptic halo-and-card achievement reveal."
+  "notes": "Distinct Mintfoil achievement art: every milestone now has meaningful medal artwork, including the mountain path for First Step, calendar for Three in Motion, and lightning crest for Steady Seven."
 }
