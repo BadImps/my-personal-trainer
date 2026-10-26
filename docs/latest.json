@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 118,
-  "versionName": "5.76",
-  "publishedAt": "2026-10-26T01:00:00Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.76/app-release.apk",
-  "sha256": "f645573632db0fdf7ba5e3e0b26c5167ca057f32630490e2c13955704f1fa044",
+  "versionCode": 119,
+  "versionName": "5.77",
+  "publishedAt": "2026-10-26T06:25:00Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.77/app-release.apk",
+  "sha256": "d96be611a4924558621d006f3151aefc3a965dae22413dd0115bcbac5df19021",
   "sizeBytes": 215941763,
-  "notes": "Guided workout health has a pulsing heart and kcal-change fire motion without a Watch label; Home Your Week now preserves actual completed training areas and matching activity icons."
+  "notes": "Mintfoil achievement rewards: unlocked achievements now arrive in a premium iron-edged card with a mounted spinning badge, double foil frame, and a direct path into Apex."
 }
