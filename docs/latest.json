@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 123,
-  "versionName": "5.81",
-  "publishedAt": "2026-10-26T19:11:46Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.81/app-release.apk",
-  "sha256": "12d4c8ce379a80e04e11c39a7d5df692e3ee2379b7e503d945bf8f587f62b386",
-  "sizeBytes": 222720115,
-  "notes": "Canvas Mintfoil medal collection: replaces every legacy achievement coin with original brushed mint-metal, navy-enamel collectible artwork across all achievement families."
+  "versionCode": 124,
+  "versionName": "5.82",
+  "publishedAt": "2026-10-26T19:24:04Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.82/app-release.apk",
+  "sha256": "8e83d07d97621e22d05d0beeea5a4b5d71d473abc8330f1f641c29cd96a0d6b1",
+  "sizeBytes": 224658763,
+  "notes": "Screenshots enabled: Android's normal screenshot gesture now works throughout the app, and Achievement Board Mintfoil cards no longer have a rectangular dark matte around their angled steel frames."
 }
