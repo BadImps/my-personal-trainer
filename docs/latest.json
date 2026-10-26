@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 122,
-  "versionName": "5.80",
-  "publishedAt": "2026-10-26T18:44:07Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.80/app-release.apk",
-  "sha256": "148d61e8796380c72798df721e4b0855a5c1764e9f2f5b5d902338635f5d6eb7",
-  "sizeBytes": 222472119,
-  "notes": "Distinct Mintfoil achievement art: every milestone now has meaningful medal artwork, including the mountain path for First Step, calendar for Three in Motion, and lightning crest for Steady Seven."
+  "versionCode": 123,
+  "versionName": "5.81",
+  "publishedAt": "2026-10-26T19:11:46Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.81/app-release.apk",
+  "sha256": "12d4c8ce379a80e04e11c39a7d5df692e3ee2379b7e503d945bf8f587f62b386",
+  "sizeBytes": 222720115,
+  "notes": "Canvas Mintfoil medal collection: replaces every legacy achievement coin with original brushed mint-metal, navy-enamel collectible artwork across all achievement families."
 }
