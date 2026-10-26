@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 124,
-  "versionName": "5.82",
-  "publishedAt": "2026-10-26T19:24:04Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.82/app-release.apk",
-  "sha256": "8e83d07d97621e22d05d0beeea5a4b5d71d473abc8330f1f641c29cd96a0d6b1",
-  "sizeBytes": 224658763,
-  "notes": "Screenshots enabled: Android's normal screenshot gesture now works throughout the app, and Achievement Board Mintfoil cards no longer have a rectangular dark matte around their angled steel frames."
+  "versionCode": 125,
+  "versionName": "5.83",
+  "publishedAt": "2026-10-26T20:33:28Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.83/app-release.apk",
+  "sha256": "84fb1dafcb930b31c8727c77e35c854e72bb7d4d6988e63fef3b9b8a0690e6c3",
+  "sizeBytes": 224561915,
+  "notes": "Achievement Board composition corrected: the themed art now fills the card's one recessed Mintfoil mount, with no nested coin rim, restored portrait ratio, and transparent angled corners."
 }
