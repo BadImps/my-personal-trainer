@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 116,
-  "versionName": "5.74",
-  "publishedAt": "2026-10-25T20:51:45Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.74/app-release.apk",
-  "sha256": "67e6f7a8304c2fdb14f1047951eb819bb484e2da9f45510ce7f815fa553756bb",
+  "versionCode": 117,
+  "versionName": "5.75",
+  "publishedAt": "2026-10-25T21:00:00Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.75/app-release.apk",
+  "sha256": "ba68b770266de9354eb53c4b7c8d94fb6bb806de1e22e428f0960d45bd07a187",
   "sizeBytes": 215941763,
-  "notes": "Fixes the physical-watch launch crash by reserving GPS foreground mode for endurance while guided strength uses Health Services only; verified through cold launch, foreground persistence, and sleep/wake testing."
+  "notes": "Hardens phone-to-watch workout synchronization: strictly ordered timer and control snapshots, stale-state rejection after sleep or reconnect, and Health Services locked to the correct guided-workout session."
 }
