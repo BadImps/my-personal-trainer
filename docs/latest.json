@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 117,
-  "versionName": "5.75",
-  "publishedAt": "2026-10-25T21:00:00Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.75/app-release.apk",
-  "sha256": "ba68b770266de9354eb53c4b7c8d94fb6bb806de1e22e428f0960d45bd07a187",
+  "versionCode": 118,
+  "versionName": "5.76",
+  "publishedAt": "2026-10-26T01:00:00Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.76/app-release.apk",
+  "sha256": "f645573632db0fdf7ba5e3e0b26c5167ca057f32630490e2c13955704f1fa044",
   "sizeBytes": 215941763,
-  "notes": "Hardens phone-to-watch workout synchronization: strictly ordered timer and control snapshots, stale-state rejection after sleep or reconnect, and Health Services locked to the correct guided-workout session."
+  "notes": "Guided workout health has a pulsing heart and kcal-change fire motion without a Watch label; Home Your Week now preserves actual completed training areas and matching activity icons."
 }
