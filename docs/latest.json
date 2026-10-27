@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 127,
-  "versionName": "5.85",
-  "publishedAt": "2026-10-27T13:55:00Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.85/app-release.apk",
-  "sha256": "1c88d847d60914f257d60fe56e517eda8c4246a47fb8e7463bb7b2590f514201",
+  "versionCode": 128,
+  "versionName": "5.86",
+  "publishedAt": "2026-10-27T19:28:33Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.86/app-release.apk",
+  "sha256": "0a99b1fd220527fbe1a901b25e0ce09931d2843aa345567460a2eaf37f646356",
   "sizeBytes": 233582607,
-  "notes": "Mintfoil achievement-card refinement: Coach-card-ratio plates preserve round badge mounts, flip-backs are fully opaque, copy clears the lower chevron, and Steady Return is optically centred."
+  "notes": "Schedule a guided or endurance workout directly from any unfinished past day on Home. The date carries into the same clear scheduling flow used by the Scheduler."
 }
