@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 126,
-  "versionName": "5.84",
-  "publishedAt": "2026-10-26T21:58:21Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.84/app-release.apk",
-  "sha256": "6a5cadf2fe806d06ba0fd079143498da7a9e0f8e2df755f1b9b495ee46b13ff5",
-  "sizeBytes": 225137451,
-  "notes": "Achievement cards, production finish: a single Mintfoil card mount with transparent icon-only family symbols, clear locked/unlocked states, and requirements retained on the flip-back."
+  "versionCode": 127,
+  "versionName": "5.85",
+  "publishedAt": "2026-10-27T13:55:00Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.85/app-release.apk",
+  "sha256": "1c88d847d60914f257d60fe56e517eda8c4246a47fb8e7463bb7b2590f514201",
+  "sizeBytes": 233582607,
+  "notes": "Mintfoil achievement-card refinement: Coach-card-ratio plates preserve round badge mounts, flip-backs are fully opaque, copy clears the lower chevron, and Steady Return is optically centred."
 }
