@@ -2,6 +2,16 @@ plugins {
     id 'com.android.application'
 }
 
+import java.util.Properties
+
+def localProperties = new Properties()
+def localPropertiesFile = rootProject.file('local.properties')
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.withInputStream { localProperties.load(it) }
+}
+
+def quotedBuildValue = { value -> '"' + value.replace('\\', '\\\\').replace('"', '\\"') + '"' }
+
 android {
     namespace 'com.badimps.personaltrainer'
     compileSdk 36
@@ -17,12 +27,16 @@ android {
         applicationId 'com.badimps.personaltrainer'
         minSdk 26
         targetSdk 36
-        versionCode 44
-        versionName '5.3'
+        versionCode 129
+        versionName '5.87'
     }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
     testOptions { unitTests.includeAndroidResources = true }
     buildFeatures { buildConfig true }
+    defaultConfig {
+        buildConfigField 'String', 'SUPABASE_URL', quotedBuildValue(localProperties.getProperty('SUPABASE_URL', ''))
+        buildConfigField 'String', 'SUPABASE_PUBLISHABLE_KEY', quotedBuildValue(localProperties.getProperty('SUPABASE_PUBLISHABLE_KEY', ''))
+    }
     buildTypes { release { signingConfig signingConfigs.otaCompatibility } }
 }
 

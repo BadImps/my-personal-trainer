@@ -1,5 +1,9 @@
 # My Personal Trainer
 
+## Canvas design lock
+
+Approved visual references are implementation contracts, not loose inspiration. See [the Canvas Design-Lock Policy](docs/DESIGN_LOCK.md) for the required asset, device-screenshot, comparison, and release gates.
+
 ## 1.4 animated exercise library
 
 The guided workout and exercise library now play coach-specific, looping three-phase GIF demonstrations for every prescribed movement, including the no-equipment substitutions. Coach Mia and Coach Leo each have their own animation set. A Machines category adds Machine Chest Press, Lat Pulldown, Leg Press, and Seated Cable Row. These are form-reference animations; follow the written cue, use a comfortable range, and stop if anything hurts.

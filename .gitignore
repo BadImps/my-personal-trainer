@@ -2,6 +2,7 @@
 build/
 app/build/
 local.properties
+signing/
 *.iml
 .idea/
 tools/*.class
