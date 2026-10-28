@@ -1,7 +1,9 @@
 # Achievement + Apex Design Pass
 
-Generated 2026-10-20. The system is local-first and free: it has no subscription gate,
-server leaderboard, or paid unlock.
+Generated 2026-10-20 and updated 2026-10-28. The system is local-first and free: it has no
+subscription gate or paid unlock. Verified members may opt into the Gym Lobby, which publishes
+only their display name, level, Momentum Points, Apex lane, and earned badge names for friendly
+private-lobby rankings; the underlying activity history remains on-device.
 
 ## Design decision
 

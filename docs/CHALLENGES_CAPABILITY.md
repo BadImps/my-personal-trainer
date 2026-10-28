@@ -25,7 +25,7 @@ WHO frames physical-activity recommendations around frequency, intensity, and du
 | First value | After one normal completed session, the member sees AP, their first level meter, and a next achievable challenge. |
 | 10-star version | Coach cards, evolving challenge paths, personal milestones, and a Progress timeline that tell a coherent training story. |
 | MVP | Local AP, levels, 12 badges, 6 challenge templates, coach-card locks, and a private Challenges view. |
-| Anti-goals | No public leaderboard, no calorie/weight-loss points, no pay-to-unlock, no points for unsafe rest skipping, no punishment for a missed day. |
+| Anti-goals | No global competitive leaderboard, calorie/weight-loss points, pay-to-unlock, points for unsafe rest skipping, or punishment for a missed day. Optional private Gym Lobby rankings use only Momentum Points. |
 | Success metrics | Challenge completion rate, voluntary return to the Challenges view, plan completion rate, and zero emergency-stop rewards. |
 
 ## Fixed rules and safety invariants
@@ -35,7 +35,7 @@ WHO frames physical-activity recommendations around frequency, intensity, and du
 3. **No body-size scoring.** Weight, calorie intake, physique, age, sex, and body measurements do not award points or unlock coaches.
 4. **Safety gates precede intensity.** A higher-tier challenge requires completed prerequisite sessions and at least one scheduled recovery day. It may never force a rest or cooldown time below the member’s selected safe setting.
 5. **Difficulty is opt-in and editable.** A coach unlock gives access to a card and challenge library; it does not change the user’s existing plan, weights, reps, or reminder schedule without confirmation.
-6. **Private by default.** AP, badge state, and coach unlocks are local app data. No leaderboard, public profile, or data upload is introduced.
+6. **Private by default.** AP, badge state, and coach unlocks are local app data. Verified members may publish a narrow social summary (display name, level, Momentum Points, Apex lane, and earned badge names) to the Gym Lobby; no underlying activity or health records are uploaded.
 7. **Plain-language guardrail.** Every Feat says: “Adjust or skip if it does not feel right. This is not medical advice.”
 
 ## Progression model
@@ -147,7 +147,7 @@ Performance/Apex coach modes, readiness checks, 14–28 day Feat paths, explicit
 
 ### Phase 4 — Tuning
 
-Add only aggregated local diagnostics—challenge start/completion/abandonment and safety exits—then tune AP thresholds. Do not add public comparisons without a separate privacy product decision.
+Add only aggregated local diagnostics—challenge start/completion/abandonment and safety exits—then tune AP thresholds. The separate 2026-10-28 Gym Lobby privacy decision permits only the narrow social summary documented above.
 
 ## Non-goals
 

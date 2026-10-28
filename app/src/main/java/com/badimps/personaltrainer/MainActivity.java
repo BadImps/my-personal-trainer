@@ -1182,6 +1182,7 @@ public final class MainActivity extends FragmentActivity {
         if ("Endurance".equals(screen)) return "Plan your distance. Own your pace.";
         if ("Scheduler".equals(screen)) return "Every session, one clear calendar.";
         if ("Body".equals(screen)) return "Your numbers, clearly and privately.";
+        if ("Gym Lobby".equals(screen)) return "Meet Gym Members and grow together.";
         if ("Apex".equals(screen)) return "Celebrate progress. Choose your next challenge.";
         if ("Settings".equals(screen)) return "Make your coach experience yours.";
         return "Your personal training dashboard.";
@@ -1207,6 +1208,7 @@ public final class MainActivity extends FragmentActivity {
         addCoachHeroNavItem(row, "Endurance", R.drawable.ic_nav_endurance, activeScreen, view -> navigateDashboard("Endurance", this::showEndurance));
         addCoachHeroNavItem(row, "Scheduler", R.drawable.ic_nav_plan, activeScreen, view -> navigateDashboard("Scheduler", this::showScheduler));
         addCoachHeroNavItem(row, "Body", R.drawable.ic_nav_body, activeScreen, view -> navigateDashboard("Body", this::showBodyContext));
+        addCoachHeroNavItem(row, "Gym Lobby", R.drawable.ic_nav_gym_lobby, activeScreen, view -> navigateDashboard("Gym Lobby", this::showGymLobby));
         addCoachHeroNavItem(row, "Apex", R.drawable.ic_nav_apex, activeScreen, view -> navigateDashboard("Apex", this::showApex));
         addCoachHeroNavItem(row, "Settings", R.drawable.ic_nav_settings, activeScreen, view -> navigateDashboard("Settings", this::showProfile));
         scroll.addView(row, new HorizontalScrollView.LayoutParams(-2, -1));
@@ -1226,7 +1228,7 @@ public final class MainActivity extends FragmentActivity {
     }
 
     private int coachHeroNavigationIndex(String screen) {
-        String[] screens = {"Home", "Workouts", "Workout Library", "Progress", "Nutrition", "Endurance", "Scheduler", "Body", "Apex", "Settings"};
+        String[] screens = {"Home", "Workouts", "Workout Library", "Progress", "Nutrition", "Endurance", "Scheduler", "Body", "Gym Lobby", "Apex", "Settings"};
         for (int index = 0; index < screens.length; index++) {
             if (screens[index].equals(screen)) return index;
         }
@@ -1445,6 +1447,7 @@ public final class MainActivity extends FragmentActivity {
         else if ("Endurance".equals(activeDashboardScrollKey)) showEndurance();
         else if ("Scheduler".equals(activeDashboardScrollKey)) showScheduler();
         else if ("Body".equals(activeDashboardScrollKey)) showBodyContext();
+        else if ("Gym Lobby".equals(activeDashboardScrollKey)) showGymLobby();
         else if ("Apex".equals(activeDashboardScrollKey)) showApex();
         else if ("Settings".equals(activeDashboardScrollKey)) showProfile();
         else showPlans();
@@ -2499,6 +2502,7 @@ public final class MainActivity extends FragmentActivity {
         configureSpeechVoices();
         LauncherIconManager.apply(this, signedInProfile.coachName);
         applyKeepPhoneAwake(signedInProfile.keepPhoneAwake);
+        GymLobbyClient.publish(this);
         showHome();
     }
 
@@ -8023,6 +8027,243 @@ public final class MainActivity extends FragmentActivity {
                     }
                 })
                 .show();
+    }
+
+    /** Public social directory backed by authenticated Supabase accounts. */
+    private void showGymLobby() {
+        LinearLayout body = appPage("Gym Lobby");
+        title(body, "PUBLIC LOBBY", "Gym Lobby", "Meet registered Gym Members, build your buddy circle, and invite friends into private friendly competition.");
+        if (!GymLobbyClient.available(this)) {
+            LinearLayout notice = card();
+            notice.addView(heading("Verified sign-in required", 20, navy));
+            notice.addView(text("The Gym Lobby uses your secure account so invitations and lobby membership can follow you between devices. Your email, workouts, body information, meals, and routes are never shown here.", 14, muted));
+            gap(notice, 12);
+            Button signIn = primary("Sign in to enter Gym Lobby");
+            signIn.setOnClickListener(view -> showLogin());
+            notice.addView(signIn, new LinearLayout.LayoutParams(-1, dp(52)));
+            body.addView(notice);
+            return;
+        }
+        LinearLayout loading = darkCard();
+        loading.addView(heading("Opening Gym Lobby…", 20, Color.WHITE));
+        loading.addView(text("Refreshing Gym Members, invitations, and private lobbies.", 13, Color.rgb(211, 225, 233)));
+        body.addView(loading);
+        GymLobbyClient.publishAndLoad(this, (snapshot, error) -> runOnUiThread(() -> {
+            if (!"Gym Lobby".equals(activeDashboardScrollKey)) return;
+            if (error != null) renderGymLobbyError(error);
+            else renderGymLobby(snapshot);
+        }));
+    }
+
+    private void renderGymLobbyError(String error) {
+        LinearLayout body = appPage("Gym Lobby");
+        title(body, "PUBLIC LOBBY", "Gym Lobby", "The lobby could not refresh yet.");
+        LinearLayout notice = card();
+        notice.addView(heading("Could not open Gym Lobby", 20, navy));
+        notice.addView(text(error, 14, muted));
+        gap(notice, 12);
+        Button retry = primary("Try again");
+        retry.setOnClickListener(view -> showGymLobby());
+        notice.addView(retry, new LinearLayout.LayoutParams(-1, dp(52)));
+        body.addView(notice);
+    }
+
+    private void renderGymLobby(GymLobbyClient.Snapshot snapshot) {
+        LinearLayout body = appPage("Gym Lobby");
+        title(body, "PUBLIC LOBBY", "Gym Lobby", "Long-press a Gym Member for buddy, invitation, lobby, and profile actions. A tap opens the same accessible menu.");
+
+        LinearLayout summary = darkCard();
+        summary.addView(heading("GYM MEMBERS", 12, mint));
+        summary.addView(heading(snapshot.members.size() + " registered members", 25, Color.WHITE));
+        summary.addView(text("Visible here: display name, level, Momentum Points, Apex lane, and earned achievement cards. Your private health and training details stay private.", 13, Color.rgb(211, 225, 233)));
+        body.addView(summary);
+        gap(body, 14);
+
+        if (!snapshot.requests.isEmpty()) {
+            body.addView(heading("INVITATIONS", 13, mint));
+            gap(body, 7);
+            for (GymLobbyClient.Request request : snapshot.requests) {
+                LinearLayout requestCard = card();
+                requestCard.addView(heading(GymLobbyClient.requestTitle(request.kind), 18, navy));
+                requestCard.addView(text(GymLobbyClient.requestDescription(request.kind, request.senderName, request.lobbyOwnerName), 14, muted));
+                gap(requestCard, 10);
+                LinearLayout actions = new LinearLayout(this);
+                actions.setOrientation(LinearLayout.HORIZONTAL);
+                Button accept = primary("Accept");
+                Button decline = lightAction("Decline");
+                accept.setOnClickListener(view -> respondToGymRequest(request, true));
+                decline.setOnClickListener(view -> respondToGymRequest(request, false));
+                actions.addView(accept, new LinearLayout.LayoutParams(0, dp(50), 1));
+                LinearLayout.LayoutParams declineParams = new LinearLayout.LayoutParams(0, dp(50), 1);
+                declineParams.leftMargin = dp(8);
+                actions.addView(decline, declineParams);
+                requestCard.addView(actions);
+                body.addView(requestCard);
+                gap(body, 9);
+            }
+            gap(body, 5);
+        }
+
+        body.addView(heading("PRIVATE LOBBIES", 13, mint));
+        gap(body, 7);
+        if (snapshot.lobbies.isEmpty()) {
+            body.addView(text("Your private lobby will appear after your account is published.", 14, Color.rgb(211, 225, 233)));
+        } else {
+            for (GymLobbyClient.Lobby lobby : snapshot.lobbies) {
+                Button open = secondary(lobby.ownerName + "’s Private Lobby");
+                open.setContentDescription("Open " + lobby.ownerName + "'s private lobby leaderboard");
+                open.setOnClickListener(view -> showPrivateGymLobby(lobby.ownerId, lobby.ownerName));
+                addButton(body, open);
+                gap(body, 8);
+            }
+        }
+        gap(body, 8);
+        body.addView(heading("ALL GYM MEMBERS", 13, mint));
+        gap(body, 7);
+        if (snapshot.members.isEmpty()) {
+            LinearLayout empty = card();
+            empty.addView(heading("You’re first in the lobby", 19, navy));
+            empty.addView(text("Other verified Gym Members will appear here after they install this update and sign in.", 14, muted));
+            body.addView(empty);
+        } else {
+            for (GymLobbyClient.Member member : snapshot.members) {
+                LinearLayout memberCard = gymMemberCard(member);
+                View.OnClickListener openMenu = view -> showGymMemberMenu(view, member);
+                memberCard.setOnClickListener(openMenu);
+                memberCard.setOnLongClickListener(view -> { showGymMemberMenu(view, member); return true; });
+                body.addView(memberCard);
+                gap(body, 9);
+            }
+        }
+    }
+
+    private LinearLayout gymMemberCard(GymLobbyClient.Member member) {
+        LinearLayout view = card();
+        view.setClickable(true);
+        view.setFocusable(true);
+        view.setContentDescription(member.name + ", level " + member.level + ", " + member.apex + " Apex lane. Tap or hold for member actions.");
+        LinearLayout top = new LinearLayout(this);
+        top.setOrientation(LinearLayout.HORIZONTAL);
+        top.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout copy = new LinearLayout(this);
+        copy.setOrientation(LinearLayout.VERTICAL);
+        copy.addView(heading(member.name, 20, navy));
+        copy.addView(text("Level " + member.level + "  •  " + member.points + " Momentum Points", 13, muted));
+        top.addView(copy, new LinearLayout.LayoutParams(0, -2, 1));
+        top.addView(chip(member.buddy ? "GYM BUDDY" : member.apex.toUpperCase(Locale.ROOT)));
+        view.addView(top);
+        gap(view, 7);
+        view.addView(text(member.achievements.size() + " achievement cards  •  Tap or hold for actions", 12, Color.rgb(65, 104, 105)));
+        return view;
+    }
+
+    private void showGymMemberMenu(View anchor, GymLobbyClient.Member member) {
+        PopupMenu menu = new PopupMenu(this, anchor);
+        menu.getMenu().add(0, 1, 0, member.buddy ? "Gym Buddy" : "Add as Gym Buddy").setEnabled(!member.buddy);
+        menu.getMenu().add(0, 2, 1, "Invite to my private lobby");
+        menu.getMenu().add(0, 3, 2, "Join private lobby");
+        menu.getMenu().add(0, 4, 3, "View Profile");
+        menu.getMenu().add(0, 5, 4, "Close");
+        menu.setOnMenuItemClickListener(item -> {
+            if (item.getItemId() == 1) sendGymLobbyAction(member, "buddy", "Gym Buddy request sent.");
+            else if (item.getItemId() == 2) sendGymLobbyAction(member, "invite", "Private lobby invitation sent.");
+            else if (item.getItemId() == 3) sendGymLobbyAction(member, "join", "Request to join private lobby sent.");
+            else if (item.getItemId() == 4) showGymMemberProfile(member);
+            return true;
+        });
+        menu.show();
+    }
+
+    private void sendGymLobbyAction(GymLobbyClient.Member member, String kind, String success) {
+        GymLobbyClient.send(this, member.id, kind, (sent, error) -> runOnUiThread(() -> {
+            toast(error == null ? success : error);
+            if (error == null && "Gym Lobby".equals(activeDashboardScrollKey)) showGymLobby();
+        }));
+    }
+
+    private void respondToGymRequest(GymLobbyClient.Request request, boolean accept) {
+        GymLobbyClient.respond(this, request.id, accept, (saved, error) -> runOnUiThread(() -> {
+            toast(error == null ? (accept ? "Invitation accepted." : "Invitation declined.") : error);
+            if (error == null) showGymLobby();
+        }));
+    }
+
+    private void showGymMemberProfile(GymLobbyClient.Member member) {
+        LinearLayout body = appPage("Gym Member", "Gym Lobby");
+        title(body, "GYM MEMBER PROFILE", member.name, "Public training milestones shared for friendly motivation.");
+        LinearLayout overview = darkCard();
+        overview.addView(heading("LEVEL " + member.level, 27, Color.WHITE));
+        overview.addView(text(member.points + " Momentum Points  •  " + member.apex + " Apex lane", 14, Color.rgb(211, 225, 233)));
+        body.addView(overview);
+        gap(body, 14);
+        body.addView(heading("ACHIEVEMENT CARDS", 13, mint));
+        gap(body, 7);
+        if (member.achievements.isEmpty()) {
+            LinearLayout empty = card();
+            empty.addView(text("No achievement cards shared yet.", 14, muted));
+            body.addView(empty);
+        } else {
+            GridLayout grid = new GridLayout(this);
+            grid.setColumnCount(3);
+            for (int index = 0; index < member.achievements.size(); index++) {
+                AchievementStore.Badge badge = new AchievementStore.Badge("ACHIEVEMENT", member.achievements.get(index), "Earned achievement.", 1, 1);
+                addAchievementBadgeTile(grid, badge, index);
+            }
+            body.addView(grid);
+        }
+        gap(body, 14);
+        Button back = secondary("Back to Gym Lobby");
+        back.setOnClickListener(view -> showGymLobby());
+        addButton(body, back);
+    }
+
+    private void showPrivateGymLobby(String ownerId, String ownerName) {
+        LinearLayout body = appPage("Private Lobby", "Gym Lobby");
+        title(body, "FRIENDLY COMPETITION", ownerName + "’s Lobby", "Loading the private leaderboard…");
+        GymLobbyClient.leaderboard(this, ownerId, (leaderboard, error) -> runOnUiThread(() -> {
+            if (!"Gym Lobby".equals(activeDashboardScrollKey)) return;
+            if (error != null) {
+                toast(error);
+                showGymLobby();
+            } else renderPrivateGymLobby(leaderboard);
+        }));
+    }
+
+    private void renderPrivateGymLobby(GymLobbyClient.Leaderboard leaderboard) {
+        LinearLayout body = appPage("Private Lobby", "Gym Lobby");
+        title(body, "FRIENDLY COMPETITION", leaderboard.ownerName + "’s Lobby", "Momentum Points set the order. Training data remains private, and the board is designed for encouragement—not judgment.");
+        if (leaderboard.members.isEmpty()) {
+            LinearLayout empty = card();
+            empty.addView(heading("No members yet", 19, navy));
+            empty.addView(text("Accepted invitations and join requests will appear here.", 14, muted));
+            body.addView(empty);
+        } else {
+            for (int index = 0; index < leaderboard.members.size(); index++) {
+                GymLobbyClient.Member member = leaderboard.members.get(index);
+                int rank = member.rank > 0 ? member.rank : index + 1;
+                LinearLayout row = rank <= 3 ? darkCard() : card();
+                LinearLayout line = new LinearLayout(this);
+                line.setOrientation(LinearLayout.HORIZONTAL);
+                line.setGravity(Gravity.CENTER_VERTICAL);
+                TextView placement = heading(GymLobbyClient.rankLabel(rank), 18, rank <= 3 ? mint : coral);
+                line.addView(placement, new LinearLayout.LayoutParams(dp(58), -2));
+                LinearLayout copy = new LinearLayout(this);
+                copy.setOrientation(LinearLayout.VERTICAL);
+                copy.addView(heading(member.name, 18, rank <= 3 ? Color.WHITE : navy));
+                copy.addView(text(member.points + " Momentum Points  •  Level " + member.level, 12, rank <= 3 ? Color.rgb(211, 225, 233) : muted));
+                line.addView(copy, new LinearLayout.LayoutParams(0, -2, 1));
+                row.addView(line);
+                row.setClickable(true);
+                row.setFocusable(true);
+                row.setContentDescription(GymLobbyClient.rankLabel(rank) + ", " + member.name + ", " + member.points + " Momentum Points. Open profile.");
+                row.setOnClickListener(view -> showGymMemberProfile(member));
+                body.addView(row);
+                gap(body, 9);
+            }
+        }
+        Button back = secondary("Back to Gym Lobby");
+        back.setOnClickListener(view -> showGymLobby());
+        addButton(body, back);
     }
 
     /** Dedicated Achievement + Apex hub. It is intentionally a first-class navigation page, before Settings. */

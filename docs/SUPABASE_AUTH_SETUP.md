@@ -1,6 +1,9 @@
 # Supabase authentication setup
 
-My Personal Trainer uses Supabase only for authentication. Personal and fitness information remains in private Android storage and is not represented in the hosted schema.
+My Personal Trainer uses Supabase for authentication and the optional Gym Lobby. Personal workout,
+route, nutrition, schedule, body, and health information remains in private Android storage. The
+Gym Lobby stores only a member's display name, level, Momentum Points, Apex lane, earned badge
+names, buddy requests, invitations, lobby membership, and leaderboard ordering.
 
 ## Mobile configuration
 
@@ -15,7 +18,10 @@ Only the publishable/anon key belongs in the Android build. Never place a servic
 
 ## Database
 
-Apply `supabase/migrations/202610240001_account_registry.sql` with the Supabase CLI or SQL editor. The migration creates one identity registry row per Auth user, enables RLS, denies anonymous writes and reads, and permits authenticated users to read only their own row.
+Apply `supabase/migrations/202610240001_account_registry.sql` and then
+`supabase/migrations/202610280001_gym_lobby.sql` with the Supabase CLI or SQL editor. The Gym Lobby
+migration enables RLS, denies direct anonymous/authenticated table access, and exposes only narrow
+authenticated security-definer functions for publishing the public summary and managing requests.
 
 ## Authentication settings
 
@@ -49,4 +55,7 @@ Password reset, session revocation, and sign-out operate only on authentication 
 
 ## Privacy boundary
 
-Supabase receives the account email, password hash managed by Supabase Auth, authentication identifiers, and Auth audit metadata. Username, profile photo, gender/body context, measurements, workouts, endurance routes, nutrition, schedules, progress, coach choice, and dialogue preferences remain on the phone.
+Supabase receives the account email, password hash managed by Supabase Auth, authentication
+identifiers, Auth audit metadata, and the optional Gym Lobby fields listed above. Profile photo,
+gender/body context, measurements, workouts, endurance routes, nutrition, schedules, detailed
+progress history, coach choice, and dialogue preferences remain on the phone.

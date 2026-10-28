@@ -13,9 +13,10 @@ import java.util.Set;
 /**
  * Computes the private Achievement and Apex experience from completed local sessions.
  *
- * <p>There is deliberately no server score, social ranking, calorie requirement, or penalty for
- * a missed day. A member can keep using every normal workout and coach regardless of this system.
- * Apex is an optional consistency lane, not a prescription for intensity.</p>
+ * <p>The detailed history remains on-device. Authenticated members may publish only the resulting
+ * level, Momentum Points, Apex lane, and earned badge names through {@link GymLobbyClient} for an
+ * optional friendly leaderboard. There is no calorie requirement or penalty for a missed day, and
+ * every normal workout and coach remains available regardless of this system.</p>
  */
 public final class AchievementStore {
     public static final class Badge {

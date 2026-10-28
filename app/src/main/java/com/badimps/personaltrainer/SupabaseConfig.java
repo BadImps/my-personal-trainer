@@ -22,5 +22,11 @@ public final class SupabaseConfig {
         return base + "/auth/v1" + path;
     }
 
+    public static String restEndpoint(String path) {
+        String base = BuildConfig.SUPABASE_URL.trim();
+        while (base.endsWith("/")) base = base.substring(0, base.length() - 1);
+        return base + "/rest/v1" + path;
+    }
+
     private SupabaseConfig() { }
 }
