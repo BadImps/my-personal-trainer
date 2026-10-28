@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 130,
-  "versionName": "5.88",
-  "publishedAt": "2026-10-28T12:33:21Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.88/app-production-release.apk",
-  "sha256": "c02a75d464b9f6f1a2d2d0378b8e4eea1008142b9e495e7af79240f01923ec5f",
+  "versionCode": 131,
+  "versionName": "5.89",
+  "publishedAt": "2026-10-28T20:50:23Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.89/app-production-release.apk",
+  "sha256": "9679fae43095946574f2b9dcd87bf16a85727d544e9cf1ec36088221e2174eab",
   "sizeBytes": 258721744,
-  "notes": "Adds Gym Lobby, Gym Buddies, private-lobby invitations and join requests, public achievement profiles, and friendly Momentum Points leaderboards."
+  "notes": "Restores the full Mintfoil iron-frame achievement cards and repairs the signed Wear OS companion handoff for guided workouts."
 }
