@@ -74,6 +74,8 @@ import androidx.biometric.BiometricManager;
 import androidx.biometric.BiometricPrompt;
 import androidx.fragment.app.FragmentActivity;
 
+import com.google.android.gms.wearable.Wearable;
+
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -8441,16 +8443,58 @@ public final class MainActivity extends FragmentActivity {
         jewelParams.bottomMargin = dp(4);
         shell.addView(jewel, jewelParams);
 
-        shell.setContentDescription(badge.name + ", " + badge.progressLabel());
+        shell.setContentDescription(badge.name + ", " + badge.progressLabel() + ". Open achievement details.");
         shell.setClickable(true);
         shell.setFocusable(true);
-        shell.setOnClickListener(view -> toast(badge.name + " — " + badge.progressLabel()));
+        shell.setOnClickListener(view -> showAchievementDetail(badge));
         GridLayout.LayoutParams params = new GridLayout.LayoutParams();
         params.width = 0; params.height = dp(224);
         params.columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f);
         params.setMargins(position % 2 == 0 ? 0 : dp(5), position >= 2 ? dp(7) : 0,
                 position % 2 == 1 ? 0 : dp(5), 0);
         grid.addView(shell, params);
+    }
+
+    /** Makes the Mintfoil art useful: a card now explains the earned or next milestone. */
+    private void showAchievementDetail(AchievementStore.Badge badge) {
+        LinearLayout body = appPage("Apex");
+        boolean unlocked = badge.unlocked();
+        title(body, badge.family.toUpperCase(Locale.US), badge.name, unlocked
+                ? "A completed milestone in your private training story."
+                : "A future milestone. Progress is earned safely, never by skipping recovery.");
+
+        LinearLayout hero = darkCard();
+        hero.setGravity(Gravity.CENTER_HORIZONTAL);
+        MintfoilBadgeView medal = new MintfoilBadgeView(this);
+        medal.bind(badge, badgeTier(badge));
+        hero.addView(medal, new LinearLayout.LayoutParams(dp(190), dp(190)));
+        TextView state = heading(unlocked ? "UNLOCKED" : "IN PROGRESS", 13, unlocked ? mint : Color.rgb(201, 212, 221));
+        state.setLetterSpacing(.12f);
+        state.setGravity(Gravity.CENTER);
+        hero.addView(state);
+        hero.addView(text(unlocked ? "This card is part of your permanent local collection." : badge.progressLabel(), 14, Color.rgb(211, 225, 233)));
+        body.addView(hero);
+        gap(body, 12);
+
+        LinearLayout detail = card();
+        detail.addView(heading("What it recognizes", 18, ink));
+        detail.addView(text(badge.description, 14, muted));
+        gap(detail, 10);
+        detail.addView(heading("Progress", 16, ink));
+        detail.addView(text(badge.progressLabel() + " · " + badge.current + " of " + badge.required, 14, muted));
+        detail.addView(text("Rest days never reduce this progress.", 12, Color.rgb(65, 104, 105)));
+        body.addView(detail);
+        gap(body, 10);
+
+        if (!unlocked) {
+            Button plan = primary("Plan next session");
+            plan.setOnClickListener(view -> showPlans());
+            addButton(body, plan);
+            gap(body, 8);
+        }
+        Button back = secondary("Back to Apex");
+        back.setOnClickListener(view -> showApex());
+        addButton(body, back);
     }
 
     private int badgeTier(AchievementStore.Badge badge) {
@@ -8531,6 +8575,8 @@ public final class MainActivity extends FragmentActivity {
 
         body.addView(settingsGroup("APP"));
         LinearLayout appGroup = settingsPanel();
+        appGroup.addView(settingsRow("◌", "Connection Center", connectionSummary(), view -> showConnectionCenter()));
+        appGroup.addView(settingsDivider());
         appGroup.addView(settingsRow("⌖", "MapLibre maps", MapLibreOfflinePack.isTrinidadReady(this) ? "Vector streets ready for routes" : "Download an offline vector pack", view -> showOfflineMapCatalog()));
         appGroup.addView(settingsDivider());
         appGroup.addView(settingsRow("▶", "Coach motion packs", "Optional smooth exercise loops · download only what you need", view -> showMediaPacks()));
@@ -8567,6 +8613,70 @@ public final class MainActivity extends FragmentActivity {
             showWelcome();
         });
         addButton(body, signOut);
+    }
+
+    private String connectionSummary() {
+        if (!AccountStore.usesRemoteAuth(this)) return "Device-only account · connect services when ready";
+        return GymLobbyClient.available(this) ? "Account and Gym Lobby connected" : "Account needs sign-in";
+    }
+
+    /** One truthful place to inspect optional services without creating a second account system. */
+    private void showConnectionCenter() {
+        LinearLayout body = appPage("Settings");
+        title(body, "CONNECTION CENTER", "Your app connections", "Check your optional account, Gym Lobby, watch, and update connections in one place.");
+
+        LinearLayout account = card();
+        boolean remoteAccount = AccountStore.usesRemoteAuth(this);
+        boolean lobbyAvailable = GymLobbyClient.available(this);
+        account.addView(heading("Account", 18, ink));
+        account.addView(text(remoteAccount
+                ? (lobbyAvailable ? "Signed in. Gym Lobby can use this secure session." : "Your secure session needs a sign-in refresh.")
+                : "This is a device-only account. Register or sign in when you want Gym Lobby and account recovery.", 14, muted));
+        gap(account, 10);
+        Button accountAction = secondary(lobbyAvailable ? "Open Gym Lobby" : "Sign in");
+        accountAction.setOnClickListener(view -> { if (lobbyAvailable) showGymLobby(); else showLogin(); });
+        addButton(account, accountAction);
+        body.addView(account);
+        gap(body, 12);
+
+        LinearLayout watch = card();
+        watch.addView(heading("Watch companion", 18, ink));
+        TextView watchStatus = text("Checking for a paired Wear OS device…", 14, muted);
+        watch.addView(watchStatus);
+        gap(watch, 10);
+        Button refreshWatch = secondary("Refresh watch status");
+        refreshWatch.setOnClickListener(view -> loadWatchConnectionStatus(watchStatus));
+        addButton(watch, refreshWatch);
+        body.addView(watch);
+        loadWatchConnectionStatus(watchStatus);
+        gap(body, 12);
+
+        LinearLayout updates = card();
+        updates.addView(heading("Updates", 18, ink));
+        updates.addView(text("Installed version " + BuildConfig.VERSION_NAME + ". Check the secure update channel when you are ready.", 14, muted));
+        gap(updates, 10);
+        Button checkUpdates = secondary("Check for update");
+        checkUpdates.setOnClickListener(view -> showUpdate());
+        addButton(updates, checkUpdates);
+        body.addView(updates);
+        gap(body, 10);
+
+        Button back = secondary("Back to settings");
+        back.setOnClickListener(view -> showProfile());
+        addButton(body, back);
+    }
+
+    private void loadWatchConnectionStatus(TextView status) {
+        try {
+            Wearable.getNodeClient(this).getConnectedNodes().addOnSuccessListener(nodes -> {
+                if (nodes.isEmpty()) status.setText("No paired Wear OS device detected. Pair the watch in the Wear OS app, then refresh here.");
+                else status.setText(nodes.size() == 1
+                        ? "1 paired Wear OS device detected. It opens when a guided workout starts."
+                        : nodes.size() + " paired Wear OS devices detected. They receive your active workout state.");
+            }).addOnFailureListener(error -> status.setText("Could not check the watch connection. Open the Wear OS app, then try again."));
+        } catch (RuntimeException error) {
+            status.setText("Wear OS services are not available on this phone.");
+        }
     }
 
     /** WhatsApp-inspired settings groups: one clear profile row, concise rows, and muted dividers. */
