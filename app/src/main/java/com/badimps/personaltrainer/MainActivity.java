@@ -2760,6 +2760,20 @@ public final class MainActivity extends FragmentActivity {
             // add recovery later, but it must never block the proven device-only flow.
             AccountStore.create(this, enteredEmail, usernameValue, passwordValue, selectedTrainer);
             LauncherIconManager.apply(this, AccountStore.get(this).coachName);
+            if (SupabaseConfig.isConfigured()) {
+                // Keep the local profile as the source of truth for this device, while also
+                // creating the secure account that lets this email sign in on a replacement
+                // phone after it has been verified.  A temporary network problem must not
+                // prevent someone from starting with the profile they just created.
+                PendingAccountStore.save(this, enteredEmail, usernameValue, selectedTrainer);
+                SupabaseAuthClient.signUp(enteredEmail, passwordValue, (created, error) -> runOnUiThread(() -> {
+                    if (error == null && Boolean.TRUE.equals(created)) {
+                        toast("Check your email to verify secure account recovery.");
+                    } else {
+                        toast("Your profile is ready on this phone. Secure recovery can be retried from registration later.");
+                    }
+                }));
+            }
             showBodyProfileSetup(true);
         });
         addButton(body, create);
