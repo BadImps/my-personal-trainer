@@ -3,7 +3,9 @@ plugins {
 }
 
 def releaseProperties = new Properties()
-def releasePropertiesFile = rootProject.file('release-signing.properties')
+def releasePropertiesFile = System.getenv('MPT_SIGNING_PROPERTIES')
+        ? file(System.getenv('MPT_SIGNING_PROPERTIES'))
+        : rootProject.file('release-signing.properties')
 def previewProperties = new Properties()
 def previewPropertiesFile = rootProject.file('signing/upload-signing.properties')
 def localProperties = new Properties()
@@ -27,7 +29,8 @@ android {
     compileSdk 36
     signingConfigs {
         production {
-            storeFile rootProject.file(releaseProperties.getProperty('storeFile', 'keys/my-personal-trainer-release.jks'))
+            def configuredStoreFile = releaseProperties.getProperty('storeFile', 'keys/my-personal-trainer-release.jks')
+            storeFile new File(releasePropertiesFile.parentFile, configuredStoreFile)
             storePassword releaseProperties.getProperty('storePassword', '')
             keyAlias releaseProperties.getProperty('keyAlias', 'my-personal-trainer')
             keyPassword releaseProperties.getProperty('keyPassword', '')
