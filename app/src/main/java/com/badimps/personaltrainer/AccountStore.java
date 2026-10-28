@@ -36,7 +36,7 @@ public final class AccountStore {
     }
     public static void create(Context c,String email,String username,String password,String trainer) {
         byte[] salt=new byte[16]; new SecureRandom().nextBytes(salt);
-        c.getSharedPreferences(FILE,Context.MODE_PRIVATE).edit().putBoolean("created",true).putString("email",email.trim()).putString("username",username.trim()).putString("trainer",trainer).putString("coach_name",CoachPreferences.defaultCoach(trainer)).putString("dialogue_mode",CoachPreferences.FULL_DIALOGUE).putBoolean("keep_phone_awake",false).putBoolean("remember_sign_in",false).putBoolean("biometric_unlock",false).putString("photo_uri", "").putString("salt",hex(salt)).putString("password_scheme", PASSWORD_SCHEME).putString("passwordHash",passwordHash(salt,password)).apply();
+        c.getSharedPreferences(FILE,Context.MODE_PRIVATE).edit().putBoolean("created",true).putBoolean("remote_auth", false).putString("email",email.trim()).putString("username",username.trim()).putString("trainer",trainer).putString("coach_name",CoachPreferences.defaultCoach(trainer)).putString("dialogue_mode",CoachPreferences.FULL_DIALOGUE).putBoolean("keep_phone_awake",false).putBoolean("remember_sign_in",false).putBoolean("biometric_unlock",false).putString("photo_uri", "").putString("salt",hex(salt)).putString("password_scheme", PASSWORD_SCHEME).putString("passwordHash",passwordHash(salt,password)).apply();
     }
     /** Creates only the private on-device profile after Supabase has verified the identity. */
     public static void createRemote(Context c, String email, String username, String trainer) {

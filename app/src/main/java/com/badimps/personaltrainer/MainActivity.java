@@ -2756,17 +2756,11 @@ public final class MainActivity extends FragmentActivity {
             }
             selectedTrainer = trainers.getCheckedRadioButtonId() == R.id.trainer_male ? "Male" : "Female";
             configureSpeechVoices();
-            if (!SupabaseConfig.isConfigured()) {
-                toast("Secure account registration is not configured on this build yet.");
-                return;
-            }
-            create.setEnabled(false); create.setText("Creating account…");
-            PendingAccountStore.save(this, enteredEmail, usernameValue, selectedTrainer);
-            SupabaseAuthClient.signUp(enteredEmail, passwordValue, (created, error) -> runOnUiThread(() -> {
-                create.setEnabled(true); create.setText("Create my profile");
-                if (error != null) { toast(error); return; }
-                showVerificationPending(enteredEmail);
-            }));
+            // A membership profile must always be usable on this phone.  Cloud setup can
+            // add recovery later, but it must never block the proven device-only flow.
+            AccountStore.create(this, enteredEmail, usernameValue, passwordValue, selectedTrainer);
+            LauncherIconManager.apply(this, AccountStore.get(this).coachName);
+            showBodyProfileSetup(true);
         });
         addButton(body, create);
         gap(body, 10);
