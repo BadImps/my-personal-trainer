@@ -3,7 +3,7 @@
   "versionCode": 129,
   "versionName": "5.87",
   "publishedAt": "2026-10-28T04:40:19Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.87/app-release.apk",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.87/app-production-release.apk",
   "sha256": "81eaae7d9dcf0a3a41b2344d1d5dcb5ffbb2ecd9c40f670bcf40e263b8f11216",
   "sizeBytes": 257489554,
   "notes": "Restores the original signed GitHub update channel. New profiles can also enroll a verified Supabase account for recovery without blocking local use."
