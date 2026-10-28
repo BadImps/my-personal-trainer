@@ -37,9 +37,13 @@ import java.util.Locale;
  * update until the published SHA-256 is checked immediately before the Android installer opens.</p>
  */
 public final class UpdateManager {
-    public static final String ENDPOINT = "https://badimps.github.io/my-personal-trainer/latest.json";
+    public static final String ENDPOINT = BuildConfig.PREVIEW_BUILD
+            ? "https://badimps.github.io/my-personal-trainer/preview/latest.json"
+            : "https://badimps.github.io/my-personal-trainer/latest.json";
     /** A separately routed copy for mobile networks that intermittently cannot reach Pages. */
-    public static final String FALLBACK_ENDPOINT = "https://api.github.com/repos/BadImps/my-personal-trainer/contents/docs/latest.json?ref=main";
+    public static final String FALLBACK_ENDPOINT = BuildConfig.PREVIEW_BUILD
+            ? "https://api.github.com/repos/BadImps/my-personal-trainer/contents/docs/preview/latest.json?ref=main"
+            : "https://api.github.com/repos/BadImps/my-personal-trainer/contents/docs/latest.json?ref=main";
     public static final String MANUAL_RELEASES_URL = "https://github.com/BadImps/my-personal-trainer/releases/latest";
     private static final String PREFS = "ota_download_state";
     private static final String KEY_ID = "download_id";

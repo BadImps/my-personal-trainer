@@ -1,0 +1,10 @@
+{
+  "applicationId": "com.badimps.personaltrainer.preview",
+  "versionCode": 129,
+  "versionName": "5.87-preview",
+  "publishedAt": "2026-10-28T01:54:00Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/preview-v5.87/app-preview-release.apk",
+  "sha256": "920c2d681a43579625455d830054098b4279546b7e16ece44059c1dc48cfd608",
+  "sizeBytes": 258704792,
+  "notes": "Independent GitHub Preview channel. It installs beside the production app and receives future preview updates without changing Google Play or the existing GitHub 5.86 installation."
+}

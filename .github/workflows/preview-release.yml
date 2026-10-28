@@ -1,0 +1,51 @@
+name: Publish preview APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: GitHub release tag, for example preview-v5.88
+        required: true
+        type: string
+      notes:
+        description: Short release notes for preview testers
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Restore the encrypted preview signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.MPT_PREVIEW_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.MPT_PREVIEW_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.MPT_PREVIEW_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.MPT_PREVIEW_KEY_PASSWORD }}
+        run: |
+          mkdir -p signing
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > signing/preview.jks
+          {
+            printf 'UPLOAD_STORE_FILE=signing/preview.jks\n'
+            printf 'UPLOAD_STORE_PASSWORD=%s\n' "$STORE_PASSWORD"
+            printf 'UPLOAD_KEY_ALIAS=%s\n' "$KEY_ALIAS"
+            printf 'UPLOAD_KEY_PASSWORD=%s\n' "$KEY_PASSWORD"
+          } > signing/upload-signing.properties
+      - name: Build signed preview APK
+        run: ./gradlew :app:assemblePreviewRelease --no-daemon
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+          NOTES: ${{ inputs.notes }}
+        run: |
+          gh release create "$TAG" app/build/outputs/apk/preview/release/app-preview-release.apk \
+            --title "My Personal Trainer Preview" --notes "$NOTES"
