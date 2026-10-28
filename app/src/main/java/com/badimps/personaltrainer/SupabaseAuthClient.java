@@ -29,11 +29,19 @@ public final class SupabaseAuthClient {
 
     private static final ExecutorService NETWORK = Executors.newSingleThreadExecutor();
 
-    public static void signUp(String email, String password, Callback<Boolean> callback) {
+    /**
+     * Creates the Supabase Auth account. With email confirmation disabled, Supabase returns a
+     * usable session immediately; callers must save it so the new member is recognised by the
+     * Gym Lobby without an unnecessary second sign-in.
+     */
+    public static void signUp(String email, String password, Callback<AuthResult> callback) {
         JSONObject body = new JSONObject();
         put(body, "email", normalizeEmail(email)); put(body, "password", password);
         request("POST", "/signup?redirect_to=com.badimps.personaltrainer%3A%2F%2Fauth%2Fverified", body, null,
-                (json, error) -> callback.complete(error == null, error == null ? null : friendly(error)));
+                (json, error) -> {
+                    if (error != null) { callback.complete(null, friendly(error)); return; }
+                    callback.complete(authResult(json, normalizeEmail(email)), null);
+                });
     }
 
     public static void signIn(String email, String password, Callback<AuthResult> callback) {

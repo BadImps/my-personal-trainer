@@ -21,8 +21,8 @@ android {
         applicationId 'com.badimps.personaltrainer'
         minSdk 30
         targetSdk 36
-        versionCode 109
-        versionName '5.67'
+        versionCode 131
+        versionName '5.89'
     }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
     buildTypes {

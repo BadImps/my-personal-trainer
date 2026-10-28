@@ -15,6 +15,8 @@ public final class ReleaseNotes {
     }
 
     public static final Entry[] HISTORY = {
+            new Entry("5.89", "Mintfoil board & watch handoff", "Restores the full iron-framed Mintfoil achievement cards and wakes the installed Wear OS companion when a guided workout starts."),
+            new Entry("5.88", "Gym Lobby", "Adds Gym Lobby, Gym Buddies, private-lobby invitations and join requests, public achievement profiles, and friendly Momentum Points leaderboards."),
             new Entry("5.86", "Schedule past dates", "Choose an unfinished past calendar day on Home, then schedule a guided or endurance workout for that exact date."),
             new Entry("5.85", "Mintfoil achievement-card refinement", "Achievement cards now use Coach-card-ratio plates that preserve true circular badge mounts. Card copy has more clearance from the lower iron chevron, the flip-back is fully opaque, and Steady Return's shield is optically centred."),
             new Entry("5.84", "Achievement cards, production finish", "Achievement cards now use the approved Mintfoil plate as the single mount and landscape, with new transparent icon-only inserts for every family. Fronts show a clear locked or unlocked state, while exact requirements and progress stay on the flip-back."),

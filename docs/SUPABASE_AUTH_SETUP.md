@@ -28,15 +28,14 @@ authenticated security-definer functions for publishing the public summary and m
 In Authentication settings:
 
 1. Enable email/password sign-up.
-2. Require email confirmation before sign-in.
+2. Turn **Confirm email** off. Registration signs the member into the app immediately; Supabase
+   still stores the email and password hash securely in Auth, without sending a verification email.
 3. Set minimum password length to 10 and require uppercase/lowercase letters, digits, and symbols. The app applies the same policy and explains every requirement while the member types.
-4. Set email OTP length to 6 and expiry to 10 minutes.
-5. Configure custom SMTP before production. Supabase's trial mailer is rate-limited and best-effort.
-6. Add `com.badimps.personaltrainer://auth/verified` to allowed redirect URLs.
+4. Add `com.badimps.personaltrainer://auth/verified` to allowed redirect URLs only if email confirmation is enabled again later.
 
-## Email templates
+## Password recovery email template
 
-The confirmation template should retain `{{ .ConfirmationURL }}`. The recovery template must show the OTP:
+Password recovery still sends an email. Its template must show the OTP:
 
 ```html
 <h2>Reset your My Personal Trainer password</h2>
@@ -45,7 +44,7 @@ The confirmation template should retain `{{ .ConfirmationURL }}`. The recovery t
 <p>This code expires in 10 minutes. If you did not request it, ignore this email.</p>
 ```
 
-Supabase supports email OTP lengths from 6–10 digits. A four-digit recovery code is intentionally not used because it is unsupported and substantially weaker against guessing attacks.
+Supabase supports email OTP lengths from 6–10 digits. A four-digit recovery code is intentionally not used because it is unsupported and substantially weaker against guessing attacks. Configure custom SMTP before releasing password recovery broadly; Supabase's trial mailer is rate-limited and best-effort.
 
 Password recovery uses three separate screens: email request, six individual OTP fields, and new-password creation. The request response deliberately does not reveal whether an email is registered, which prevents account enumeration.
 

@@ -2771,10 +2771,19 @@ public final class MainActivity extends FragmentActivity {
                 // prevent someone from starting with the profile they just created.
                 PendingAccountStore.save(this, enteredEmail, usernameValue, selectedTrainer);
                 SupabaseAuthClient.signUp(enteredEmail, passwordValue, (created, error) -> runOnUiThread(() -> {
-                    if (error == null && Boolean.TRUE.equals(created)) {
-                        toast("Check your email to verify secure account recovery.");
+                    if (error == null && created != null && created.session().isUsable()) {
+                        // Email confirmation is intentionally disabled for this product. Supabase
+                        // returns a password-authenticated session at registration, so persist it
+                        // now and publish the new member when they open the Gym Lobby.
+                        AuthSessionStore.save(this, created.session());
+                        AccountStore.markRemoteAuthenticated(this);
+                        PendingAccountStore.clear(this);
+                        GymLobbyClient.publish(this);
+                        toast("Your account is saved securely and ready for Gym Lobby.");
+                    } else if (error == null) {
+                        toast("Your profile is ready. Sign in once to connect it to Gym Lobby.");
                     } else {
-                        toast("Your profile is ready on this phone. Secure recovery can be retried from registration later.");
+                        toast("Your profile is ready on this phone. Secure account setup can be retried later.");
                     }
                 }));
             }
@@ -8204,7 +8213,7 @@ public final class MainActivity extends FragmentActivity {
             body.addView(empty);
         } else {
             GridLayout grid = new GridLayout(this);
-            grid.setColumnCount(3);
+            grid.setColumnCount(2);
             for (int index = 0; index < member.achievements.size(); index++) {
                 AchievementStore.Badge badge = new AchievementStore.Badge("ACHIEVEMENT", member.achievements.get(index), "Earned achievement.", 1, 1);
                 addAchievementBadgeTile(grid, badge, index);
@@ -8318,7 +8327,7 @@ public final class MainActivity extends FragmentActivity {
         achievements.addView(text(snapshot.unlockedBadgeCount() + " of " + snapshot.badges.size() + " badges earned. Achievements record progress; they never judge your body, food, or a rest day.", 14, muted));
         gap(achievements, 10);
         GridLayout badgeGrid = new GridLayout(this);
-        badgeGrid.setColumnCount(3);
+        badgeGrid.setColumnCount(2);
         int displayed = 0;
         for (AchievementStore.Badge badge : snapshot.badges) {
             if (!badge.unlocked() && displayed >= 5) continue;
@@ -8364,31 +8373,84 @@ public final class MainActivity extends FragmentActivity {
         return row;
     }
 
-    /** Three-up premium visual collection, matching the approved Mintfoil badge layout. */
+    /**
+     * The achievement collection is intentionally a portrait, two-up Mintfoil board.
+     * Keep the steel/mint frame here rather than reducing the cards to small generic
+     * dashboard tiles: the frame is part of the collectible artwork itself.
+     */
     private void addAchievementBadgeTile(GridLayout grid, AchievementStore.Badge badge, int position) {
-        LinearLayout tile = new LinearLayout(this);
-        tile.setOrientation(LinearLayout.VERTICAL);
-        tile.setGravity(Gravity.CENTER);
-        tile.setPadding(dp(5), dp(8), dp(5), dp(7));
         boolean unlocked = badge.unlocked();
-        tile.setBackground(surface(unlocked ? Color.rgb(16, 42, 61) : Color.rgb(39, 52, 70), 16, 1, unlocked ? mint : Color.rgb(76, 94, 114)));
-        tile.setElevation(dp(unlocked ? 6 : 2));
+        int frameMint = unlocked ? Color.rgb(105, 229, 201) : Color.rgb(67, 92, 111);
+        int steel = unlocked ? Color.rgb(126, 171, 174) : Color.rgb(65, 81, 101);
+
+        FrameLayout shell = new FrameLayout(this);
+        shell.setPadding(dp(3), dp(3), dp(3), dp(3));
+        shell.setBackground(surface(unlocked ? Color.rgb(22, 78, 82) : Color.rgb(34, 47, 64), 15, 2, steel));
+        shell.setElevation(dp(unlocked ? 7 : 2));
+
+        FrameLayout mintRim = new FrameLayout(this);
+        mintRim.setPadding(dp(3), dp(3), dp(3), dp(3));
+        mintRim.setBackground(surface(unlocked ? Color.rgb(7, 38, 57) : Color.rgb(31, 42, 57), 12, 1, frameMint));
+        shell.addView(mintRim, new FrameLayout.LayoutParams(-1, -1));
+
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setGravity(Gravity.CENTER_HORIZONTAL);
+        card.setPadding(dp(8), dp(11), dp(8), dp(8));
+        card.setBackground(surface(unlocked ? Color.rgb(8, 28, 48) : Color.rgb(29, 41, 57), 10, 1, unlocked ? Color.rgb(41, 104, 108) : Color.rgb(56, 73, 91)));
+        mintRim.addView(card, new FrameLayout.LayoutParams(-1, -1));
+
+        TextView crest = heading(badge.family, 8, unlocked ? mint : Color.rgb(157, 177, 190));
+        crest.setGravity(Gravity.CENTER);
+        crest.setLetterSpacing(.12f);
+        card.addView(crest, new LinearLayout.LayoutParams(-1, dp(16)));
+
+        FrameLayout medalMount = new FrameLayout(this);
+        medalMount.setPadding(dp(4), dp(4), dp(4), dp(4));
+        medalMount.setBackground(surface(unlocked ? Color.rgb(13, 53, 68) : Color.rgb(44, 56, 72), 99, 1, unlocked ? Color.rgb(130, 214, 197) : Color.rgb(79, 101, 120)));
         MintfoilBadgeView medal = new MintfoilBadgeView(this);
         medal.bind(badge, badgeTier(badge));
-        tile.addView(medal, new LinearLayout.LayoutParams(dp(66), dp(66)));
-        TextView name = heading(badge.name, 10, unlocked ? Color.WHITE : Color.rgb(185, 198, 211));
-        name.setGravity(Gravity.CENTER); name.setMaxLines(2);
-        tile.addView(name, new LinearLayout.LayoutParams(-1, dp(31)));
-        TextView state = text(unlocked ? "UNLOCKED" : badge.progressLabel(), 8, unlocked ? mint : Color.rgb(160, 176, 192));
-        state.setGravity(Gravity.CENTER); state.setSingleLine(true);
-        tile.addView(state, new LinearLayout.LayoutParams(-1, dp(16)));
-        tile.setContentDescription(badge.name + ", " + badge.progressLabel());
+        FrameLayout.LayoutParams medalParams = new FrameLayout.LayoutParams(dp(88), dp(88), Gravity.CENTER);
+        medalMount.addView(medal, medalParams);
+        LinearLayout.LayoutParams mountParams = new LinearLayout.LayoutParams(dp(100), dp(100));
+        mountParams.topMargin = dp(2);
+        card.addView(medalMount, mountParams);
+
+        View divider = new View(this);
+        divider.setBackgroundColor(unlocked ? Color.rgb(98, 194, 181) : Color.rgb(72, 88, 108));
+        LinearLayout.LayoutParams dividerParams = new LinearLayout.LayoutParams(-1, dp(1));
+        dividerParams.topMargin = dp(8);
+        dividerParams.bottomMargin = dp(6);
+        card.addView(divider, dividerParams);
+
+        TextView name = heading(badge.name.toUpperCase(Locale.US), 10, unlocked ? Color.WHITE : Color.rgb(201, 212, 221));
+        name.setGravity(Gravity.CENTER);
+        name.setMaxLines(2);
+        name.setLineSpacing(0f, .92f);
+        card.addView(name, new LinearLayout.LayoutParams(-1, dp(30)));
+
+        TextView state = text(unlocked ? "UNLOCKED" : badge.progressLabel(), 8, unlocked ? mint : Color.rgb(161, 177, 191));
+        state.setGravity(Gravity.CENTER);
+        state.setSingleLine(true);
+        state.setLetterSpacing(.08f);
+        card.addView(state, new LinearLayout.LayoutParams(-1, dp(15)));
+
+        View jewel = new View(this);
+        jewel.setBackground(surface(unlocked ? coral : Color.rgb(84, 98, 117), 99, 0, Color.TRANSPARENT));
+        FrameLayout.LayoutParams jewelParams = new FrameLayout.LayoutParams(dp(7), dp(7), Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
+        jewelParams.bottomMargin = dp(4);
+        shell.addView(jewel, jewelParams);
+
+        shell.setContentDescription(badge.name + ", " + badge.progressLabel());
+        shell.setClickable(true);
+        shell.setFocusable(true);
+        shell.setOnClickListener(view -> toast(badge.name + " — " + badge.progressLabel()));
         GridLayout.LayoutParams params = new GridLayout.LayoutParams();
-        params.width = 0; params.height = dp(128);
+        params.width = 0; params.height = dp(224);
         params.columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f);
-        params.setMargins(position % 3 == 0 ? 0 : dp(5), position >= 3 ? dp(6) : 0,
-                position % 3 == 2 ? 0 : dp(5), 0);
-        grid.addView(tile, params);
+        params.setMargins(position % 2 == 0 ? 0 : dp(5), position >= 2 ? dp(7) : 0,
+                position % 2 == 1 ? 0 : dp(5), 0);
+        grid.addView(shell, params);
     }
 
     private int badgeTier(AchievementStore.Badge badge) {
@@ -8413,7 +8475,7 @@ public final class MainActivity extends FragmentActivity {
                 family.setLetterSpacing(.08f);
                 body.addView(family);
                 grid = new GridLayout(this);
-                grid.setColumnCount(3);
+                grid.setColumnCount(2);
                 familyPosition = 0;
             }
             addAchievementBadgeTile(grid, badge, familyPosition++);
