@@ -1,7 +1,9 @@
 plugins { id 'com.android.application' }
 
 def releaseProperties = new Properties()
-def releasePropertiesFile = rootProject.file('release-signing.properties')
+def releasePropertiesFile = System.getenv('MPT_SIGNING_PROPERTIES')
+        ? file(System.getenv('MPT_SIGNING_PROPERTIES'))
+        : rootProject.file('release-signing.properties')
 if (releasePropertiesFile.exists()) {
     releasePropertiesFile.withInputStream { releaseProperties.load(it) }
 }
@@ -11,7 +13,11 @@ android {
     compileSdk 36
     signingConfigs {
         production {
-            storeFile file(releaseProperties.getProperty('storeFile', '../keys/my-personal-trainer-release.jks'))
+            def configuredStoreFile = releaseProperties.getProperty('storeFile', '../keys/my-personal-trainer-release.jks')
+            // Keep the wearable companion signed by the same protected certificate as the phone.
+            def signingBase = releasePropertiesFile.parentFile.canonicalPath == rootProject.projectDir.canonicalPath
+                    ? project.projectDir : new File(releasePropertiesFile.parentFile, 'app')
+            storeFile new File(signingBase, configuredStoreFile)
             storePassword releaseProperties.getProperty('storePassword', '')
             keyAlias releaseProperties.getProperty('keyAlias', 'my-personal-trainer')
             keyPassword releaseProperties.getProperty('keyPassword', '')
