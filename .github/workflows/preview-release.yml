@@ -49,3 +49,30 @@ jobs:
         run: |
           gh release create "$TAG" app/build/outputs/apk/preview/release/app-preview-release.apk \
             --title "My Personal Trainer Preview" --notes "$NOTES"
+      - name: Publish the matching preview update manifest
+        env:
+          TAG: ${{ inputs.tag }}
+          NOTES: ${{ inputs.notes }}
+        run: |
+          APK=app/build/outputs/apk/preview/release/app-preview-release.apk
+          METADATA=app/build/outputs/apk/preview/release/output-metadata.json
+          VERSION_CODE=$(jq -r '.elements[0].versionCode' "$METADATA")
+          VERSION_NAME=$(jq -r '.elements[0].versionName' "$METADATA")
+          SHA256=$(sha256sum "$APK" | awk '{print $1}')
+          SIZE_BYTES=$(stat --printf='%s' "$APK")
+          jq -n \
+            --arg applicationId "com.badimps.personaltrainer.preview" \
+            --argjson versionCode "$VERSION_CODE" \
+            --arg versionName "$VERSION_NAME" \
+            --arg publishedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --arg apkUrl "https://github.com/BadImps/my-personal-trainer/releases/download/$TAG/app-preview-release.apk" \
+            --arg sha256 "$SHA256" \
+            --argjson sizeBytes "$SIZE_BYTES" \
+            --arg notes "$NOTES" \
+            '{applicationId: $applicationId, versionCode: $versionCode, versionName: $versionName, publishedAt: $publishedAt, apkUrl: $apkUrl, sha256: $sha256, sizeBytes: $sizeBytes, notes: $notes}' \
+            > docs/preview/latest.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/preview/latest.json
+          git commit -m "chore: publish preview OTA manifest for $VERSION_NAME"
+          git push
