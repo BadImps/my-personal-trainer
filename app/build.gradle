@@ -30,7 +30,11 @@ android {
     signingConfigs {
         production {
             def configuredStoreFile = releaseProperties.getProperty('storeFile', 'keys/my-personal-trainer-release.jks')
-            storeFile new File(releasePropertiesFile.parentFile, configuredStoreFile)
+            // Signing properties normally sit beside the project.  When a protected copy is
+            // supplied from a recovery location, keep its existing app-relative path intact.
+            def signingBase = releasePropertiesFile.parentFile.canonicalPath == rootProject.projectDir.canonicalPath
+                    ? project.projectDir : new File(releasePropertiesFile.parentFile, 'app')
+            storeFile new File(signingBase, configuredStoreFile)
             storePassword releaseProperties.getProperty('storePassword', '')
             keyAlias releaseProperties.getProperty('keyAlias', 'my-personal-trainer')
             keyPassword releaseProperties.getProperty('keyPassword', '')
