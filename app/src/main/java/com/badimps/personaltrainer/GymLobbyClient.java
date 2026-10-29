@@ -65,6 +65,18 @@ public final class GymLobbyClient {
         }
     }
 
+    /** A private social message. Only the sender and recipient receive it from Supabase. */
+    public static final class Message {
+        public final String id, senderId, senderName, body, createdAt;
+        public final boolean unread;
+        Message(JSONObject json) {
+            id = json.optString("id"); senderId = json.optString("senderId");
+            senderName = json.optString("senderName", "Gym Member");
+            body = json.optString("body", ""); createdAt = json.optString("createdAt", "");
+            unread = json.optBoolean("unread", false);
+        }
+    }
+
     public static final class Snapshot {
         public final List<Member> members;
         public final List<Request> requests;
@@ -87,6 +99,34 @@ public final class GymLobbyClient {
             }
             lobbies = Collections.unmodifiableList(joined);
         }
+    }
+
+    public static final class Inbox {
+        public final List<Request> requests;
+        public final List<Message> messages;
+        Inbox(JSONObject json) {
+            ArrayList<Request> pending = new ArrayList<>();
+            JSONArray requestValues = json.optJSONArray("requests");
+            if (requestValues != null) for (int index = 0; index < requestValues.length(); index++) {
+                JSONObject value = requestValues.optJSONObject(index); if (value != null) pending.add(new Request(value));
+            }
+            requests = Collections.unmodifiableList(pending);
+            ArrayList<Message> received = new ArrayList<>();
+            JSONArray messageValues = json.optJSONArray("messages");
+            if (messageValues != null) for (int index = 0; index < messageValues.length(); index++) {
+                JSONObject value = messageValues.optJSONObject(index); if (value != null) received.add(new Message(value));
+            }
+            messages = Collections.unmodifiableList(received);
+        }
+        public int unreadCount() {
+            int unreadMessages = 0;
+            for (Message message : messages) if (message.unread) unreadMessages++;
+            return GymLobbyClient.unreadCount(requests.size(), unreadMessages);
+        }
+    }
+
+    static int unreadCount(int pendingRequests, int unreadMessages) {
+        return Math.max(0, pendingRequests) + Math.max(0, unreadMessages);
     }
 
     public static final class Leaderboard {
@@ -129,6 +169,22 @@ public final class GymLobbyClient {
         JSONObject body = new JSONObject();
         put(body, "request_id", requestId); put(body, "accept_request", accept);
         rpc(context, "gym_lobby_respond", body, (ignored, error) -> callback.complete(error == null, error));
+    }
+
+    public static void inbox(Context context, Callback<Inbox> callback) {
+        rpc(context, "gym_lobby_inbox", new JSONObject(), (json, error) -> {
+            if (error == null && json.has("error")) error = json.optString("error");
+            callback.complete(error == null ? new Inbox(json) : null, error);
+        });
+    }
+
+    public static void sendMessage(Context context, String targetId, String message, Callback<Boolean> callback) {
+        JSONObject body = new JSONObject(); put(body, "target_id", targetId); put(body, "message_body", message == null ? "" : message.trim());
+        rpc(context, "gym_lobby_send_message", body, (ignored, error) -> callback.complete(error == null, error));
+    }
+
+    public static void markMessagesRead(Context context, Callback<Boolean> callback) {
+        rpc(context, "gym_lobby_mark_messages_read", new JSONObject(), (ignored, error) -> callback.complete(error == null, error));
     }
 
     public static void leaderboard(Context context, String ownerId, Callback<Leaderboard> callback) {

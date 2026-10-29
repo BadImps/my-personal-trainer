@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 133,
-  "versionName": "5.91",
-  "publishedAt": "2026-10-29T18:14:48Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.91/app-production-release.apk",
-  "sha256": "a70e068349b9c958d0a4d6e5a7530227cc1daf798614ec88be153aee0bd956e9",
-  "sizeBytes": 265141936,
-  "notes": "Removes Coach Motion Packs, refines Mintfoil achievement tiers and rank titles, and creates Supabase accounts with immediate sign-in."
+  "versionCode": 134,
+  "versionName": "5.92",
+  "publishedAt": "2026-10-29T23:19:34Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.92/app-production-release.apk",
+  "sha256": "d9661dc2fae7b2280061b713bc09065556f4db9dbd457797dfed2b977632530b",
+  "sizeBytes": 265142524,
+  "notes": "Refines Settings, adds Gym Lobby activity messages, and gives every training rank a compact earned banner."
 }
