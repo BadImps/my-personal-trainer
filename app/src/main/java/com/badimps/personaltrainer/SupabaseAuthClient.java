@@ -2,9 +2,6 @@ package com.badimps.personaltrainer;
 
 import org.json.JSONObject;
 
-import android.net.Uri;
-import android.util.Base64;
-
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -34,13 +31,21 @@ public final class SupabaseAuthClient {
      * usable session immediately; callers must save it so the new member is recognised by the
      * Gym Lobby without an unnecessary second sign-in.
      */
-    public static void signUp(String email, String password, Callback<AuthResult> callback) {
+    public static void signUp(String email, String password, String displayName, Callback<AuthResult> callback) {
         JSONObject body = new JSONObject();
         put(body, "email", normalizeEmail(email)); put(body, "password", password);
-        request("POST", "/signup?redirect_to=com.badimps.personaltrainer%3A%2F%2Fauth%2Fverified", body, null,
+        JSONObject metadata = new JSONObject();
+        put(metadata, "display_name", displayName == null ? "" : displayName.trim());
+        put(body, "data", metadata);
+        request("POST", "/signup", body, null,
                 (json, error) -> {
                     if (error != null) { callback.complete(null, friendly(error)); return; }
-                    callback.complete(authResult(json, normalizeEmail(email)), null);
+                    AuthResult result = authResult(json, normalizeEmail(email));
+                    if (!result.session().isUsable()) {
+                        callback.complete(null, "Registration must sign in immediately. Turn off Confirm email in Supabase Authentication settings, then try again.");
+                        return;
+                    }
+                    callback.complete(result, null);
                 });
     }
 
@@ -82,27 +87,6 @@ public final class SupabaseAuthClient {
 
     public static void signOut(String accessToken, Callback<Boolean> callback) {
         request("POST", "/logout", new JSONObject(), accessToken, (json, error) -> callback.complete(error == null, error));
-    }
-
-    /** Reads the verified Supabase session returned through the app's private auth deep link. */
-    public static AuthResult fromRedirect(Uri uri) {
-        if (uri == null || !"com.badimps.personaltrainer".equalsIgnoreCase(uri.getScheme())
-                || !"auth".equalsIgnoreCase(uri.getHost())) return null;
-        String fragment = uri.getFragment();
-        if (fragment == null || fragment.isEmpty()) return null;
-        Uri values = Uri.parse("https://local.invalid/?" + fragment);
-        String access = values.getQueryParameter("access_token");
-        String refresh = values.getQueryParameter("refresh_token");
-        if (access == null || refresh == null) return null;
-        String id = "", email = "";
-        try {
-            String[] parts = access.split("\\.");
-            if (parts.length > 1) {
-                JSONObject claims = new JSONObject(new String(Base64.decode(parts[1], Base64.URL_SAFE | Base64.NO_WRAP | Base64.NO_PADDING), StandardCharsets.UTF_8));
-                id = claims.optString("sub", ""); email = claims.optString("email", "");
-            }
-        } catch (Exception ignored) { }
-        return id.isEmpty() ? null : new AuthResult(access, refresh, id, email);
     }
 
     private interface JsonCallback { void complete(JSONObject json, String error); }
@@ -147,7 +131,7 @@ public final class SupabaseAuthClient {
     private static String friendly(String value) {
         if (value == null) return "Request could not be completed.";
         String lower = value.toLowerCase(Locale.ROOT);
-        if (lower.contains("email not confirmed")) return "Verify your email before signing in.";
+        if (lower.contains("email not confirmed")) return "This account requires email confirmation, which is disabled for this app. Confirm it in Supabase or create the account again.";
         if (lower.contains("invalid login")) return "That email or password is not correct.";
         if (lower.contains("already registered") || lower.contains("already been registered")) return "An account already exists for this email.";
         if (lower.contains("expired") || lower.contains("invalid token")) return "That verification code is invalid or has expired.";

@@ -16,7 +16,9 @@ public final class MintfoilBadgeView extends ImageView {
 
     public MintfoilBadgeView(Context context) {
         super(context);
-        setScaleType(ScaleType.CENTER_CROP);
+        // The source symbols have different transparent bounds. FIT_CENTER keeps every one
+        // optically centred in the shared Mintfoil mount instead of cropping tall artwork.
+        setScaleType(ScaleType.FIT_CENTER);
         setAdjustViewBounds(false);
         coin = new GradientDrawable();
         coin.setShape(GradientDrawable.OVAL);
@@ -28,15 +30,18 @@ public final class MintfoilBadgeView extends ImageView {
     public void bind(AchievementStore.Badge badge, int index) {
         unlocked = badge.unlocked();
         artwork = artworkFor(badge);
-        coin.setStroke(0, Color.TRANSPARENT);
+        coin.setStroke(3, badge.tierColor());
+        setPadding(5, 5, 5, 5);
         setImageResource(artwork);
         setAlpha(unlocked ? 1f : .52f);
-        setContentDescription(badge.name + ", " + badge.progressLabel());
+        setContentDescription(badge.name + ", " + badge.tierName() + " achievement, " + badge.progressLabel());
     }
 
     public void bindApex(String tierName, boolean isUnlocked, int index) {
         unlocked = isUnlocked;
         artwork = index >= 4 ? R.drawable.achievement_symbol_trophy : R.drawable.achievement_symbol_mountain;
+        coin.setStroke(0, Color.TRANSPARENT);
+        setPadding(0, 0, 0, 0);
         setImageResource(artwork);
         setAlpha(unlocked ? 1f : .52f);
         setContentDescription(tierName + " Apex tier" + (isUnlocked ? ", unlocked" : ", locked"));

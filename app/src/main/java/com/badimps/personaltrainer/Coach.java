@@ -248,7 +248,7 @@ public final class Coach {
                 ex("Dumbbell March", target, "Stand tall, move steadily and keep the load close.", "Low-impact loaded conditioning."),
                 ex("Dumbbell High Pull", target, "Drive through your legs and guide the dumbbells close to your body.", "Full-body dumbbell conditioning."));
         if ("Chest".equals(target)) return options(
-                ex("Dumbbell Floor Press", "Chest", "Pause lightly, then press smoothly.", "Dumbbell chest pressing from the floor."),
+                ex("Floor Press", "Chest", "Pause lightly, then press smoothly.", "Dumbbell chest pressing from the floor."),
                 ex("Dumbbell Fly", "Chest", "Hug a big tree; use a light load.", "Dumbbell chest isolation."),
                 ex("Dumbbell Squeeze Press", "Chest", "Press the dumbbells together as you move smoothly.", "Dumbbell chest pressing without a bench."));
         if ("Legs".equals(target) || "Lower".equals(target)) return options(
@@ -293,7 +293,8 @@ public final class Coach {
                 ex("Water Bottle Carry", target, "Walk smoothly with bottles held at your sides.", "Household carry conditioning."));
         if ("Chest".equals(target)) return options(
                 ex("Counter Incline Push-up", target, "Body moves as one unit.", "Chest pressing using a sturdy household counter."),
-                ex("Backpack Floor Press", target, "Keep the backpack secure and move slowly.", "A household-weight chest press."));
+                ex("Backpack Floor Press", target, "Keep the backpack secure and move slowly.", "A household-weight chest press."),
+                ex("Towel Chest Press", target, "Press your palms steadily into a taut towel without holding your breath.", "Low-load at-home chest isometric."));
         if ("Legs".equals(target) || "Lower".equals(target)) return options(
                 ex("Backpack Squat", target, "Keep the backpack secure and knees following your toes.", "Household-weight leg strength."),
                 ex("Stair Step-up", target, "Use a stable household stair and drive through the whole foot.", "Household leg conditioning."),

@@ -19,24 +19,48 @@ import java.util.Set;
  * every normal workout and coach remains available regardless of this system.</p>
  */
 public final class AchievementStore {
+    /** A stable, human-readable rank for every level range shown in Apex and the Gym Lobby. */
+    public static final class Rank {
+        public final String title;
+        public final int firstLevel;
+        public final int lastLevel;
+
+        Rank(String title, int firstLevel, int lastLevel) {
+            this.title = title;
+            this.firstLevel = firstLevel;
+            this.lastLevel = lastLevel;
+        }
+
+        public String rangeLabel() {
+            return lastLevel == Integer.MAX_VALUE
+                    ? "LEVEL " + firstLevel + "+"
+                    : "LEVELS " + firstLevel + "–" + lastLevel;
+        }
+    }
+
     public static final class Badge {
         public final String family;
         public final String name;
         public final String description;
         public final int current;
         public final int required;
+        /** 0–3: Copper, Bronze, Silver, Gold. Later family milestones remain Gold. */
+        public final int tier;
 
-        Badge(String family, String name, String description, int current, int required) {
+        Badge(String family, String name, String description, int current, int required, int tier) {
             this.family = family;
             this.name = name;
             this.description = description;
             this.current = Math.max(0, current);
             this.required = Math.max(1, required);
+            this.tier = Math.max(0, Math.min(3, tier));
         }
 
         public boolean unlocked() { return current >= required; }
         public int progressPercent() { return Math.min(100, Math.round(100f * current / required)); }
         public String progressLabel() { return unlocked() ? "Unlocked" : current + " / " + required; }
+        public String tierName() { return new String[]{"COPPER", "BRONZE", "SILVER", "GOLD"}[tier]; }
+        public int tierColor() { return new int[]{0xFFB87333, 0xFFCD7F32, 0xFFC0C0C0, 0xFFFFD54F}[tier]; }
     }
 
     public static final class ApexTier {
@@ -107,6 +131,8 @@ public final class AchievementStore {
             for (ApexTier tier : apexTiers) if (tier.unlocked(level)) current = tier;
             return current;
         }
+
+        public Rank rank() { return rankForLevel(level); }
     }
 
     public static Snapshot snapshot(Context context) {
@@ -148,11 +174,23 @@ public final class AchievementStore {
                 500 - levelProgress, badges, tiers);
     }
 
+    public static Rank rankForLevel(int level) {
+        int safeLevel = Math.max(1, level);
+        if (safeLevel <= 10) return new Rank("BEGINNER", 1, 10);
+        if (safeLevel <= 25) return new Rank("NOVICE", 11, 25);
+        if (safeLevel <= 50) return new Rank("CONTENDER", 26, 50);
+        if (safeLevel <= 75) return new Rank("COMPETITOR", 51, 75);
+        if (safeLevel <= 100) return new Rank("ATHLETE", 76, 100);
+        if (safeLevel <= 150) return new Rank("ELITE", 101, 150);
+        if (safeLevel <= 200) return new Rank("CHAMPION", 151, 200);
+        return new Rank("APEX", 201, Integer.MAX_VALUE);
+    }
+
     private static void addSeries(List<Badge> badges, String family, String[] names, int[] requirements,
             int current, String unit) {
         for (int index = 0; index < Math.min(names.length, requirements.length); index++) {
             int required = requirements[index];
-            badges.add(new Badge(family, names[index], "Reach " + required + " " + unit + ".", current, required));
+            badges.add(new Badge(family, names[index], "Reach " + required + " " + unit + ".", current, required, Math.min(index, 3)));
         }
     }
 

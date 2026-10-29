@@ -31,7 +31,7 @@ In Authentication settings:
 2. Turn **Confirm email** off. Registration signs the member into the app immediately; Supabase
    still stores the email and password hash securely in Auth, without sending a verification email.
 3. Set minimum password length to 10 and require uppercase/lowercase letters, digits, and symbols. The app applies the same policy and explains every requirement while the member types.
-4. Add `com.badimps.personaltrainer://auth/verified` to allowed redirect URLs only if email confirmation is enabled again later.
+4. No mobile redirect URL is required for account registration. The app creates the account and keeps the returned Supabase session immediately.
 
 ## Password recovery email template
 

@@ -1,12 +1,10 @@
 [auth]
-site_url = "com.badimps.personaltrainer://auth"
-additional_redirect_urls = ["com.badimps.personaltrainer://auth/verified"]
 minimum_password_length = 6
 password_requirements = "lower_upper_letters_digits_symbols"
 
 [auth.email]
 enable_signup = true
-enable_confirmations = true
+enable_confirmations = false
 double_confirm_changes = true
 secure_password_change = true
 max_frequency = "60s"

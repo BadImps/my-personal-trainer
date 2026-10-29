@@ -335,7 +335,6 @@ public final class MainActivity extends FragmentActivity {
         }
         initialisePlanSelections();
         restoreSavedPlan();
-        if (handleSupabaseAuthRedirect(getIntent())) return;
         // Local AVD-only visual QA entry point. This branch is excluded from release builds
         // and avoids weakening the protected sign-in flow just to inspect a composition.
         if (BuildConfig.DEBUG && "com.badimps.personaltrainer.DEBUG_REGISTRATION".equals(getIntent().getAction())) {
@@ -558,7 +557,6 @@ public final class MainActivity extends FragmentActivity {
         super.onNewIntent(intent);
         setIntent(intent);
         if (intent == null) return;
-        if (handleSupabaseAuthRedirect(intent)) return;
         if (GuidedWorkoutService.ACTION_END.equals(intent.getAction()) && hasActiveGuidedWorkout()) {
             showEmergencyStopConfirmation(activeWorkoutExerciseIndex, activeWorkoutSet, this::resumeActiveWorkoutSurface);
         } else if (GuidedWorkoutService.ACTION_OPEN.equals(intent.getAction()) && hasActiveGuidedWorkout()) {
@@ -887,14 +885,6 @@ public final class MainActivity extends FragmentActivity {
     private void addWorkoutWizardProgress(FrameLayout hero, String currentStep) {
         int active = Math.max(0, wizardStep(currentStep) - 1);
         addCoachHeroWizardSteps(hero, wizardLabels(), active);
-    }
-
-    private boolean handleSupabaseAuthRedirect(Intent intent) {
-        SupabaseAuthClient.AuthResult verified = intent == null ? null : SupabaseAuthClient.fromRedirect(intent.getData());
-        if (verified == null) return false;
-        completeRemoteSignIn(verified, true);
-        toast("Email verified. Your account is ready.");
-        return true;
     }
 
     /** Shared full-bleed Coach Hero composition for every Workout wizard step. */
@@ -2054,18 +2044,6 @@ public final class MainActivity extends FragmentActivity {
             mediaCard.addView(new LoopingExerciseWebpView(this, webpLoop), new FrameLayout.LayoutParams(-1, -1));
             return mediaCard;
         }
-        File downloadedVideo = MediaPackManager.localLoop(this, trainer, exercise.name);
-        if (downloadedVideo != null) {
-            FrameLayout mediaCard = new FrameLayout(this);
-            mediaCard.setBackground(surface(navyPanel, 18, 1, mint));
-            applyPremiumTileDepth(mediaCard, false);
-            mediaCard.setClipToOutline(true);
-            mediaCard.setClipChildren(true);
-            mediaCard.setContentDescription("Coach " + coachName() + " demonstrating " + exercise.name);
-            LoopingExerciseVideoView demonstration = new LoopingExerciseVideoView(this, downloadedVideo);
-            mediaCard.addView(demonstration, new FrameLayout.LayoutParams(-1, -1));
-            return mediaCard;
-        }
         return missingExerciseArtwork(exercise, navyPanel, mint);
     }
 
@@ -2519,13 +2497,8 @@ public final class MainActivity extends FragmentActivity {
         }
         AuthSessionStore.save(this, result.session());
         if (!AccountStore.exists(this) || !profile().email.equalsIgnoreCase(result.email)) {
-            String username = PendingAccountStore.matches(this, result.email)
-                    ? PendingAccountStore.username(this) : defaultUsername(result.email);
-            String trainer = PendingAccountStore.matches(this, result.email)
-                    ? PendingAccountStore.trainer(this) : selectedTrainer;
-            AccountStore.createRemote(this, result.email, username, trainer);
+            AccountStore.createRemote(this, result.email, defaultUsername(result.email), selectedTrainer);
         } else AccountStore.markRemoteAuthenticated(this);
-        PendingAccountStore.clear(this);
         AccountStore.Profile current = profile();
         AccountStore.updatePersonalProfile(this, current.username, current.photoUri, remember, current.biometricUnlock, "");
         commitCredentialAutofill();
@@ -2766,33 +2739,32 @@ public final class MainActivity extends FragmentActivity {
             }
             selectedTrainer = trainers.getCheckedRadioButtonId() == R.id.trainer_male ? "Male" : "Female";
             configureSpeechVoices();
-            // A membership profile must always be usable on this phone.  Cloud setup can
-            // add recovery later, but it must never block the proven device-only flow.
+            if (SupabaseConfig.isConfigured()) {
+                // Account registration is authoritative: the profile is not created locally
+                // until Supabase has accepted it and returned a signed-in session. This keeps
+                // every new registration recoverable and avoids an email-confirmation detour.
+                create.setEnabled(false);
+                create.setText("Creating secure account…");
+                String trainerValue = selectedTrainer;
+                SupabaseAuthClient.signUp(enteredEmail, passwordValue, usernameValue, (created, error) -> runOnUiThread(() -> {
+                    create.setEnabled(true);
+                    create.setText("Create my profile");
+                    if (error != null || created == null || !created.session().isUsable()) {
+                        toast(error == null ? "Secure account creation did not return a valid session. Please try again." : error);
+                        return;
+                    }
+                    AuthSessionStore.save(this, created.session());
+                    AccountStore.createRemote(this, created.email, usernameValue, trainerValue);
+                    LauncherIconManager.apply(this, AccountStore.get(this).coachName);
+                    GymLobbyClient.publish(this);
+                    toast("Your Supabase account is ready.");
+                    showBodyProfileSetup(true);
+                }));
+                return;
+            }
+            // Builds without Supabase credentials retain the offline-only onboarding path.
             AccountStore.create(this, enteredEmail, usernameValue, passwordValue, selectedTrainer);
             LauncherIconManager.apply(this, AccountStore.get(this).coachName);
-            if (SupabaseConfig.isConfigured()) {
-                // Keep the local profile as the source of truth for this device, while also
-                // creating the secure account that lets this email sign in on a replacement
-                // phone after it has been verified.  A temporary network problem must not
-                // prevent someone from starting with the profile they just created.
-                PendingAccountStore.save(this, enteredEmail, usernameValue, selectedTrainer);
-                SupabaseAuthClient.signUp(enteredEmail, passwordValue, (created, error) -> runOnUiThread(() -> {
-                    if (error == null && created != null && created.session().isUsable()) {
-                        // Email confirmation is intentionally disabled for this product. Supabase
-                        // returns a password-authenticated session at registration, so persist it
-                        // now and publish the new member when they open the Gym Lobby.
-                        AuthSessionStore.save(this, created.session());
-                        AccountStore.markRemoteAuthenticated(this);
-                        PendingAccountStore.clear(this);
-                        GymLobbyClient.publish(this);
-                        toast("Your account is saved securely and ready for Gym Lobby.");
-                    } else if (error == null) {
-                        toast("Your profile is ready. Sign in once to connect it to Gym Lobby.");
-                    } else {
-                        toast("Your profile is ready on this phone. Secure account setup can be retried later.");
-                    }
-                }));
-            }
             showBodyProfileSetup(true);
         });
         addButton(body, create);
@@ -2859,7 +2831,6 @@ public final class MainActivity extends FragmentActivity {
         animatePage(shell);
         // A short delay lets the signed-in dashboard settle before optional cards appear.
         root.postDelayed(this::maybePromptForAvailableUpdate, 500L);
-        root.postDelayed(this::maybeShowCoachMotionPromo, 1250L);
 
         FrameLayout hero = coachHeroBackdrop("Home");
         root.addView(hero, new LinearLayout.LayoutParams(-1, dp(518)));
@@ -7516,17 +7487,6 @@ public final class MainActivity extends FragmentActivity {
         addButton(body, back);
     }
 
-    private void showVerificationPending(String email) {
-        LinearLayout body = signedOutPage();
-        title(body, "VERIFY YOUR EMAIL", "One more step", "We sent a verification email to " + email + ". Open it and approve your account before signing in.");
-        LinearLayout notice = card();
-        notice.addView(heading("Access stays locked until verification", 18, ink));
-        notice.addView(text("After approving the email, return here and sign in. Your private profile will then be created only on this phone.", 14, muted));
-        body.addView(notice); gap(body, 16);
-        Button login = primary("I verified my email — sign in"); login.setOnClickListener(view -> showLogin()); addButton(body, login); gap(body, 9);
-        Button change = secondary("Use a different email"); change.setOnClickListener(view -> { PendingAccountStore.clear(this); showRegistration(); }); addButton(body, change);
-    }
-
     private void addPasswordRequirements(LinearLayout parent, EditText field) {
         TextView requirements = text(PasswordPolicy.requirements(), 12, Color.rgb(202, 216, 234));
         requirements.setContentDescription("Password requirements: " + PasswordPolicy.requirements());
@@ -8163,7 +8123,7 @@ public final class MainActivity extends FragmentActivity {
         LinearLayout copy = new LinearLayout(this);
         copy.setOrientation(LinearLayout.VERTICAL);
         copy.addView(heading(member.name, 20, navy));
-        copy.addView(text("Level " + member.level + "  •  " + member.points + " Momentum Points", 13, muted));
+        copy.addView(text(AchievementStore.rankForLevel(member.level).title + " · Level " + member.level + "  •  " + member.points + " Momentum Points", 13, muted));
         top.addView(copy, new LinearLayout.LayoutParams(0, -2, 1));
         top.addView(chip(member.buddy ? "GYM BUDDY" : member.apex.toUpperCase(Locale.ROOT)));
         view.addView(top);
@@ -8207,7 +8167,9 @@ public final class MainActivity extends FragmentActivity {
         LinearLayout body = appPage("Gym Member", "Gym Lobby");
         title(body, "GYM MEMBER PROFILE", member.name, "Public training milestones shared for friendly motivation.");
         LinearLayout overview = darkCard();
-        overview.addView(heading("LEVEL " + member.level, 27, Color.WHITE));
+        AchievementStore.Rank memberRank = AchievementStore.rankForLevel(member.level);
+        overview.addView(heading("LEVEL " + member.level + " · " + memberRank.title, 23, Color.WHITE));
+        overview.addView(text(memberRank.rangeLabel(), 11, mint));
         overview.addView(text(member.points + " Momentum Points  •  " + member.apex + " Apex lane", 14, Color.rgb(211, 225, 233)));
         body.addView(overview);
         gap(body, 14);
@@ -8221,7 +8183,7 @@ public final class MainActivity extends FragmentActivity {
             GridLayout grid = new GridLayout(this);
             grid.setColumnCount(2);
             for (int index = 0; index < member.achievements.size(); index++) {
-                AchievementStore.Badge badge = new AchievementStore.Badge("ACHIEVEMENT", member.achievements.get(index), "Earned achievement.", 1, 1);
+                AchievementStore.Badge badge = new AchievementStore.Badge("ACHIEVEMENT", member.achievements.get(index), "Earned achievement.", 1, 1, Math.min(index, 3));
                 addAchievementBadgeTile(grid, badge, index);
             }
             body.addView(grid);
@@ -8265,7 +8227,7 @@ public final class MainActivity extends FragmentActivity {
                 LinearLayout copy = new LinearLayout(this);
                 copy.setOrientation(LinearLayout.VERTICAL);
                 copy.addView(heading(member.name, 18, rank <= 3 ? Color.WHITE : navy));
-                copy.addView(text(member.points + " Momentum Points  •  Level " + member.level, 12, rank <= 3 ? Color.rgb(211, 225, 233) : muted));
+                copy.addView(text(member.points + " Momentum Points  •  " + AchievementStore.rankForLevel(member.level).title + " · Level " + member.level, 12, rank <= 3 ? Color.rgb(211, 225, 233) : muted));
                 line.addView(copy, new LinearLayout.LayoutParams(0, -2, 1));
                 row.addView(line);
                 row.setClickable(true);
@@ -8288,7 +8250,9 @@ public final class MainActivity extends FragmentActivity {
         title(body, "ACHIEVEMENTS + APEX", "Build your momentum", "Private progress that celebrates completed work, variety, and recovery-aware consistency. Apex is always optional.");
 
         LinearLayout levelCard = darkCard();
-        levelCard.addView(heading("LEVEL " + snapshot.level, 28, Color.WHITE));
+        AchievementStore.Rank memberRank = snapshot.rank();
+        levelCard.addView(heading("LEVEL " + snapshot.level + " · " + memberRank.title, 24, Color.WHITE));
+        levelCard.addView(text(memberRank.rangeLabel(), 11, mint));
         levelCard.addView(text(snapshot.xp + " momentum points  •  " + snapshot.xpToNextLevel + " to Level " + (snapshot.level + 1), 14, Color.rgb(211, 225, 233)));
         gap(levelCard, 10);
         ProgressBar levelBar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
@@ -8365,13 +8329,13 @@ public final class MainActivity extends FragmentActivity {
         boolean unlocked = badge.unlocked();
         row.setBackground(surface(unlocked ? Color.rgb(225, 249, 242) : Color.rgb(243, 246, 250), 13, 1, unlocked ? mint : cardLine));
         MintfoilBadgeView medal = new MintfoilBadgeView(this);
-        medal.bind(badge, badgeTier(badge));
+        medal.bind(badge, badge.tier);
         row.addView(medal, new LinearLayout.LayoutParams(dp(42), dp(42)));
         LinearLayout copy = new LinearLayout(this); copy.setOrientation(LinearLayout.VERTICAL);
         copy.addView(heading(badge.name, 14, ink));
         copy.addView(text(badge.family + " · " + badge.description, 11, muted));
         row.addView(copy, new LinearLayout.LayoutParams(0, -2, 1));
-        TextView state = heading(badge.progressLabel(), 11, unlocked ? navy : muted);
+        TextView state = heading(badge.tierName() + " · " + badge.progressLabel(), 10, unlocked ? badge.tierColor() : muted);
         state.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
         row.addView(state, new LinearLayout.LayoutParams(dp(62), dp(38)));
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2); params.topMargin = dp(8);
@@ -8388,22 +8352,24 @@ public final class MainActivity extends FragmentActivity {
         tile.setCameraDistance(dp(12000));
         FrameLayout front = new FrameLayout(this);
         MintfoilBadgeView medal = new MintfoilBadgeView(this);
-        medal.bind(badge, badgeTier(badge));
+        medal.bind(badge, badge.tier);
         FrameLayout.LayoutParams medalParams = new FrameLayout.LayoutParams(dp(70), dp(70), Gravity.TOP | Gravity.CENTER_HORIZONTAL);
-        medalParams.topMargin = dp(32);
+        // Centre the insert on the original circular mount, then leave two compact spaces
+        // before the title so artwork and text never compete.
+        medalParams.topMargin = dp(38);
         front.addView(medal, medalParams);
         TextView name = heading(badge.name.toUpperCase(Locale.ROOT), 12, unlocked ? Color.WHITE : Color.rgb(222, 229, 237));
         name.setGravity(Gravity.CENTER); name.setLetterSpacing(.10f); name.setMaxLines(2);
         FrameLayout.LayoutParams nameParams = new FrameLayout.LayoutParams(-1, dp(38), Gravity.TOP);
-        nameParams.leftMargin = dp(17); nameParams.rightMargin = dp(17); nameParams.topMargin = dp(158);
+        nameParams.leftMargin = dp(17); nameParams.rightMargin = dp(17); nameParams.topMargin = dp(116);
         front.addView(name, nameParams);
         LinearLayout divider = mintfoilDivider();
         FrameLayout.LayoutParams dividerParams = new FrameLayout.LayoutParams(dp(92), dp(18), Gravity.TOP | Gravity.CENTER_HORIZONTAL);
-        dividerParams.topMargin = dp(191); front.addView(divider, dividerParams);
-        TextView state = text(unlocked ? "UNLOCKED" : "LOCKED · " + badge.current + " / " + badge.required, 10, unlocked ? mint : Color.rgb(255, 183, 166));
+        dividerParams.topMargin = dp(153); front.addView(divider, dividerParams);
+        TextView state = text(badge.tierName() + " · " + (unlocked ? "UNLOCKED" : "LOCKED · " + badge.current + " / " + badge.required), 9, badge.tierColor());
         state.setGravity(Gravity.CENTER); state.setMaxLines(2);
         FrameLayout.LayoutParams stateParams = new FrameLayout.LayoutParams(-1, dp(26), Gravity.TOP);
-        stateParams.leftMargin = dp(19); stateParams.rightMargin = dp(19); stateParams.topMargin = dp(211);
+        stateParams.leftMargin = dp(19); stateParams.rightMargin = dp(19); stateParams.topMargin = dp(171);
         front.addView(state, stateParams);
         tile.addView(front, new FrameLayout.LayoutParams(-1, -1));
         FrameLayout back = achievementBadgeCardBack(badge);
@@ -8471,13 +8437,6 @@ public final class MainActivity extends FragmentActivity {
             else if (flippedAchievementCard == card) { flippedAchievementCard = null; flippedAchievementFront = null; flippedAchievementBack = null; }
             card.setRotationY(-90f); card.animate().rotationY(0f).setDuration(reducedMotion ? 0 : 150).start();
         }).start();
-    }
-
-    private int badgeTier(AchievementStore.Badge badge) {
-        if (badge.required >= 50 || badge.required >= 600) return 4;
-        if (badge.required >= 20 || badge.required >= 180) return 3;
-        if (badge.required >= 7 || badge.required >= 60) return 2;
-        return 1;
     }
 
     private void showAchievementCatalogue() {
@@ -8555,7 +8514,6 @@ public final class MainActivity extends FragmentActivity {
         appGroup.addView(settingsDivider());
         appGroup.addView(settingsRow("⌖", "MapLibre maps", MapLibreOfflinePack.isTrinidadReady(this) ? "Vector streets ready for routes" : "Download an offline vector pack", view -> showOfflineMapCatalog()));
         appGroup.addView(settingsDivider());
-        appGroup.addView(settingsRow("▶", "Coach motion packs", "Optional smooth exercise loops · download only what you need", view -> showMediaPacks()));
         appGroup.addView(settingsDivider());
         appGroup.addView(settingsRow("◉", "Live workout display", liveWorkoutSurfaceStatus(), view -> openLiveWorkoutSurfaceSettings()));
         appGroup.addView(settingsDivider());
@@ -8567,7 +8525,6 @@ public final class MainActivity extends FragmentActivity {
             AuthSessionStore.Session remoteSession = AuthSessionStore.load(this);
             if (remoteSession != null) SupabaseAuthClient.signOut(remoteSession.accessToken, (ignored, error) -> { });
             AuthSessionStore.clear(this);
-            PendingAccountStore.clear(this);
             AccountStore.clear(this);
             PlanStore.clear(this);
             WeeklyScheduleStore.clear(this);
@@ -13021,70 +12978,6 @@ public final class MainActivity extends FragmentActivity {
         }).start();
     }
 
-    /** Manage optional coach videos separately from the core OTA package. */
-    private void showMediaPacks() {
-        LinearLayout body = appPage("Settings");
-        title(body, "COACH MOTION", "Smooth exercise loops", "The app remains usable offline with its motion guide. Download only the coach-loop library you want to keep offline.");
-        LinearLayout statusCard = card();
-        TextView status = heading("Checking available packs…", 17, ink);
-        statusCard.addView(status);
-        TextView detail = text("Video packs are SHA-256 verified before they become available to your exercise library.", 13, muted);
-        LinearLayout.LayoutParams detailParams = new LinearLayout.LayoutParams(-1, -2); detailParams.topMargin = dp(5);
-        statusCard.addView(detail, detailParams);
-        body.addView(statusCard);
-        gap(body, 12);
-        LinearLayout packs = new LinearLayout(this); packs.setOrientation(LinearLayout.VERTICAL); body.addView(packs);
-        loadMediaPacks(status, packs);
-    }
-
-    /** First-open reward-style invitation. It is informational only: motion packs remain optional. */
-    private void maybeShowCoachMotionPromo() {
-        if (isFinishing() || !AccountStore.exists(this)) return;
-        String coachKey = "Male".equals(profile().trainer) ? "leo" : "mia";
-        android.content.SharedPreferences prefs = getSharedPreferences("coach_motion_promo", MODE_PRIVATE);
-        if (prefs.getBoolean("shown_" + coachKey, false)) return;
-        prefs.edit().putBoolean("shown_" + coachKey, true).apply();
-
-        final Dialog dialog = new Dialog(this);
-        dialog.setCanceledOnTouchOutside(true);
-        LinearLayout card = new LinearLayout(this);
-        card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(dp(22), dp(22), dp(22), dp(20));
-        card.setBackground(surface(navyPanel, 24, 2, mint));
-
-        TextView tag = heading("OPTIONAL MOTION LIBRARY", 10, mint);
-        tag.setLetterSpacing(.13f);
-        card.addView(tag);
-        gap(card, 8);
-        card.addView(heading("Unlock smooth\ncoach demos", 27, Color.WHITE));
-        gap(card, 8);
-        card.addView(text("Add polished, looping exercise demonstrations for offline playback. Your plan still works without them.", 14, Color.rgb(211, 225, 233)));
-        gap(card, 16);
-        LinearLayout reward = new LinearLayout(this);
-        reward.setOrientation(LinearLayout.VERTICAL);
-        reward.setPadding(dp(14), dp(12), dp(14), dp(12));
-        reward.setBackground(surface(Color.rgb(20, 50, 74), 16, 1, Color.rgb(52, 102, 122)));
-        reward.addView(heading("COACH MOTION STARTER", 11, mint));
-        reward.addView(text("About 10 MB per coach · verified · saved privately on this phone", 12, Color.WHITE));
-        card.addView(reward);
-        gap(card, 18);
-        Button unlock = action("View motion packs", coral, Color.WHITE);
-        unlock.setOnClickListener(view -> { dialog.dismiss(); showMediaPacks(); });
-        card.addView(unlock, new LinearLayout.LayoutParams(-1, dp(52)));
-        gap(card, 8);
-        Button later = action("Not now", Color.TRANSPARENT, mint);
-        later.setBackground(surface(Color.TRANSPARENT, 15, 1, mint));
-        later.setOnClickListener(view -> dialog.dismiss());
-        card.addView(later, new LinearLayout.LayoutParams(-1, dp(48)));
-
-        dialog.setContentView(card);
-        dialog.show();
-        if (dialog.getWindow() != null) {
-            dialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(Color.TRANSPARENT));
-            dialog.getWindow().setLayout(getResources().getDisplayMetrics().widthPixels - dp(32), -2);
-        }
-    }
-
     private void showMigrationCenter() {
         LinearLayout body = appPage("Settings");
         title(body, "DATA TRANSFER", "Keep your private progress", "Create a private backup before changing phones or moving to the protected app update.");
@@ -13120,68 +13013,6 @@ public final class MainActivity extends FragmentActivity {
         open.setType("application/zip");
         open.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
         startActivityForResult(open, REQUEST_MIGRATION_IMPORT);
-    }
-
-    private void loadMediaPacks(TextView status, LinearLayout target) {
-        target.removeAllViews();
-        new Thread(() -> {
-            try {
-                MediaPackManager.Pack[] packs = MediaPackManager.fetchCatalog();
-                runOnUiThread(() -> {
-                    status.setText(packs.length == 0 ? "No coach motion packs are published yet" : "Choose a coach motion library");
-                    for (MediaPackManager.Pack pack : packs) addMediaPackCard(target, pack);
-                });
-            } catch (Exception error) {
-                runOnUiThread(() -> {
-                    status.setText("Coach motion packs are unavailable right now");
-                    Button retry = primary("Check again");
-                    retry.setOnClickListener(view -> loadMediaPacks(status, target));
-                    addButton(target, retry);
-                });
-            }
-        }).start();
-    }
-
-    private void addMediaPackCard(LinearLayout parent, MediaPackManager.Pack pack) {
-        LinearLayout card = card();
-        card.addView(heading(pack.label, 18, ink));
-        card.addView(text("Coach " + pack.coach + " · Pack " + pack.version + " · " + formatDownloadSize(pack.sizeBytes), 13, muted));
-        gap(card, 10);
-        boolean installed = MediaPackManager.isInstalled(this, pack);
-        Button action = installed ? secondary("Remove downloaded pack") : primary("Download for offline use");
-        action.setOnClickListener(view -> {
-            if (installed) {
-                MediaPackManager.remove(this, pack);
-                showMediaPacks();
-                return;
-            }
-            confirmMediaPackDownload(pack);
-        });
-        addButton(card, action);
-        parent.addView(card); gap(parent, 10);
-    }
-
-    private void confirmMediaPackDownload(MediaPackManager.Pack pack) {
-        Runnable download = () -> downloadMediaPack(pack);
-        if (!MediaPackManager.isMetered(this)) { download.run(); return; }
-        new AlertDialog.Builder(this)
-                .setTitle("Use mobile data?")
-                .setMessage(pack.label + " is " + formatDownloadSize(pack.sizeBytes) + ". It will remain on this phone for offline playback.")
-                .setNegativeButton("Wait for Wi‑Fi", null)
-                .setPositiveButton("Download", (dialog, which) -> download.run())
-                .show();
-    }
-
-    private void downloadMediaPack(MediaPackManager.Pack pack) {
-        toast("Downloading " + pack.label + "…");
-        new Thread(() -> {
-            try {
-                MediaPackManager.downloadAndInstall(this, pack, (complete, total) -> { });
-                runOnUiThread(() -> { toast(pack.label + " is ready offline."); showMediaPacks(); });
-            } catch (Exception error) {
-                runOnUiThread(() -> toast("Could not download this coach pack: " + conciseNetworkError(error)));
-            }
-        }).start();
     }
 
     private void showPatchNotes() {
@@ -13660,7 +13491,7 @@ public final class MainActivity extends FragmentActivity {
         TextView overline = heading("NEW BADGE", 12, mint); overline.setLetterSpacing(.16f); overline.setGravity(Gravity.CENTER);
         card.addView(overline);
         MintfoilBadgeView medal = new MintfoilBadgeView(this);
-        medal.bind(badge, badgeTier(badge));
+        medal.bind(badge, badge.tier);
         LinearLayout.LayoutParams medalParams = new LinearLayout.LayoutParams(dp(154), dp(154));
         medalParams.topMargin = dp(13); card.addView(medal, medalParams);
         TextView name = heading(badge.name, 25, Color.WHITE); name.setGravity(Gravity.CENTER);
