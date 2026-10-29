@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 131,
-  "versionName": "5.89",
-  "publishedAt": "2026-10-28T20:50:23Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.89/app-production-release.apk",
-  "sha256": "9679fae43095946574f2b9dcd87bf16a85727d544e9cf1ec36088221e2174eab",
-  "sizeBytes": 258721744,
-  "notes": "Restores the full Mintfoil iron-frame achievement cards and repairs the signed Wear OS companion handoff for guided workouts."
+  "versionCode": 132,
+  "versionName": "5.90",
+  "publishedAt": "2026-10-29T03:52:03Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.90/app-production-release.apk",
+  "sha256": "a4beffa68f05929534d3fcfca24a6a2a44b35c511919c37121000b5ce25eae27",
+  "sizeBytes": 265142096,
+  "notes": "Restores the original tall Mintfoil iron-frame achievement cards, distinct milestone symbols, and the tap-to-flip collection details."
 }

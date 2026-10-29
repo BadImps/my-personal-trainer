@@ -15,6 +15,7 @@ public final class ReleaseNotes {
     }
 
     public static final Entry[] HISTORY = {
+            new Entry("5.90", "Original Mintfoil collection restored", "Achievement cards are back to their full tall iron-frame artwork, with distinct milestone symbols and the original tap-to-flip collection details."),
             new Entry("5.89", "Mintfoil board & watch handoff", "Restores the full iron-framed Mintfoil achievement cards and wakes the installed Wear OS companion when a guided workout starts."),
             new Entry("5.88", "Gym Lobby", "Adds Gym Lobby, Gym Buddies, private-lobby invitations and join requests, public achievement profiles, and friendly Momentum Points leaderboards."),
             new Entry("5.86", "Schedule past dates", "Choose an unfinished past calendar day on Home, then schedule a guided or endurance workout for that exact date."),
