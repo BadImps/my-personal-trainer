@@ -15,6 +15,7 @@ public final class ReleaseNotes {
     }
 
     public static final Entry[] HISTORY = {
+            new Entry("5.91", "Ranks, refined achievements & direct signup", "Removes optional coach-motion packs, restores achievement tiers and rank titles, refines medal layout, and creates Supabase accounts with immediate sign-in."),
             new Entry("5.90", "Original Mintfoil collection restored", "Achievement cards are back to their full tall iron-frame artwork, with distinct milestone symbols and the original tap-to-flip collection details."),
             new Entry("5.89", "Mintfoil board & watch handoff", "Restores the full iron-framed Mintfoil achievement cards and wakes the installed Wear OS companion when a guided workout starts."),
             new Entry("5.88", "Gym Lobby", "Adds Gym Lobby, Gym Buddies, private-lobby invitations and join requests, public achievement profiles, and friendly Momentum Points leaderboards."),

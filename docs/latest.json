@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 132,
-  "versionName": "5.90",
-  "publishedAt": "2026-10-29T03:52:03Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.90/app-production-release.apk",
-  "sha256": "a4beffa68f05929534d3fcfca24a6a2a44b35c511919c37121000b5ce25eae27",
-  "sizeBytes": 265142096,
-  "notes": "Restores the original tall Mintfoil iron-frame achievement cards, distinct milestone symbols, and the tap-to-flip collection details."
+  "versionCode": 133,
+  "versionName": "5.91",
+  "publishedAt": "2026-10-29T18:14:48Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.91/app-production-release.apk",
+  "sha256": "a70e068349b9c958d0a4d6e5a7530227cc1daf798614ec88be153aee0bd956e9",
+  "sizeBytes": 265141936,
+  "notes": "Removes Coach Motion Packs, refines Mintfoil achievement tiers and rank titles, and creates Supabase accounts with immediate sign-in."
 }
