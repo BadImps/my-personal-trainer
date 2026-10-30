@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 137,
-  "versionName": "5.95",
-  "publishedAt": "2026-10-30T03:31:25Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.95/app-production-release.apk",
-  "sha256": "fb348c7180fe83e3e51cb493c1a8972b879e9073cf4cc85a01ba77ac38572e20",
+  "versionCode": 138,
+  "versionName": "5.96",
+  "publishedAt": "2026-10-30T03:56:46Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.96/app-production-release.apk",
+  "sha256": "2b468af7705919738851b91c5e65668c1a59749118c496d772ed1f137ff79ac2",
   "sizeBytes": 265158908,
-  "notes": "Completes calendar alignment and stability: clear Rest Day and completed-workout states, contained future-date selection shadows, and verified planning controls."
+  "notes": "Centres Mintfoil medal art, keeps Scheduler plan text inside date tiles, and adds safe lower spacing below Your Week."
 }

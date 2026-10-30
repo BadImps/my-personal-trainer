@@ -414,6 +414,10 @@ public final class MainActivity extends FragmentActivity {
             showHome();
             return;
         }
+        if (BuildConfig.DEBUG && "com.badimps.personaltrainer.DEBUG_ACHIEVEMENTS".equals(getIntent().getAction())) {
+            showAchievementCatalogue();
+            return;
+        }
         if (BuildConfig.DEBUG && "com.badimps.personaltrainer.DEBUG_BODY".equals(getIntent().getAction())) {
             showBodyContext();
             return;
@@ -2949,6 +2953,9 @@ public final class MainActivity extends FragmentActivity {
         // Do not clip the small shadow or let one tile paint over its neighbour.
         days.setClipChildren(false);
         days.setClipToPadding(false);
+        // Keep the raised selection shadow inside this section instead of letting the
+        // lowest tile touch the content that follows.
+        days.setPadding(0, dp(2), 0, dp(6));
         Calendar homeWeek = homeWeekStart(0);
         boolean homeWeekConfirmed = hasHomeWeekSchedule(0, homeWeek);
         WeeklyScheduleStore.Schedule savedWeek = homeWeekSchedule(0, homeWeek, homeWeekConfirmed);
@@ -8701,10 +8708,10 @@ public final class MainActivity extends FragmentActivity {
         FrameLayout front = new FrameLayout(this);
         MintfoilBadgeView medal = new MintfoilBadgeView(this);
         medal.bind(badge, badge.tier);
-        FrameLayout.LayoutParams medalParams = new FrameLayout.LayoutParams(dp(70), dp(70), Gravity.TOP | Gravity.CENTER_HORIZONTAL);
-        // Centre the insert on the original circular mount, then leave two compact spaces
-        // before the title so artwork and text never compete.
-        medalParams.topMargin = dp(38);
+        FrameLayout.LayoutParams medalParams = new FrameLayout.LayoutParams(dp(60), dp(60), Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+        // The original Mintfoil mount is centred at 26.4% of the card height. Keeping the
+        // insert centred on that point prevents symbol art from sitting low in the ring.
+        medalParams.topMargin = dp(34);
         front.addView(medal, medalParams);
         TextView name = heading(badge.name.toUpperCase(Locale.ROOT), 12, unlocked ? Color.WHITE : Color.rgb(222, 229, 237));
         name.setGravity(Gravity.CENTER); name.setLetterSpacing(.10f); name.setMaxLines(2);
@@ -12612,7 +12619,7 @@ public final class MainActivity extends FragmentActivity {
                     int day = index - first + 1;
                     Calendar date = null;
                     if (day >= 1 && day <= max) { date = (Calendar) month.clone(); date.set(Calendar.DAY_OF_MONTH, day); }
-                    cell = schedulerCalendarCell(date); cellHeight = 56;
+                    cell = schedulerCalendarCell(date); cellHeight = 64;
                 }
                 LinearLayout.LayoutParams cellParams = new LinearLayout.LayoutParams(0, dp(cellHeight), 1f);
                 cellParams.setMargins(dp(1), dp(1), dp(1), dp(1));
@@ -12671,10 +12678,15 @@ public final class MainActivity extends FragmentActivity {
         boolean completed = completedStrength || completedEnduranceRecord != null;
         boolean incomplete = historical && !completed && (planned || !appointments.isEmpty());
         String state = incomplete ? "✕" : completedStrength ? "✓" : !appointments.isEmpty() ? appointmentAbbreviation(appointments.get(0).mode) : planned ? schedulerStrengthSummary(date) : "☾";
-        if (state.length() > 10) state = state.substring(0, 10);
         int fill = incomplete ? Color.rgb(255, 218, 215) : completedStrength ? Color.rgb(202, 243, 216) : !appointments.isEmpty() ? coral : planned ? mint : Color.rgb(232, 236, 244);
         TextView cell = text(date.get(Calendar.DAY_OF_MONTH) + "\n" + state, 10, selected ? navy : (planned || completedStrength || !appointments.isEmpty() || incomplete ? navy : muted));
         cell.setGravity(Gravity.CENTER);
+        // Keep a plan name inside its own date tile: day number plus up to two wrapped
+        // state lines. Long labels end cleanly rather than spilling into a neighbour.
+        cell.setMaxLines(3);
+        cell.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        cell.setIncludeFontPadding(false);
+        cell.setLineSpacing(0f, .92f);
         cell.setTypeface(Typeface.create("sans-serif", selected ? Typeface.BOLD : Typeface.NORMAL));
         boolean futureSelected = selected && !sameCalendarDate(date, Calendar.getInstance());
         cell.setBackground(surface(fill, 11, selected && !futureSelected ? 3 : 0, selected && !futureSelected ? coral : Color.TRANSPARENT));
