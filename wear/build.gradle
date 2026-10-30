@@ -29,8 +29,8 @@ android {
         targetSdk 36
         // Wear OS already has a historical production build using 36,057,401. Keep the
         // public version aligned with the phone while advancing the Wear-only install code.
-        versionCode 36059701
-        versionName '5.97'
+        versionCode 36059801
+        versionName '5.98'
     }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
     buildTypes {
@@ -43,5 +43,11 @@ android {
 dependencies {
     implementation 'androidx.core:core:1.17.0'
     implementation 'androidx.wear:wear:1.3.0'
+    implementation 'androidx.wear:wear-ongoing:1.1.0'
+    implementation 'androidx.health:health-services-client:1.1.0'
+    implementation 'androidx.wear.tiles:tiles:1.6.2'
+    implementation 'androidx.wear.protolayout:protolayout:1.4.2'
+    implementation 'androidx.wear.protolayout:protolayout-material:1.4.2'
+    implementation 'com.google.guava:guava:33.7.2-android'
     implementation 'com.google.android.gms:play-services-wearable:20.0.1'
 }

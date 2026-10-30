@@ -1,15 +1,53 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_HEALTH" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <uses-permission android:name="android.permission.health.READ_HEART_RATE" />
+    <uses-permission android:name="android.permission.BODY_SENSORS" android:maxSdkVersion="35" />
     <uses-feature android:name="android.hardware.type.watch" android:required="true" />
     <application android:theme="@style/WearTheme" android:label="My Personal Trainer" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher" android:allowBackup="false" android:usesCleartextTraffic="false">
         <meta-data android:name="com.google.android.wearable.standalone" android:value="false" />
         <uses-library android:name="com.google.android.wearable" android:required="true" />
-        <activity android:name=".WearWorkoutActivity" android:exported="true">
+        <activity android:name=".WearWorkoutActivity" android:exported="true"
+            android:launchMode="singleTop" android:turnScreenOn="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="mpt" android:host="workout" android:pathPrefix="/start" />
+            </intent-filter>
         </activity>
+        <activity android:name=".WearHealthConsentActivity" android:exported="false" />
+        <activity android:name=".WearHealthActivity" android:exported="false" />
+        <service android:name=".WearHealthExerciseService"
+            android:exported="false"
+            android:foregroundServiceType="health|location" />
+        <service android:name=".WearWorkoutDataService" android:exported="true">
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.DATA_CHANGED" />
+                <data android:scheme="wear" android:host="*" android:pathPrefix="/workout/state" />
+            </intent-filter>
+        </service>
+        <service android:name=".CoachWorkoutTileService"
+            android:label="Workout"
+            android:description="@string/workout_tile_description"
+            android:icon="@mipmap/ic_launcher"
+            android:exported="true"
+            android:permission="com.google.android.wearable.permission.BIND_TILE_PROVIDER">
+            <intent-filter>
+                <action android:name="androidx.wear.tiles.action.BIND_TILE_PROVIDER" />
+            </intent-filter>
+        </service>
         <service android:name=".WearWorkoutWakeService" android:exported="true">
             <intent-filter>
                 <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
