@@ -1178,7 +1178,7 @@ public final class MainActivity extends FragmentActivity {
         FrameLayout holder = new FrameLayout(this);
         holder.setContentDescription("Open Message Center");
         holder.setClickable(true); holder.setFocusable(true);
-        holder.setBackground(surface(Color.argb(170, 7, 24, 45), 99, 1, Color.argb(155, 156, 234, 218)));
+        holder.setBackgroundColor(Color.TRANSPARENT);
         ImageButton bell = new ImageButton(this);
         bell.setImageResource(R.drawable.ic_nav_notifications);
         bell.setImageTintList(ColorStateList.valueOf(mint));
@@ -2886,6 +2886,9 @@ public final class MainActivity extends FragmentActivity {
         FrameLayout.LayoutParams copyParams = new FrameLayout.LayoutParams(dp(230), -2, Gravity.LEFT | Gravity.TOP);
         copyParams.leftMargin = dp(22); copyParams.topMargin = dp(34);
         hero.addView(heroCopy, copyParams);
+        // Home owns its hero shell, so it explicitly receives the same unobtrusive Message
+        // Center entry point as every page that uses coachHeroHeader().
+        addGymLobbyBell(hero);
 
         LinearLayout next = new LinearLayout(this);
         next.setOrientation(LinearLayout.VERTICAL);
@@ -3392,19 +3395,22 @@ public final class MainActivity extends FragmentActivity {
         if (date == null) return cell;
         boolean planned = isMonthWorkoutDay(date);
         List<SchedulerStore.Appointment> appointments = SchedulerStore.onDate(this, date);
+        JourneyStore.WorkoutRecord completedWorkout = completedStrengthWorkoutOn(date);
         JourneyStore.WorkoutRecord completedEndurance = completedEnduranceOn(date);
+        boolean completedStrength = completedWorkout != null;
         boolean endurance = !appointments.isEmpty() || completedEndurance != null;
-        int fill = endurance && !planned ? coral : planned ? mint : Color.rgb(238, 242, 247);
+        int fill = endurance && !planned ? coral : planned || completedStrength ? mint : Color.rgb(238, 242, 247);
         boolean today = SchedulerStore.dateKey(date).equals(SchedulerStore.dateKey(Calendar.getInstance()));
         cell.setPadding(dp(2), dp(3), dp(2), dp(2));
         cell.setBackground(surface(fill, 8, today ? 2 : 0, today ? coral : Color.TRANSPARENT));
-        TextView number = text(String.valueOf(date.get(Calendar.DAY_OF_MONTH)), 12, planned || endurance ? navy : muted);
+        TextView number = text(String.valueOf(date.get(Calendar.DAY_OF_MONTH)), 12, planned || completedStrength || endurance ? navy : muted);
         number.setGravity(Gravity.CENTER);
         number.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
         cell.addView(number, new LinearLayout.LayoutParams(-1, dp(22)));
-        if (planned) {
-            TextView plan = text("PLAN", 8, navy);
+        if (planned || completedStrength) {
+            TextView plan = text(completedStrength ? completedWorkout.target.toUpperCase(Locale.ROOT) : "PLAN", 8, navy);
             plan.setGravity(Gravity.CENTER);
+            plan.setMaxLines(2);
             cell.addView(plan, new LinearLayout.LayoutParams(-1, endurance ? dp(16) : dp(28)));
         }
         if (endurance) {
@@ -3415,20 +3421,30 @@ public final class MainActivity extends FragmentActivity {
             activity.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
             activity.setBackground(surface(coral, 5, 0, Color.TRANSPARENT));
             cell.addView(activity, new LinearLayout.LayoutParams(-1, planned ? dp(14) : dp(28)));
-        } else if (!planned) {
+        } else if (!planned && !completedStrength) {
             TextView rest = text("REST", 8, muted);
             rest.setGravity(Gravity.CENTER);
             cell.addView(rest, new LinearLayout.LayoutParams(-1, dp(28)));
         }
         cell.setClickable(true);
-        cell.setContentDescription(new SimpleDateFormat("EEEE, MMMM d", Locale.getDefault()).format(date.getTime()) + ", " + (planned ? "work plan" : "rest day") + (endurance ? ", " + enduranceDayLabel(appointments) : ""));
+        String calendarState = completedStrength ? "completed " + completedWorkout.target + " workout" : planned ? "work plan" : "rest day";
+        if (endurance) calendarState += ", " + (completedEndurance == null ? enduranceDayLabel(appointments) : "completed " + completedEndurance.target.replace("Endurance · ", ""));
+        cell.setContentDescription(new SimpleDateFormat("EEEE, MMMM d", Locale.getDefault()).format(date.getTime()) + ", " + calendarState);
         cell.setOnClickListener(view -> showMonthDayDetail(date));
         return cell;
     }
 
     private void showMonthDayDetail(Calendar date) {
         List<SchedulerStore.Appointment> appointments = SchedulerStore.onDate(this, date);
-        StringBuilder detail = new StringBuilder(isMonthWorkoutDay(date) ? "Work plan · " + schedulerStrengthSummary(date) : "Rest day");
+        JourneyStore.WorkoutRecord completedWorkout = completedStrengthWorkoutOn(date);
+        JourneyStore.WorkoutRecord completedEndurance = completedEnduranceOn(date);
+        boolean completedStrength = completedWorkout != null;
+        StringBuilder detail = new StringBuilder(completedStrength
+                ? "Completed workout · " + completedWorkout.target + " · " + completedWorkout.minutes + " min"
+                : isMonthWorkoutDay(date) ? "Work plan · " + schedulerStrengthSummary(date) : "Rest day");
+        if (completedEndurance != null) detail.append("\nCompleted endurance · ")
+                .append(completedEndurance.target.replace("Endurance · ", ""))
+                .append(" · ").append(completedEndurance.minutes).append(" min");
         for (SchedulerStore.Appointment appointment : appointments) {
             detail.append("\n").append(appointment.mode).append(" · ").append(schedulerTime(appointment.when)).append(" · ").append(appointment.durationMinutes).append(" min");
         }
@@ -3469,12 +3485,16 @@ public final class MainActivity extends FragmentActivity {
         boolean historical = isPastCalendarDate(date);
         List<SchedulerStore.Appointment> appointments = SchedulerStore.onDate(this, date);
         JourneyStore.WorkoutRecord completedEndurance = completedEnduranceOn(date);
-        JourneyStore.WorkoutRecord completedRecord = completedWorkoutOn(date);
-        boolean completed = completedRecord != null;
+        JourneyStore.WorkoutRecord completedRecord = completedStrengthWorkoutOn(date);
+        boolean completed = completedRecord != null || completedEndurance != null;
+        boolean completedStrength = completedRecord != null;
+        // A real completed session is historical truth. It must stay visible even if that day
+        // was originally a rest day or its old scheduled focus has since changed.
+        boolean showStrength = workoutDay || completedStrength;
         boolean endurance = !appointments.isEmpty() || completedEndurance != null;
         boolean missedPlan = historical && !completed && (workoutDay || !appointments.isEmpty());
         int base = missedPlan ? Color.rgb(255, 235, 232)
-                : workoutDay || endurance ? Color.rgb(224, 249, 242) : Color.rgb(232, 236, 244);
+                : showStrength || endurance ? Color.rgb(224, 249, 242) : Color.rgb(232, 236, 244);
         LinearLayout tile = new LinearLayout(this);
         tile.setOrientation(LinearLayout.VERTICAL);
         tile.setGravity(Gravity.CENTER_HORIZONTAL);
@@ -3484,12 +3504,13 @@ public final class MainActivity extends FragmentActivity {
         // looking selected; past days are deliberately watermark-like historical records.
         tile.setBackground(homeScheduleDaySurface(base, today));
         tile.setAlpha(historical && !completed ? .64f : 1f);
-        TextView dateLabel = text(weekDays[dayIndex] + "\n" + homeWeekDate(date, 0), 9, (workoutDay || endurance) ? navy : muted);
+        TextView dateLabel = text(weekDays[dayIndex] + "\n" + homeWeekDate(date, 0), 9, (showStrength || endurance) ? navy : muted);
         dateLabel.setGravity(Gravity.CENTER);
         dateLabel.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
         tile.addView(dateLabel, new LinearLayout.LayoutParams(-1, dp(34)));
-        if (workoutDay) {
-            TextView plan = text(homeFocusForDay(dayIndex, schedule), 8, navy);
+        if (showStrength) {
+            String strengthLabel = completedStrength ? completedRecord.target : homeFocusForDay(dayIndex, schedule);
+            TextView plan = text(strengthLabel, 8, navy);
             plan.setGravity(Gravity.CENTER);
             plan.setMaxLines(2);
             tile.addView(plan, new LinearLayout.LayoutParams(-1, endurance ? dp(14) : dp(24)));
@@ -3504,24 +3525,25 @@ public final class MainActivity extends FragmentActivity {
             TextView activity = text(enduranceLabel, 8, navy);
             activity.setGravity(Gravity.CENTER);
             activity.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
-            LinearLayout.LayoutParams activityParams = new LinearLayout.LayoutParams(-1, workoutDay ? dp(12) : dp(24));
+            LinearLayout.LayoutParams activityParams = new LinearLayout.LayoutParams(-1, showStrength ? dp(12) : dp(24));
             tile.addView(activity, activityParams);
         }
-        if (workoutDay || endurance) {
+        if (showStrength || endurance) {
             LinearLayout icons = new LinearLayout(this);
             icons.setOrientation(LinearLayout.VERTICAL);
             icons.setGravity(Gravity.CENTER);
             // When both are booked, endurance stays above the workout mark as agreed.
             if (endurance) icons.addView(homeCalendarMarker(R.drawable.ic_nav_endurance, "Scheduled endurance"),
                     new LinearLayout.LayoutParams(dp(25), dp(15)));
-            if (workoutDay) {
+            if (showStrength) {
                 LinearLayout.LayoutParams markerParams = new LinearLayout.LayoutParams(dp(25), dp(15));
                 markerParams.topMargin = endurance ? dp(1) : 0;
                 icons.addView(homeCalendarMarker(R.drawable.ic_nav_workouts, "Scheduled workout"), markerParams);
             }
             tile.addView(icons, new LinearLayout.LayoutParams(-1, 0, 1));
         }
-        String state = workoutDay ? homeFocusForDay(dayIndex, schedule) + " workout" : confirmed ? "Rest Day" : "Open";
+        String state = completedStrength ? "completed " + completedRecord.target + " workout"
+                : workoutDay ? homeFocusForDay(dayIndex, schedule) + " workout" : confirmed ? "Rest Day" : "Open";
         if (endurance) state += ", " + (completedEndurance == null ? enduranceDayLabel(appointments) : "completed " + completedEndurance.target.replace("Endurance · ", ""));
         tile.setContentDescription(weekDays[dayIndex] + " " + homeWeekDate(date, 0) + ", " + state);
         if (!completed) return tile;
@@ -3552,14 +3574,15 @@ public final class MainActivity extends FragmentActivity {
         return completedDay;
     }
 
-    /** The newest local completion is the one a historical Home tile opens for review. */
-    private JourneyStore.WorkoutRecord completedWorkoutOn(Calendar date) {
+    /** Finds a completed guided/strength workout for one calendar day without hiding it behind a same-day route. */
+    private JourneyStore.WorkoutRecord completedStrengthWorkoutOn(Calendar date) {
         if (date == null) return null;
         Calendar start = (Calendar) date.clone();
         start.set(Calendar.HOUR_OF_DAY, 0); start.set(Calendar.MINUTE, 0); start.set(Calendar.SECOND, 0); start.set(Calendar.MILLISECOND, 0);
         Calendar end = (Calendar) start.clone(); end.add(Calendar.DAY_OF_YEAR, 1);
         for (JourneyStore.WorkoutRecord record : JourneyStore.workouts(this)) {
-            if (record.timestamp >= start.getTimeInMillis() && record.timestamp < end.getTimeInMillis()) return record;
+            boolean endurance = record.target != null && record.target.startsWith("Endurance · ");
+            if (!endurance && record.timestamp >= start.getTimeInMillis() && record.timestamp < end.getTimeInMillis()) return record;
         }
         return null;
     }
@@ -8577,31 +8600,35 @@ public final class MainActivity extends FragmentActivity {
     private void showProfile() {
         AccountStore.Profile profile = AccountStore.get(this);
         LinearLayout body = appPage("Settings");
-        title(body, "SETTINGS", "Your account", "Manage your profile, security, app preferences, and connections.");
+        title(body, "ACCOUNT", "Your profile", "Your identity, privacy, preferences, and trusted connections.");
 
         // One prominent identity card establishes the same familiar hierarchy as a polished
         // chat-profile screen: person first, then concise grouped actions below.
         LinearLayout identity = new LinearLayout(this);
         identity.setOrientation(LinearLayout.HORIZONTAL);
         identity.setGravity(Gravity.CENTER_VERTICAL);
-        identity.setPadding(dp(16), dp(16), dp(16), dp(16));
+        identity.setPadding(dp(18), dp(18), dp(14), dp(18));
         identity.setBackground(surface(navyPanel, 22, 1, Color.rgb(47, 91, 103)));
         applyPremiumTileDepth(identity, true);
         ImageView profilePhoto = new ImageView(this);
         bindProfilePhoto(profilePhoto, profile);
         profilePhoto.setPadding(dp(3), dp(3), dp(3), dp(3));
         profilePhoto.setBackground(surface(mint, 99, 2, Color.argb(130, 255, 255, 255)));
-        LinearLayout.LayoutParams profilePhotoParams = new LinearLayout.LayoutParams(dp(74), dp(74));
+        LinearLayout.LayoutParams profilePhotoParams = new LinearLayout.LayoutParams(dp(82), dp(82));
         profilePhotoParams.rightMargin = dp(15);
         identity.addView(profilePhoto, profilePhotoParams);
         LinearLayout identityCopy = new LinearLayout(this); identityCopy.setOrientation(LinearLayout.VERTICAL);
         identityCopy.setGravity(Gravity.CENTER_VERTICAL);
-        identityCopy.addView(heading(profile.username, 21, Color.WHITE));
+        identityCopy.addView(heading(profile.username, 22, Color.WHITE));
         TextView email = text(profile.email, 13, Color.rgb(211, 225, 233)); email.setSingleLine(true); email.setEllipsize(android.text.TextUtils.TruncateAt.END); identityCopy.addView(email);
         TextView accountStatus = text(AccountStore.usesRemoteAuth(this) ? "●  Secure account connected" : "●  Private device profile", 12, mint);
-        accountStatus.setPadding(0, dp(6), 0, 0); identityCopy.addView(accountStatus);
+        accountStatus.setPadding(dp(8), dp(4), dp(8), dp(4));
+        accountStatus.setBackground(surface(Color.argb(46, 130, 236, 209), 99, 1, Color.argb(120, 130, 236, 209)));
+        LinearLayout.LayoutParams statusParams = new LinearLayout.LayoutParams(-2, -2); statusParams.topMargin = dp(7);
+        identityCopy.addView(accountStatus, statusParams);
         identity.addView(identityCopy, new LinearLayout.LayoutParams(0, -2, 1));
-        TextView edit = heading("›", 34, mint); edit.setGravity(Gravity.CENTER); identity.addView(edit, new LinearLayout.LayoutParams(dp(28), dp(54)));
+        TextView edit = heading("EDIT", 10, mint); edit.setLetterSpacing(.08f); edit.setGravity(Gravity.CENTER);
+        identity.addView(edit, new LinearLayout.LayoutParams(dp(42), dp(54)));
         identity.setClickable(true); identity.setFocusable(true);
         identity.setContentDescription("Open personal details for " + profile.username);
         identity.setOnClickListener(view -> showProfileEditor());
@@ -8739,7 +8766,8 @@ public final class MainActivity extends FragmentActivity {
     private TextView settingsGroup(String label) {
         TextView header = heading(label, 11, mint);
         header.setLetterSpacing(.08f);
-        header.setPadding(dp(7), dp(1), 0, dp(7));
+        // Match the 16dp left edge used by the content panel rows below it.
+        header.setPadding(0, dp(1), 0, dp(7));
         return header;
     }
 
