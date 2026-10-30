@@ -15,6 +15,7 @@ public final class ReleaseNotes {
     }
 
     public static final Entry[] HISTORY = {
+            new Entry("5.97", "Phone & watch aligned", "Removes the extra medal-art ring and aligns the Wear OS companion with the current phone release and protected workout-sync channel."),
             new Entry("5.96", "Mintfoil & calendar fit", "Centres each Mintfoil symbol in its medal mount, keeps Scheduler plan text inside its date tile, and separates Your Week from the content below."),
             new Entry("5.95", "Verified calendar stability", "Completes the aligned Home and Scheduler calendar states: clearer Rest Day and completed-workout presentation, safe selection shadows, and verified future-date planning controls."),
             new Entry("5.94", "Calendar refinements", "Allows screenshots, uses compact missed-plan X markers, aligns moon rest markers, preserves moved plans, and softens future-date selection."),

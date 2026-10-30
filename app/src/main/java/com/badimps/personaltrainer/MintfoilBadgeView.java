@@ -30,7 +30,9 @@ public final class MintfoilBadgeView extends ImageView {
     public void bind(AchievementStore.Badge badge, int index) {
         unlocked = badge.unlocked();
         artwork = artworkFor(badge);
-        coin.setStroke(3, badge.tierColor());
+        // The Mintfoil card already supplies the physical circular frame. A second tier-colour
+        // outline reads as an orange ring around the symbol, so keep this insert borderless.
+        coin.setStroke(0, Color.TRANSPARENT);
         setPadding(5, 5, 5, 5);
         setImageResource(artwork);
         setAlpha(unlocked ? 1f : .52f);

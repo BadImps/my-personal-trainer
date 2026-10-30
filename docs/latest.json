@@ -1,10 +1,13 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 138,
-  "versionName": "5.96",
-  "publishedAt": "2026-10-30T03:56:46Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.96/app-production-release.apk",
-  "sha256": "2b468af7705919738851b91c5e65668c1a59749118c496d772ed1f137ff79ac2",
+  "versionCode": 139,
+  "versionName": "5.97",
+  "publishedAt": "2026-10-30T10:37:16Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.97/app-production-release.apk",
+  "sha256": "62d0113f4a6007f3a1ec285b28094efd9f5b5b8e59ec34dc3fa32d05814bad05",
   "sizeBytes": 265158908,
-  "notes": "Centres Mintfoil medal art, keeps Scheduler plan text inside date tiles, and adds safe lower spacing below Your Week."
+  "watchApkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.97/wear-release.apk",
+  "watchSha256": "2d368343efa6a6deaacc059f21a1b70c6b9663b5c61fa931994020051aa1c863",
+  "watchSizeBytes": 8445553,
+  "notes": "Removes the extra medal-art ring and aligns the phone and Wear OS companion at v5.97 / code 139."
 }
