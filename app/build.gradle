@@ -50,8 +50,8 @@ android {
         applicationId 'com.badimps.personaltrainer'
         minSdk 26
         targetSdk 36
-        versionCode (migrationBridge ? 73 : 135)
-        versionName (migrationBridge ? '5.31 Migration' : '5.93')
+        versionCode (migrationBridge ? 73 : 136)
+        versionName (migrationBridge ? '5.31 Migration' : '5.94')
         resValue 'string', 'app_display_name', 'My Personal Trainer'
         buildConfigField 'boolean', 'PREVIEW_BUILD', 'false'
         // The anon/publishable key is intentionally a client credential. Never place a
