@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 134,
-  "versionName": "5.92",
-  "publishedAt": "2026-10-29T23:19:34Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.92/app-production-release.apk",
-  "sha256": "d9661dc2fae7b2280061b713bc09065556f4db9dbd457797dfed2b977632530b",
-  "sizeBytes": 265142524,
-  "notes": "Refines Settings, adds Gym Lobby activity messages, and gives every training rank a compact earned banner."
+  "versionCode": 135,
+  "versionName": "5.93",
+  "publishedAt": "2026-10-30T01:29:44Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.93/app-production-release.apk",
+  "sha256": "42c2ae6169b8ceaa5603803a42ccb31c9f707d3b86ce57a7db6cc28fe211cc4b",
+  "sizeBytes": 265158908,
+  "notes": "Adds future-date Create a Plan, four-second plan controls, incomplete-day ribbons, and moon-marked rest days."
 }

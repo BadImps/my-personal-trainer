@@ -15,6 +15,7 @@ public final class ReleaseNotes {
     }
 
     public static final Entry[] HISTORY = {
+            new Entry("5.93", "Calendar plans & incomplete days", "Adds Create a Plan for future dates, four-second plan controls, clear incomplete-day ribbons, and moon-marked rest days."),
             new Entry("5.92", "Gym Lobby activity & earned rank banners", "Refines Settings, adds a private Gym Lobby Message Center, and gives every training rank its own compact earned banner."),
             new Entry("5.91", "Ranks, refined achievements & direct signup", "Removes optional coach-motion packs, restores achievement tiers and rank titles, refines medal layout, and creates Supabase accounts with immediate sign-in."),
             new Entry("5.90", "Original Mintfoil collection restored", "Achievement cards are back to their full tall iron-frame artwork, with distinct milestone symbols and the original tap-to-flip collection details."),
