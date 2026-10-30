@@ -260,6 +260,8 @@ public final class MainActivity extends FragmentActivity {
     private int schedulerMonthOffset;
     private int homeCalendarMonthOffset;
     private Calendar schedulerSelectedDate = Calendar.getInstance();
+    /** A future Home-calendar tap deliberately changes the primary card into a plan action. */
+    private Calendar homePlanDate;
     private String schedulerActivity = EndurancePlanStore.WALKING;
     private int schedulerHour = 18;
     private int schedulerMinute;
@@ -3361,7 +3363,7 @@ public final class MainActivity extends FragmentActivity {
         LinearLayout.LayoutParams gridParams = new LinearLayout.LayoutParams(-1, -2);
         gridParams.topMargin = dp(8);
         content.addView(grid, gridParams);
-        TextView legend = text("Mint  workout     Coral  Run / Walk / Cycle     Slate  rest", 11, muted);
+        TextView legend = text("Mint  workout     Coral  endurance     Red  incomplete     ☾  rest", 11, muted);
         legend.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams legendParams = new LinearLayout.LayoutParams(-1, -2);
         legendParams.topMargin = dp(10);
@@ -3399,7 +3401,8 @@ public final class MainActivity extends FragmentActivity {
         JourneyStore.WorkoutRecord completedEndurance = completedEnduranceOn(date);
         boolean completedStrength = completedWorkout != null;
         boolean endurance = !appointments.isEmpty() || completedEndurance != null;
-        int fill = endurance && !planned ? coral : planned || completedStrength ? mint : Color.rgb(238, 242, 247);
+        boolean incomplete = isPastCalendarDate(date) && completedWorkout == null && completedEndurance == null && (planned || !appointments.isEmpty());
+        int fill = incomplete ? Color.rgb(255, 218, 215) : endurance && !planned ? coral : planned || completedStrength ? mint : Color.rgb(238, 242, 247);
         boolean today = SchedulerStore.dateKey(date).equals(SchedulerStore.dateKey(Calendar.getInstance()));
         cell.setPadding(dp(2), dp(3), dp(2), dp(2));
         cell.setBackground(surface(fill, 8, today ? 2 : 0, today ? coral : Color.TRANSPARENT));
@@ -3407,7 +3410,13 @@ public final class MainActivity extends FragmentActivity {
         number.setGravity(Gravity.CENTER);
         number.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
         cell.addView(number, new LinearLayout.LayoutParams(-1, dp(22)));
-        if (planned || completedStrength) {
+        if (incomplete) {
+            TextView ribbon = heading("INCOMPLETE", 6, Color.WHITE);
+            ribbon.setGravity(Gravity.CENTER);
+            ribbon.setLetterSpacing(.04f);
+            ribbon.setBackground(surface(Color.rgb(191, 58, 58), 4, 0, Color.TRANSPARENT));
+            cell.addView(ribbon, new LinearLayout.LayoutParams(-1, dp(12)));
+        } else if (planned || completedStrength) {
             TextView plan = text(completedStrength ? completedWorkout.target.toUpperCase(Locale.ROOT) : "PLAN", 8, navy);
             plan.setGravity(Gravity.CENTER);
             plan.setMaxLines(2);
@@ -3422,12 +3431,16 @@ public final class MainActivity extends FragmentActivity {
             activity.setBackground(surface(coral, 5, 0, Color.TRANSPARENT));
             cell.addView(activity, new LinearLayout.LayoutParams(-1, planned ? dp(14) : dp(28)));
         } else if (!planned && !completedStrength) {
-            TextView rest = text("REST", 8, muted);
-            rest.setGravity(Gravity.CENTER);
-            cell.addView(rest, new LinearLayout.LayoutParams(-1, dp(28)));
+            ImageView rest = new ImageView(this);
+            rest.setImageResource(R.drawable.ic_home_rest);
+            rest.setImageTintList(ColorStateList.valueOf(muted));
+            rest.setContentDescription("Rest day");
+            LinearLayout.LayoutParams restParams = new LinearLayout.LayoutParams(dp(17), dp(24));
+            restParams.gravity = Gravity.CENTER_HORIZONTAL;
+            cell.addView(rest, restParams);
         }
         cell.setClickable(true);
-        String calendarState = completedStrength ? "completed " + completedWorkout.target + " workout" : planned ? "work plan" : "rest day";
+        String calendarState = incomplete ? "incomplete plan" : completedStrength ? "completed " + completedWorkout.target + " workout" : planned ? "work plan" : "rest day";
         if (endurance) calendarState += ", " + (completedEndurance == null ? enduranceDayLabel(appointments) : "completed " + completedEndurance.target.replace("Endurance · ", ""));
         cell.setContentDescription(new SimpleDateFormat("EEEE, MMMM d", Locale.getDefault()).format(date.getTime()) + ", " + calendarState);
         cell.setOnClickListener(view -> showMonthDayDetail(date));
@@ -3439,9 +3452,12 @@ public final class MainActivity extends FragmentActivity {
         JourneyStore.WorkoutRecord completedWorkout = completedStrengthWorkoutOn(date);
         JourneyStore.WorkoutRecord completedEndurance = completedEnduranceOn(date);
         boolean completedStrength = completedWorkout != null;
+        boolean incomplete = isPastCalendarDate(date) && !completedStrength && completedEndurance == null
+                && (isMonthWorkoutDay(date) || !appointments.isEmpty());
         StringBuilder detail = new StringBuilder(completedStrength
                 ? "Completed workout · " + completedWorkout.target + " · " + completedWorkout.minutes + " min"
                 : isMonthWorkoutDay(date) ? "Work plan · " + schedulerStrengthSummary(date) : "Rest day");
+        if (incomplete) detail.insert(0, "INCOMPLETE\nA planned session passed without a recorded completion.\n\n");
         if (completedEndurance != null) detail.append("\nCompleted endurance · ")
                 .append(completedEndurance.target.replace("Endurance · ", ""))
                 .append(" · ").append(completedEndurance.minutes).append(" min");
@@ -3502,8 +3518,10 @@ public final class MainActivity extends FragmentActivity {
         // The coral selection frame belongs to the full day tile, not the small activity icon.
         // Only today carries the active-day frame. Future plans remain legible without
         // looking selected; past days are deliberately watermark-like historical records.
-        tile.setBackground(homeScheduleDaySurface(base, today));
-        tile.setAlpha(historical && !completed ? .64f : 1f);
+        tile.setBackground(homeScheduleDaySurface(base, today || sameCalendarDate(date, homePlanDate)));
+        // A missed plan is deliberately bright: it is an actionable historical outcome, not
+        // background decoration like an unscheduled past rest day.
+        tile.setAlpha(historical && !completed && !missedPlan ? .64f : 1f);
         TextView dateLabel = text(weekDays[dayIndex] + "\n" + homeWeekDate(date, 0), 9, (showStrength || endurance) ? navy : muted);
         dateLabel.setGravity(Gravity.CENTER);
         dateLabel.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
@@ -3515,9 +3533,16 @@ public final class MainActivity extends FragmentActivity {
             plan.setMaxLines(2);
             tile.addView(plan, new LinearLayout.LayoutParams(-1, endurance ? dp(14) : dp(24)));
         } else if (!endurance) {
-            TextView rest = text(confirmed ? "REST" : "OPEN", 8, muted);
-            rest.setGravity(Gravity.CENTER);
-            tile.addView(rest, new LinearLayout.LayoutParams(-1, dp(24)));
+            if (confirmed) {
+                FrameLayout rest = homeCalendarMarker(R.drawable.ic_home_rest, "Rest day");
+                LinearLayout.LayoutParams restParams = new LinearLayout.LayoutParams(dp(25), dp(20));
+                restParams.gravity = Gravity.CENTER_HORIZONTAL;
+                tile.addView(rest, restParams);
+            } else {
+                TextView open = text("OPEN", 8, muted);
+                open.setGravity(Gravity.CENTER);
+                tile.addView(open, new LinearLayout.LayoutParams(-1, dp(24)));
+            }
         }
         if (endurance) {
             String enduranceLabel = completedEndurance == null ? enduranceDayLabel(appointments)
@@ -3546,21 +3571,25 @@ public final class MainActivity extends FragmentActivity {
                 : workoutDay ? homeFocusForDay(dayIndex, schedule) + " workout" : confirmed ? "Rest Day" : "Open";
         if (endurance) state += ", " + (completedEndurance == null ? enduranceDayLabel(appointments) : "completed " + completedEndurance.target.replace("Endurance · ", ""));
         tile.setContentDescription(weekDays[dayIndex] + " " + homeWeekDate(date, 0) + ", " + state);
-        if (!completed) return tile;
+        if (!completed && !missedPlan) {
+            attachCalendarPlanActions(tile, date, () -> refreshCurrentPageKeepingScroll(this::showCoachHeroHome));
+            return tile;
+        }
         FrameLayout completedDay = new FrameLayout(this);
         completedDay.addView(tile, new FrameLayout.LayoutParams(-1, -1));
-        TextView ribbon = heading("COMPLETED", 6, Color.WHITE);
+        TextView ribbon = heading(completed ? "COMPLETED" : "INCOMPLETE", 6, Color.WHITE);
         ribbon.setGravity(Gravity.CENTER);
         ribbon.setLetterSpacing(.08f);
-        ribbon.setBackground(surface(coral, 5, 1, Color.rgb(255, 159, 146)));
-        ribbon.setContentDescription(completedEndurance != null ? "Endurance completed" : "Workout completed");
+        int ribbonColor = completed ? coral : Color.rgb(191, 58, 58);
+        ribbon.setBackground(surface(ribbonColor, 5, 1, completed ? Color.rgb(255, 159, 146) : Color.rgb(255, 183, 174)));
+        ribbon.setContentDescription(completed ? (completedEndurance != null ? "Endurance completed" : "Workout completed") : "Incomplete plan");
         // A centered inner ribbon keeps the status visually balanced within the complete day outline.
         FrameLayout.LayoutParams ribbonParams = new FrameLayout.LayoutParams(-1, dp(16), Gravity.TOP | Gravity.CENTER_HORIZONTAL);
         ribbonParams.topMargin = dp(5);
         ribbonParams.leftMargin = dp(5);
         ribbonParams.rightMargin = dp(5);
         completedDay.addView(ribbon, ribbonParams);
-        completedDay.setContentDescription(tile.getContentDescription() + ", completed");
+        completedDay.setContentDescription(tile.getContentDescription() + (completed ? ", completed" : ", incomplete"));
         if (historical) {
             JourneyStore.WorkoutRecord opened = completedRecord;
             completedDay.setClickable(true);
@@ -3570,7 +3599,7 @@ public final class MainActivity extends FragmentActivity {
                 if (completedRoute != null) showEnduranceSessionDetails(completedRoute);
                 else showWorkoutSetTimeDetails(opened, SetTimeStore.loadWorkout(this, opened.timestamp));
             });
-        }
+        } else if (missedPlan) attachCalendarPlanActions(completedDay, date, () -> refreshCurrentPageKeepingScroll(this::showCoachHeroHome));
         return completedDay;
     }
 
@@ -3613,6 +3642,163 @@ public final class MainActivity extends FragmentActivity {
         today.set(Calendar.SECOND, 0);
         today.set(Calendar.MILLISECOND, 0);
         return candidate.before(today);
+    }
+
+    private boolean isCurrentOrFutureCalendarDate(Calendar date) {
+        return date != null && !isPastCalendarDate(date);
+    }
+
+    private boolean sameCalendarDate(Calendar one, Calendar two) {
+        return one != null && two != null && SchedulerStore.dateKey(one).equals(SchedulerStore.dateKey(two));
+    }
+
+    /** A normal future-date tap turns Home's primary card into the one clear creation action. */
+    private void attachCalendarPlanActions(View tile, Calendar date, Runnable refresh) {
+        tile.setClickable(true);
+        tile.setFocusable(true);
+        tile.setOnClickListener(view -> {
+            if (!isCurrentOrFutureCalendarDate(date)) return;
+            if (sameCalendarDate(date, Calendar.getInstance())) {
+                schedulerSelectedDate = (Calendar) date.clone();
+                return;
+            }
+            homePlanDate = (Calendar) date.clone();
+            refresh.run();
+        });
+        attachFourSecondPlanMenu(tile, date, refresh);
+    }
+
+    /** Four seconds avoids accidental plan changes while browsing a compact calendar. */
+    private void attachFourSecondPlanMenu(View tile, Calendar date, Runnable refresh) {
+        if (!isCurrentOrFutureCalendarDate(date)) return;
+        final boolean[] opened = {false};
+        final Runnable[] openMenu = new Runnable[1];
+        openMenu[0] = () -> {
+            opened[0] = true;
+            tile.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
+            showPlanContextMenu(tile, date, refresh);
+        };
+        tile.setOnTouchListener((view, event) -> {
+            if (event.getAction() == MotionEvent.ACTION_DOWN) {
+                opened[0] = false;
+                workoutHandler.postDelayed(openMenu[0], 4000L);
+            } else if (event.getAction() == MotionEvent.ACTION_UP || event.getAction() == MotionEvent.ACTION_CANCEL) {
+                workoutHandler.removeCallbacks(openMenu[0]);
+                if (opened[0]) return true;
+            }
+            return false;
+        });
+    }
+
+    private void showPlanContextMenu(View anchor, Calendar date, Runnable refresh) {
+        PopupMenu menu = new PopupMenu(this, anchor);
+        menu.getMenu().add(0, 1, 0, "Edit Plan");
+        menu.getMenu().add(0, 2, 1, "Cancel Plan");
+        menu.getMenu().add(0, 3, 2, "Change Date");
+        menu.getMenu().add(0, 4, 3, "Change Plan");
+        menu.getMenu().add(0, 5, 4, "Close");
+        menu.setOnMenuItemClickListener(item -> {
+            schedulerSelectedDate = (Calendar) date.clone();
+            if (item.getItemId() == 1) editPlanOnDate(date);
+            else if (item.getItemId() == 2) confirmCancelPlan(date, refresh);
+            else if (item.getItemId() == 3) showMovePlanDatePicker(date, refresh);
+            else if (item.getItemId() == 4) changePlanOnDate(date, refresh);
+            return true;
+        });
+        menu.show();
+    }
+
+    private void editPlanOnDate(Calendar date) {
+        boolean strength = isMonthWorkoutDay(date);
+        boolean endurance = !SchedulerStore.onDate(this, date).isEmpty();
+        if (strength && endurance) {
+            new AlertDialog.Builder(this).setTitle("Edit plan")
+                    .setItems(new String[]{"Edit workout", "Edit endurance"}, (dialog, which) -> {
+                        if (which == 0) beginSchedulerWorkoutWizard(false); else showSchedulerActivity();
+                    }).show();
+        } else if (strength) beginSchedulerWorkoutWizard(false);
+        else if (endurance) showSchedulerActivity();
+        else showSchedulerAppointmentSheet(date);
+    }
+
+    private void confirmCancelPlan(Calendar date, Runnable refresh) {
+        new AlertDialog.Builder(this).setTitle("Cancel plan?")
+                .setMessage("This removes the workout and endurance plans on " + new SimpleDateFormat("EEEE, MMM d", Locale.getDefault()).format(date.getTime()) + ".")
+                .setNegativeButton("Keep", null)
+                .setPositiveButton("Cancel plan", (dialog, which) -> {
+                    removePlansOnDate(date);
+                    if (sameCalendarDate(homePlanDate, date)) homePlanDate = null;
+                    toast("Plan cancelled.");
+                    refresh.run();
+                }).show();
+    }
+
+    private void changePlanOnDate(Calendar date, Runnable refresh) {
+        new AlertDialog.Builder(this).setTitle("Change plan")
+                .setMessage("The current plan for this day will be replaced.")
+                .setNegativeButton("Keep current", null)
+                .setPositiveButton("Choose new plan", (dialog, which) -> {
+                    removePlansOnDate(date);
+                    refresh.run();
+                    showSchedulerAppointmentSheet(date);
+                }).show();
+    }
+
+    private void showMovePlanDatePicker(Calendar source, Runnable refresh) {
+        Calendar today = Calendar.getInstance();
+        android.app.DatePickerDialog picker = new android.app.DatePickerDialog(this, (view, year, month, day) -> {
+            Calendar destination = Calendar.getInstance();
+            destination.set(year, month, day, 0, 0, 0); destination.set(Calendar.MILLISECOND, 0);
+            if (sameCalendarDate(source, destination)) return;
+            movePlansOnDate(source, destination);
+            if (sameCalendarDate(homePlanDate, source)) homePlanDate = (Calendar) destination.clone();
+            schedulerSelectedDate = (Calendar) destination.clone();
+            toast("Plan moved to " + new SimpleDateFormat("MMM d", Locale.getDefault()).format(destination.getTime()) + ".");
+            refresh.run();
+        }, today.get(Calendar.YEAR), today.get(Calendar.MONTH), today.get(Calendar.DAY_OF_MONTH));
+        picker.getDatePicker().setMinDate(today.getTimeInMillis());
+        picker.show();
+    }
+
+    private Calendar planWeekStart(Calendar date) {
+        Calendar week = (Calendar) date.clone();
+        week.setFirstDayOfWeek(Calendar.MONDAY);
+        week.set(Calendar.HOUR_OF_DAY, 0); week.set(Calendar.MINUTE, 0); week.set(Calendar.SECOND, 0); week.set(Calendar.MILLISECOND, 0);
+        week.add(Calendar.DAY_OF_YEAR, -((week.get(Calendar.DAY_OF_WEEK) - Calendar.MONDAY + 7) % 7));
+        return week;
+    }
+
+    private int planDayIndex(Calendar date) { return (date.get(Calendar.DAY_OF_WEEK) - Calendar.MONDAY + 7) % 7; }
+
+    private void removePlansOnDate(Calendar date) {
+        Calendar week = planWeekStart(date);
+        WeeklyScheduleStore.Schedule schedule = WeeklyScheduleStore.load(this, week, defaultWeeklyDays(), defaultWeeklyTargets());
+        int day = planDayIndex(date);
+        schedule.workoutDays[day] = false;
+        schedule.targets.get(day).clear();
+        WeeklyScheduleStore.save(this, week, schedule.workoutDays, schedule.targets);
+        SchedulerStore.removeOnDate(this, date);
+    }
+
+    /** Moves all plan types on the source date: strength focus plus every endurance appointment. */
+    private void movePlansOnDate(Calendar source, Calendar destination) {
+        Calendar sourceWeek = planWeekStart(source);
+        WeeklyScheduleStore.Schedule sourceSchedule = WeeklyScheduleStore.load(this, sourceWeek, defaultWeeklyDays(), defaultWeeklyTargets());
+        int sourceDay = planDayIndex(source);
+        if (sourceSchedule.workoutDays[sourceDay]) {
+            List<String> focus = new ArrayList<>(sourceSchedule.targets.get(sourceDay));
+            Calendar destinationWeek = planWeekStart(destination);
+            WeeklyScheduleStore.Schedule destinationSchedule = WeeklyScheduleStore.load(this, destinationWeek, defaultWeeklyDays(), defaultWeeklyTargets());
+            int destinationDay = planDayIndex(destination);
+            destinationSchedule.workoutDays[destinationDay] = true;
+            destinationSchedule.targets.get(destinationDay).clear();
+            destinationSchedule.targets.get(destinationDay).addAll(focus);
+            WeeklyScheduleStore.save(this, destinationWeek, destinationSchedule.workoutDays, destinationSchedule.targets);
+            sourceSchedule.workoutDays[sourceDay] = false;
+            sourceSchedule.targets.get(sourceDay).clear();
+            WeeklyScheduleStore.save(this, sourceWeek, sourceSchedule.workoutDays, sourceSchedule.targets);
+        }
+        SchedulerStore.moveOnDate(this, source, destination);
     }
 
     private GradientDrawable homeScheduleDaySurface(int fill, boolean today) {
@@ -3665,6 +3851,12 @@ public final class MainActivity extends FragmentActivity {
 
     /** The Home hero must be a view of the user's schedule, never a demo workout. */
     private HomeSession nextHomeSession() {
+        if (homePlanDate != null && isPastCalendarDate(homePlanDate)) homePlanDate = null;
+        if (homePlanDate != null && !sameCalendarDate(homePlanDate, Calendar.getInstance())) {
+            return new HomeSession("Create a Plan",
+                    new SimpleDateFormat("EEEE, MMM d", Locale.getDefault()).format(homePlanDate.getTime()) + "  •  Pick workout, endurance, or both",
+                    "+  Create a Plan", "create-plan");
+        }
         if (hasActiveGuidedWorkout()) {
             Coach.Exercise exercise = session.get(activeWorkoutExerciseIndex);
             String prefix = "Custom".equalsIgnoreCase(planMode) ? "Custom workout" : target + " workout";
@@ -3888,6 +4080,11 @@ public final class MainActivity extends FragmentActivity {
         if ("empty".equals(homeSession.state)) {
             planMode = "Custom";
             showCoachHeroWorkout();
+            return;
+        }
+        if ("create-plan".equals(homeSession.state)) {
+            schedulerSelectedDate = (Calendar) homePlanDate.clone();
+            showSchedulerAppointmentSheet(schedulerSelectedDate);
             return;
         }
         if ("endurance".equals(homeSession.state)) {
@@ -12374,7 +12571,7 @@ public final class MainActivity extends FragmentActivity {
 
         LinearLayout calendarCard = card();
         calendarCard.addView(heading("MONTH VIEW", 11, muted));
-        calendarCard.addView(text("Mint = work plan  •  Coral = endurance appointment  •  Slate = rest day", 12, muted));
+        calendarCard.addView(text("Mint = work plan  •  Coral = endurance  •  Red = incomplete  •  ☾ = rest", 12, muted));
         // Use weighted rows rather than fixed-width grid cells. The sidebar changes available
         // width on phones and tablets, so fixed 39dp cells could crop the last calendar days.
         LinearLayout grid = new LinearLayout(this);
@@ -12408,7 +12605,10 @@ public final class MainActivity extends FragmentActivity {
         gap(body, 12);
         addSchedulerDayAgenda(body, schedulerSelectedDate);
         gap(body, 10);
-        Button book = primary("Schedule a workout");
+        boolean editableDate = isCurrentOrFutureCalendarDate(schedulerSelectedDate);
+        Button book = primary(editableDate ? "Create a Plan" : "Past date");
+        book.setEnabled(editableDate);
+        book.setAlpha(editableDate ? 1f : .55f);
         book.setOnClickListener(view -> showSchedulerAppointmentSheet(schedulerSelectedDate));
         addButton(body, book);
     }
@@ -12445,22 +12645,25 @@ public final class MainActivity extends FragmentActivity {
         boolean planned = isMonthWorkoutDay(date);
         boolean selected = sameSchedulerDate(date, schedulerSelectedDate);
         boolean historical = isPastCalendarDate(date);
-        String state = !appointments.isEmpty() ? appointmentAbbreviation(appointments.get(0).mode) : planned ? schedulerStrengthSummary(date) : "Rest";
-        if (state.length() > 8) state = state.substring(0, 8);
-        int fill = !appointments.isEmpty() ? coral : planned ? mint : Color.rgb(232, 236, 244);
-        TextView cell = text(date.get(Calendar.DAY_OF_MONTH) + "\n" + state, 10, selected ? navy : (planned || !appointments.isEmpty() ? navy : muted));
+        boolean completed = completedStrengthWorkoutOn(date) != null || completedEnduranceOn(date) != null;
+        boolean incomplete = historical && !completed && (planned || !appointments.isEmpty());
+        String state = incomplete ? "INCOMPLETE" : !appointments.isEmpty() ? appointmentAbbreviation(appointments.get(0).mode) : planned ? schedulerStrengthSummary(date) : "☾";
+        if (state.length() > 10) state = state.substring(0, 10);
+        int fill = incomplete ? Color.rgb(255, 218, 215) : !appointments.isEmpty() ? coral : planned ? mint : Color.rgb(232, 236, 244);
+        TextView cell = text(date.get(Calendar.DAY_OF_MONTH) + "\n" + state, 10, selected ? navy : (planned || !appointments.isEmpty() || incomplete ? navy : muted));
         cell.setGravity(Gravity.CENTER);
         cell.setTypeface(Typeface.create("sans-serif", selected ? Typeface.BOLD : Typeface.NORMAL));
         cell.setBackground(surface(fill, 11, selected ? 3 : 0, selected ? coral : Color.TRANSPARENT));
         cell.setContentDescription(new SimpleDateFormat("EEEE, MMMM d", Locale.getDefault()).format(date.getTime()) + ", " + state);
         cell.setClickable(true);
-        cell.setAlpha(historical ? .52f : 1f);
+        cell.setAlpha(historical && !incomplete ? .52f : 1f);
         // Selecting a day must only update the agenda. The explicit CTA owns wizard entry,
         // so browsing a calendar cannot accidentally interrupt the user with a modal.
         cell.setOnClickListener(view -> {
             schedulerSelectedDate = (Calendar) date.clone();
             refreshCurrentPageKeepingScroll(this::showScheduler);
         });
+        attachFourSecondPlanMenu(cell, date, () -> refreshCurrentPageKeepingScroll(this::showScheduler));
         return cell;
     }
 
@@ -12553,9 +12756,19 @@ public final class MainActivity extends FragmentActivity {
     private void addSchedulerDayAgenda(LinearLayout body, Calendar date) {
         LinearLayout agenda = card();
         agenda.addView(heading(new SimpleDateFormat("EEEE, MMMM d", Locale.getDefault()).format(date.getTime()), 19, ink));
-        if (isMonthWorkoutDay(date)) agenda.addView(text("Work plan · " + schedulerStrengthSummary(date), 14, Color.rgb(46, 116, 103)));
-        else agenda.addView(text("Rest day in your current work plan", 13, muted));
         List<SchedulerStore.Appointment> appointments = SchedulerStore.onDate(this, date);
+        boolean completed = completedStrengthWorkoutOn(date) != null || completedEnduranceOn(date) != null;
+        boolean incomplete = isPastCalendarDate(date) && !completed && (isMonthWorkoutDay(date) || !appointments.isEmpty());
+        if (incomplete) {
+            TextView missed = heading("INCOMPLETE", 11, Color.WHITE);
+            missed.setGravity(Gravity.CENTER);
+            missed.setPadding(dp(8), dp(6), dp(8), dp(6));
+            missed.setBackground(surface(Color.rgb(191, 58, 58), 7, 0, Color.TRANSPARENT));
+            agenda.addView(missed, new LinearLayout.LayoutParams(-1, dp(30)));
+            agenda.addView(text("A planned session passed without a recorded completion.", 13, Color.rgb(163, 55, 48)));
+        }
+        if (isMonthWorkoutDay(date)) agenda.addView(text("Work plan · " + schedulerStrengthSummary(date), 14, Color.rgb(46, 116, 103)));
+        else agenda.addView(text("☾  Rest day in your current work plan", 13, muted));
         for (SchedulerStore.Appointment appointment : appointments) {
             gap(agenda, 8);
             LinearLayout row = new LinearLayout(this); row.setGravity(Gravity.CENTER_VERTICAL);

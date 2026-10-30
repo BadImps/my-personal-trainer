@@ -58,6 +58,34 @@ public final class SchedulerStore {
         write(context, values);
     }
 
+    /** Removes every endurance appointment on one day. Used when a member cancels that day's plan. */
+    public static void removeOnDate(Context context, Calendar date) {
+        String day = dateKey(date);
+        List<Appointment> values = all(context);
+        values.removeIf(value -> day.equals(dateKey(value.when)));
+        write(context, values);
+    }
+
+    /** Moves every endurance appointment on a day while preserving its time, type, and duration. */
+    public static void moveOnDate(Context context, Calendar from, Calendar to) {
+        String sourceDay = dateKey(from);
+        List<Appointment> moved = new ArrayList<>();
+        for (Appointment value : all(context)) {
+            if (!sourceDay.equals(dateKey(value.when))) {
+                moved.add(value);
+                continue;
+            }
+            Calendar time = Calendar.getInstance();
+            time.setTimeInMillis(value.when);
+            time.set(Calendar.YEAR, to.get(Calendar.YEAR));
+            time.set(Calendar.MONTH, to.get(Calendar.MONTH));
+            time.set(Calendar.DAY_OF_MONTH, to.get(Calendar.DAY_OF_MONTH));
+            moved.add(new Appointment(value.id, value.mode, time.getTimeInMillis(), value.durationMinutes));
+        }
+        Collections.sort(moved, Comparator.comparingLong(value -> value.when));
+        write(context, moved);
+    }
+
     public static void clear(Context context) { preferences(context).edit().clear().apply(); }
 
     private static List<Appointment> all(Context context) {
