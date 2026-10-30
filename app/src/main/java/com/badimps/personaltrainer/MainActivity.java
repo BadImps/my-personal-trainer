@@ -298,9 +298,8 @@ public final class MainActivity extends FragmentActivity {
         // before content is created.
         setTheme(R.style.AppTheme);
         super.onCreate(state);
-        // Production builds contain private health and route information. Debug remains
-        // capturable so approved AVD visual QA can continue without weakening release privacy.
-        if (!BuildConfig.DEBUG) getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);
+        // Members may take screenshots to keep or share their own training progress.
+        // Never set FLAG_SECURE here: it blocks Android screenshots and screen capture.
         coachAudio = new CoachAudioClips(this);
         // Keep editable content inside the resized visible area when the IME is open.
         // The focused-field helper below also asks nested scroll containers to reveal it.
@@ -3411,11 +3410,10 @@ public final class MainActivity extends FragmentActivity {
         number.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
         cell.addView(number, new LinearLayout.LayoutParams(-1, dp(22)));
         if (incomplete) {
-            TextView ribbon = heading("INCOMPLETE", 6, Color.WHITE);
-            ribbon.setGravity(Gravity.CENTER);
-            ribbon.setLetterSpacing(.04f);
-            ribbon.setBackground(surface(Color.rgb(191, 58, 58), 4, 0, Color.TRANSPARENT));
-            cell.addView(ribbon, new LinearLayout.LayoutParams(-1, dp(12)));
+            TextView missed = heading("✕", 16, Color.rgb(191, 58, 58));
+            missed.setGravity(Gravity.CENTER);
+            missed.setContentDescription("Incomplete plan");
+            cell.addView(missed, new LinearLayout.LayoutParams(-1, dp(20)));
         } else if (planned || completedStrength) {
             TextView plan = text(completedStrength ? completedWorkout.target.toUpperCase(Locale.ROOT) : "PLAN", 8, navy);
             plan.setGravity(Gravity.CENTER);
@@ -3508,6 +3506,7 @@ public final class MainActivity extends FragmentActivity {
         // was originally a rest day or its old scheduled focus has since changed.
         boolean showStrength = workoutDay || completedStrength;
         boolean endurance = !appointments.isEmpty() || completedEndurance != null;
+        boolean restDay = confirmed && !showStrength && !endurance;
         boolean missedPlan = historical && !completed && (workoutDay || !appointments.isEmpty());
         int base = missedPlan ? Color.rgb(255, 235, 232)
                 : showStrength || endurance ? Color.rgb(224, 249, 242) : Color.rgb(232, 236, 244);
@@ -3515,10 +3514,12 @@ public final class MainActivity extends FragmentActivity {
         tile.setOrientation(LinearLayout.VERTICAL);
         tile.setGravity(Gravity.CENTER_HORIZONTAL);
         tile.setPadding(dp(2), dp(5), dp(2), dp(3));
-        // The coral selection frame belongs to the full day tile, not the small activity icon.
-        // Only today carries the active-day frame. Future plans remain legible without
-        // looking selected; past days are deliberately watermark-like historical records.
-        tile.setBackground(homeScheduleDaySurface(base, today || sameCalendarDate(date, homePlanDate)));
+        boolean futureSelected = sameCalendarDate(date, homePlanDate) && !today;
+        // Today keeps its coral frame. A selected future day is raised with a quiet shadow,
+        // so it reads as the active planning target without looking like an alert state.
+        tile.setBackground(homeScheduleDaySurface(base, today));
+        tile.setElevation(futureSelected ? dp(6) : 0f);
+        tile.setTranslationZ(futureSelected ? dp(2) : 0f);
         // A missed plan is deliberately bright: it is an actionable historical outcome, not
         // background decoration like an unscheduled past rest day.
         tile.setAlpha(historical && !completed && !missedPlan ? .64f : 1f);
@@ -3533,12 +3534,7 @@ public final class MainActivity extends FragmentActivity {
             plan.setMaxLines(2);
             tile.addView(plan, new LinearLayout.LayoutParams(-1, endurance ? dp(14) : dp(24)));
         } else if (!endurance) {
-            if (confirmed) {
-                FrameLayout rest = homeCalendarMarker(R.drawable.ic_home_rest, "Rest day");
-                LinearLayout.LayoutParams restParams = new LinearLayout.LayoutParams(dp(25), dp(20));
-                restParams.gravity = Gravity.CENTER_HORIZONTAL;
-                tile.addView(rest, restParams);
-            } else {
+            if (!confirmed) {
                 TextView open = text("OPEN", 8, muted);
                 open.setGravity(Gravity.CENTER);
                 tile.addView(open, new LinearLayout.LayoutParams(-1, dp(24)));
@@ -3553,7 +3549,7 @@ public final class MainActivity extends FragmentActivity {
             LinearLayout.LayoutParams activityParams = new LinearLayout.LayoutParams(-1, showStrength ? dp(12) : dp(24));
             tile.addView(activity, activityParams);
         }
-        if (showStrength || endurance) {
+        if (showStrength || endurance || restDay) {
             LinearLayout icons = new LinearLayout(this);
             icons.setOrientation(LinearLayout.VERTICAL);
             icons.setGravity(Gravity.CENTER);
@@ -3565,6 +3561,8 @@ public final class MainActivity extends FragmentActivity {
                 markerParams.topMargin = endurance ? dp(1) : 0;
                 icons.addView(homeCalendarMarker(R.drawable.ic_nav_workouts, "Scheduled workout"), markerParams);
             }
+            if (restDay) icons.addView(homeCalendarMarker(R.drawable.ic_home_rest, "Rest day", Color.rgb(111, 122, 138), Color.WHITE),
+                    new LinearLayout.LayoutParams(dp(25), dp(15)));
             tile.addView(icons, new LinearLayout.LayoutParams(-1, 0, 1));
         }
         String state = completedStrength ? "completed " + completedRecord.target + " workout"
@@ -3788,15 +3786,23 @@ public final class MainActivity extends FragmentActivity {
         if (sourceSchedule.workoutDays[sourceDay]) {
             List<String> focus = new ArrayList<>(sourceSchedule.targets.get(sourceDay));
             Calendar destinationWeek = planWeekStart(destination);
-            WeeklyScheduleStore.Schedule destinationSchedule = WeeklyScheduleStore.load(this, destinationWeek, defaultWeeklyDays(), defaultWeeklyTargets());
+            // A same-week move must use one shared schedule instance. Saving a separately
+            // loaded source copy after the destination copy was the cause of moved plans vanishing.
+            boolean sameWeek = SchedulerStore.dateKey(sourceWeek).equals(SchedulerStore.dateKey(destinationWeek));
+            WeeklyScheduleStore.Schedule destinationSchedule = sameWeek ? sourceSchedule
+                    : WeeklyScheduleStore.load(this, destinationWeek, defaultWeeklyDays(), defaultWeeklyTargets());
             int destinationDay = planDayIndex(destination);
             destinationSchedule.workoutDays[destinationDay] = true;
             destinationSchedule.targets.get(destinationDay).clear();
             destinationSchedule.targets.get(destinationDay).addAll(focus);
-            WeeklyScheduleStore.save(this, destinationWeek, destinationSchedule.workoutDays, destinationSchedule.targets);
             sourceSchedule.workoutDays[sourceDay] = false;
             sourceSchedule.targets.get(sourceDay).clear();
-            WeeklyScheduleStore.save(this, sourceWeek, sourceSchedule.workoutDays, sourceSchedule.targets);
+            if (sameWeek) {
+                WeeklyScheduleStore.save(this, sourceWeek, sourceSchedule.workoutDays, sourceSchedule.targets);
+            } else {
+                WeeklyScheduleStore.save(this, destinationWeek, destinationSchedule.workoutDays, destinationSchedule.targets);
+                WeeklyScheduleStore.save(this, sourceWeek, sourceSchedule.workoutDays, sourceSchedule.targets);
+            }
         }
         SchedulerStore.moveOnDate(this, source, destination);
     }
@@ -3811,15 +3817,20 @@ public final class MainActivity extends FragmentActivity {
 
     /** Compact icons label a scheduled activity; the day tile itself carries the coral frame. */
     private FrameLayout homeCalendarMarker(int drawable, String description) {
+        return homeCalendarMarker(drawable, description, Color.rgb(16, 35, 57), mint);
+    }
+
+    /** Rest uses the exact activity-marker lane with a neutral grey base, never a stray text row. */
+    private FrameLayout homeCalendarMarker(int drawable, String description, int backgroundColor, int iconColor) {
         FrameLayout marker = new FrameLayout(this);
         GradientDrawable shape = new GradientDrawable();
-        shape.setColor(Color.rgb(16, 35, 57));
+        shape.setColor(backgroundColor);
         shape.setCornerRadius(dp(8));
         marker.setBackground(shape);
         marker.setContentDescription(description);
         ImageView icon = new ImageView(this);
         icon.setImageResource(drawable);
-        icon.setImageTintList(ColorStateList.valueOf(mint));
+        icon.setImageTintList(ColorStateList.valueOf(iconColor));
         icon.setPadding(dp(4), dp(2), dp(4), dp(2));
         marker.addView(icon, new FrameLayout.LayoutParams(-1, -1));
         return marker;
@@ -12647,14 +12658,18 @@ public final class MainActivity extends FragmentActivity {
         boolean historical = isPastCalendarDate(date);
         boolean completed = completedStrengthWorkoutOn(date) != null || completedEnduranceOn(date) != null;
         boolean incomplete = historical && !completed && (planned || !appointments.isEmpty());
-        String state = incomplete ? "INCOMPLETE" : !appointments.isEmpty() ? appointmentAbbreviation(appointments.get(0).mode) : planned ? schedulerStrengthSummary(date) : "☾";
+        String state = incomplete ? "✕" : !appointments.isEmpty() ? appointmentAbbreviation(appointments.get(0).mode) : planned ? schedulerStrengthSummary(date) : "☾";
         if (state.length() > 10) state = state.substring(0, 10);
         int fill = incomplete ? Color.rgb(255, 218, 215) : !appointments.isEmpty() ? coral : planned ? mint : Color.rgb(232, 236, 244);
         TextView cell = text(date.get(Calendar.DAY_OF_MONTH) + "\n" + state, 10, selected ? navy : (planned || !appointments.isEmpty() || incomplete ? navy : muted));
         cell.setGravity(Gravity.CENTER);
         cell.setTypeface(Typeface.create("sans-serif", selected ? Typeface.BOLD : Typeface.NORMAL));
-        cell.setBackground(surface(fill, 11, selected ? 3 : 0, selected ? coral : Color.TRANSPARENT));
-        cell.setContentDescription(new SimpleDateFormat("EEEE, MMMM d", Locale.getDefault()).format(date.getTime()) + ", " + state);
+        boolean futureSelected = selected && !sameCalendarDate(date, Calendar.getInstance());
+        cell.setBackground(surface(fill, 11, selected && !futureSelected ? 3 : 0, selected && !futureSelected ? coral : Color.TRANSPARENT));
+        cell.setElevation(futureSelected ? dp(5) : 0f);
+        cell.setTranslationZ(futureSelected ? dp(2) : 0f);
+        String stateDescription = incomplete ? "incomplete plan" : state;
+        cell.setContentDescription(new SimpleDateFormat("EEEE, MMMM d", Locale.getDefault()).format(date.getTime()) + ", " + stateDescription);
         cell.setClickable(true);
         cell.setAlpha(historical && !incomplete ? .52f : 1f);
         // Selecting a day must only update the agenda. The explicit CTA owns wizard entry,
@@ -12760,10 +12775,11 @@ public final class MainActivity extends FragmentActivity {
         boolean completed = completedStrengthWorkoutOn(date) != null || completedEnduranceOn(date) != null;
         boolean incomplete = isPastCalendarDate(date) && !completed && (isMonthWorkoutDay(date) || !appointments.isEmpty());
         if (incomplete) {
-            TextView missed = heading("INCOMPLETE", 11, Color.WHITE);
+            TextView missed = heading("✕", 17, Color.WHITE);
             missed.setGravity(Gravity.CENTER);
             missed.setPadding(dp(8), dp(6), dp(8), dp(6));
             missed.setBackground(surface(Color.rgb(191, 58, 58), 7, 0, Color.TRANSPARENT));
+            missed.setContentDescription("Incomplete plan");
             agenda.addView(missed, new LinearLayout.LayoutParams(-1, dp(30)));
             agenda.addView(text("A planned session passed without a recorded completion.", 13, Color.rgb(163, 55, 48)));
         }
