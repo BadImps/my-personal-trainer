@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 136,
-  "versionName": "5.94",
-  "publishedAt": "2026-10-30T02:42:35Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.94/app-production-release.apk",
-  "sha256": "6be4791b26d9ab943115f41bde113edf07470b5b098403a56608c9f12d5b2cdd",
+  "versionCode": 137,
+  "versionName": "5.95",
+  "publishedAt": "2026-10-30T03:31:25Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.95/app-production-release.apk",
+  "sha256": "fb348c7180fe83e3e51cb493c1a8972b879e9073cf4cc85a01ba77ac38572e20",
   "sizeBytes": 265158908,
-  "notes": "Allows screenshots, preserves moved plans, uses compact missed-plan X markers, aligns moon rest markers, and softens future-date selection."
+  "notes": "Completes calendar alignment and stability: clear Rest Day and completed-workout states, contained future-date selection shadows, and verified planning controls."
 }
