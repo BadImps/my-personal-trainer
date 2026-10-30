@@ -27,7 +27,9 @@ android {
         applicationId 'com.badimps.personaltrainer'
         minSdk 30
         targetSdk 36
-        versionCode 139
+        // Wear OS already has a historical production build using 36,057,401. Keep the
+        // public version aligned with the phone while advancing the Wear-only install code.
+        versionCode 36059701
         versionName '5.97'
     }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
