@@ -120,6 +120,9 @@ public final class MainActivity extends FragmentActivity {
     private String environment = Coach.ENVIRONMENTS[0];
     private String selectedTrainer = "Female";
     private String planMode = Coach.PLAN_MODES[0];
+    /** A combined plan keeps the proven Workout and Endurance wizards intact, in sequence. */
+    private boolean combinedPlanFlow;
+    private boolean combinedPlanWorkoutSaved;
     private String equipmentType = Coach.EQUIPMENT_TYPES[0];
     private final List<String> selectedEquipmentTypes = new ArrayList<>();
     private int sessionMinutes = 45;
@@ -907,7 +910,7 @@ public final class MainActivity extends FragmentActivity {
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(navy);
         scroll.addView(root, new ScrollView.LayoutParams(-1, -2));
-        setCoachHeroWizardShell(scroll, "Workouts");
+        setCoachHeroWizardShell(scroll, "Plan");
 
         FrameLayout hero = coachHeroBackdrop(backdropKey);
         root.addView(hero, new LinearLayout.LayoutParams(-1, dp(260)));
@@ -1234,11 +1237,10 @@ public final class MainActivity extends FragmentActivity {
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setPadding(dp(8), dp(7), dp(8), dp(8));
         addCoachHeroNavItem(row, "Home", R.drawable.ic_nav_home, activeScreen, view -> navigateDashboard("Home", this::showHome));
-        addCoachHeroNavItem(row, "Workouts", R.drawable.ic_nav_workouts, activeScreen, view -> navigateDashboard("Workouts", this::showPlans));
+        addCoachHeroNavItem(row, "Plan", R.drawable.ic_nav_plan, activeScreen, view -> navigateDashboard("Plan", this::showPlans));
         addCoachHeroNavItem(row, "Workout Library", R.drawable.ic_nav_library_premium, activeScreen, view -> navigateDashboard("Workout Library", this::showWorkoutLibrary));
         addCoachHeroNavItem(row, "Progress", R.drawable.ic_nav_progress, activeScreen, view -> navigateDashboard("Progress", this::showProgress));
         addCoachHeroNavItem(row, "Nutrition", R.drawable.ic_nav_nutrition, activeScreen, view -> navigateDashboard("Nutrition", this::showMeals));
-        addCoachHeroNavItem(row, "Endurance", R.drawable.ic_nav_endurance, activeScreen, view -> navigateDashboard("Endurance", this::showEndurance));
         addCoachHeroNavItem(row, "Scheduler", R.drawable.ic_nav_plan, activeScreen, view -> navigateDashboard("Scheduler", this::showScheduler));
         addCoachHeroNavItem(row, "Body", R.drawable.ic_nav_body, activeScreen, view -> navigateDashboard("Body", this::showBodyContext));
         addCoachHeroNavItem(row, "Gym Lobby", R.drawable.ic_nav_gym_lobby, activeScreen, view -> navigateDashboard("Gym Lobby", this::showGymLobby));
@@ -1261,7 +1263,7 @@ public final class MainActivity extends FragmentActivity {
     }
 
     private int coachHeroNavigationIndex(String screen) {
-        String[] screens = {"Home", "Workouts", "Workout Library", "Progress", "Nutrition", "Endurance", "Scheduler", "Body", "Gym Lobby", "Apex", "Settings"};
+        String[] screens = {"Home", "Plan", "Workout Library", "Progress", "Nutrition", "Scheduler", "Body", "Gym Lobby", "Apex", "Settings"};
         for (int index = 0; index < screens.length; index++) {
             if (screens[index].equals(screen)) return index;
         }
@@ -1382,9 +1384,9 @@ public final class MainActivity extends FragmentActivity {
                 });
             }
             shell.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
-            shell.addView(coachHeroBottomNavigation("Workouts"), new LinearLayout.LayoutParams(-1, dp(76)));
+            shell.addView(coachHeroBottomNavigation("Plan"), new LinearLayout.LayoutParams(-1, dp(76)));
             mountScreen(shell);
-            activeDashboardScrollKey = "Workouts";
+            activeDashboardScrollKey = "Plan";
             activateScroll(scroll);
             return body;
         } finally {
@@ -1477,7 +1479,6 @@ public final class MainActivity extends FragmentActivity {
         else if ("Workout Library".equals(activeDashboardScrollKey)) showWorkoutLibrary();
         else if ("Progress".equals(activeDashboardScrollKey)) showProgress();
         else if ("Nutrition".equals(activeDashboardScrollKey)) showMeals();
-        else if ("Endurance".equals(activeDashboardScrollKey)) showEndurance();
         else if ("Scheduler".equals(activeDashboardScrollKey)) showScheduler();
         else if ("Body".equals(activeDashboardScrollKey)) showBodyContext();
         else if ("Gym Lobby".equals(activeDashboardScrollKey)) showGymLobby();
@@ -1511,7 +1512,7 @@ public final class MainActivity extends FragmentActivity {
      * screens or introducing a second navigation style.
      */
     private LinearLayout planPage() {
-        return planPage("Workouts");
+        return planPage("Plan");
     }
 
     /** Legacy wizard content can opt into the correct Coach Hero section. */
@@ -1529,7 +1530,7 @@ public final class MainActivity extends FragmentActivity {
         body.setClipChildren(false);
         FrameLayout wizardHero = coachHeroHeader(activeScreen);
         body.addView(wizardHero, new LinearLayout.LayoutParams(-1, dp(250)));
-        legacyWorkoutWizardHero = "Workouts".equals(activeScreen) ? wizardHero : null;
+        legacyWorkoutWizardHero = "Plan".equals(activeScreen) ? wizardHero : null;
         gap(body, 16);
         scroll.addView(body, new ScrollView.LayoutParams(-1, -2));
 
@@ -1802,10 +1803,9 @@ public final class MainActivity extends FragmentActivity {
         rail.addView(divider, dividerParams);
 
         addPlanRailItem(rail, "Home", R.drawable.ic_nav_home, false, view -> navigateDashboard("Home", this::showHome));
-        addPlanRailItem(rail, "Workouts", R.drawable.ic_nav_workouts, true, view -> navigateDashboard("Workouts", this::showPlans));
+        addPlanRailItem(rail, "Plan", R.drawable.ic_nav_plan, true, view -> navigateDashboard("Plan", this::showPlans));
         addPlanRailItem(rail, "Progress", R.drawable.ic_nav_progress, false, view -> navigateDashboard("Progress", this::showProgress));
         addPlanRailItem(rail, "Nutrition", R.drawable.ic_nav_nutrition, false, view -> navigateDashboard("Nutrition", this::showMeals));
-        addPlanRailItem(rail, "Endurance", R.drawable.ic_nav_endurance, false, view -> navigateDashboard("Endurance", this::showEndurance));
         addPlanRailItem(rail, "Scheduler", R.drawable.ic_nav_plan, false, view -> navigateDashboard("Scheduler", this::showScheduler));
         addPlanRailItem(rail, "Body", R.drawable.ic_nav_body, false, view -> navigateDashboard("Body", this::showBodyContext));
         addPlanRailItem(rail, "Apex", R.drawable.ic_nav_apex, false, view -> navigateDashboard("Apex", this::showApex));
@@ -1871,10 +1871,9 @@ public final class MainActivity extends FragmentActivity {
         rail.addView(divider, dividerParams);
 
         addRailItem(rail, "Home", R.drawable.ic_nav_home, activeScreen, view -> navigateDashboard("Home", this::showHome));
-        addRailItem(rail, "Workouts", R.drawable.ic_nav_workouts, activeScreen, view -> navigateDashboard("Workouts", this::showPlans));
+        addRailItem(rail, "Plan", R.drawable.ic_nav_plan, activeScreen, view -> navigateDashboard("Plan", this::showPlans));
         addRailItem(rail, "Progress", R.drawable.ic_nav_progress, activeScreen, view -> navigateDashboard("Progress", this::showProgress));
         addRailItem(rail, "Nutrition", R.drawable.ic_nav_nutrition, activeScreen, view -> navigateDashboard("Nutrition", this::showMeals));
-        addRailItem(rail, "Endurance", R.drawable.ic_nav_endurance, activeScreen, view -> navigateDashboard("Endurance", this::showEndurance));
         addRailItem(rail, "Scheduler", R.drawable.ic_nav_plan, activeScreen, view -> navigateDashboard("Scheduler", this::showScheduler));
         addRailItem(rail, "Body", R.drawable.ic_nav_body, activeScreen, view -> navigateDashboard("Body", this::showBodyContext));
         addRailItem(rail, "Apex", R.drawable.ic_nav_apex, activeScreen, view -> navigateDashboard("Apex", this::showApex));
@@ -4079,7 +4078,58 @@ public final class MainActivity extends FragmentActivity {
 
     private void showPlans() {
         homeShortcutPlanReady = false;
-        showCoachHeroWorkout();
+        // Plan is the single navigation category.  It deliberately keeps the mature
+        // Workout and Endurance wizards intact instead of replacing either surface.
+        combinedPlanFlow = false;
+        combinedPlanWorkoutSaved = false;
+        showPlanCategory();
+    }
+
+    /** First and only decision at the Plan navigation entry point. */
+    private void showPlanCategory() {
+        LinearLayout body = appPage("Plan");
+        title(body, "CREATE A PLAN", "What are you planning?",
+                "Choose Workout, Endurance, or Both. Your choice opens the existing planner you already know.");
+
+        LinearLayout workout = card();
+        workout.addView(heading("Workout plan", 20, ink));
+        workout.addView(text("Build strength sessions with the current workout wizard.", 14, muted));
+        Button workoutOpen = primary("Create workout plan");
+        workoutOpen.setOnClickListener(view -> {
+            combinedPlanFlow = false;
+            beginWorkoutPlanDraft("Weekly");
+            showCoachHeroWorkout();
+        });
+        LinearLayout.LayoutParams workoutButton = new LinearLayout.LayoutParams(-1, dp(50)); workoutButton.topMargin = dp(12);
+        workout.addView(workoutOpen, workoutButton);
+        body.addView(workout); gap(body, 10);
+
+        LinearLayout endurance = card();
+        endurance.addView(heading("Endurance plan", 20, ink));
+        endurance.addView(text("Plan a run, walk, or cycle with the current endurance wizard.", 14, muted));
+        Button enduranceOpen = primary("Create endurance plan");
+        enduranceOpen.setOnClickListener(view -> {
+            combinedPlanFlow = false;
+            startEnduranceWizard(EndurancePlanStore.WALKING);
+        });
+        LinearLayout.LayoutParams enduranceButton = new LinearLayout.LayoutParams(-1, dp(50)); enduranceButton.topMargin = dp(12);
+        endurance.addView(enduranceOpen, enduranceButton);
+        body.addView(endurance); gap(body, 10);
+
+        LinearLayout both = card();
+        both.addView(heading("Combined plan", 20, ink));
+        both.addView(text("First build the workout. Then build the endurance session. The app saves both as one organised plan.", 14, muted));
+        Button bothOpen = primary("Create workout + endurance plan");
+        bothOpen.setOnClickListener(view -> {
+            combinedPlanFlow = true;
+            combinedPlanWorkoutSaved = false;
+            beginWorkoutPlanDraft("Weekly");
+            toast("Step 1 of 2: build your workout plan.");
+            showCoachHeroWorkout();
+        });
+        LinearLayout.LayoutParams bothButton = new LinearLayout.LayoutParams(-1, dp(50)); bothButton.topMargin = dp(12);
+        both.addView(bothOpen, bothButton);
+        body.addView(both);
     }
 
     /** Home is a shortcut to the already-built plan, not a restart of the planning wizard. */
@@ -4143,7 +4193,7 @@ public final class MainActivity extends FragmentActivity {
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(navy);
         scroll.addView(root, new ScrollView.LayoutParams(-1, -2));
-        setCoachHeroWizardShell(scroll, "Workouts");
+        setCoachHeroWizardShell(scroll, "Plan");
 
         FrameLayout hero = coachHeroBackdrop("Workouts");
         root.addView(hero, new LinearLayout.LayoutParams(-1, dp(388)));
@@ -4381,7 +4431,7 @@ public final class MainActivity extends FragmentActivity {
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(navy);
         scroll.addView(root, new ScrollView.LayoutParams(-1, -2));
-        setCoachHeroWizardShell(scroll, "Workouts");
+        setCoachHeroWizardShell(scroll, "Plan");
 
         FrameLayout hero = coachHeroBackdrop("Workouts schedule");
         root.addView(hero, new LinearLayout.LayoutParams(-1, dp(265)));
@@ -4730,7 +4780,7 @@ public final class MainActivity extends FragmentActivity {
         scroll.setFillViewport(true); scroll.setClipToPadding(false); scroll.setBackgroundColor(navy);
         LinearLayout root = new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL); root.setBackgroundColor(navy);
         scroll.addView(root, new ScrollView.LayoutParams(-1, -2));
-        setCoachHeroWizardShell(scroll, "Workouts");
+        setCoachHeroWizardShell(scroll, "Plan");
 
         FrameLayout hero = coachHeroBackdrop("Workouts training areas");
         root.addView(hero, new LinearLayout.LayoutParams(-1, dp(250)));
@@ -5069,7 +5119,7 @@ public final class MainActivity extends FragmentActivity {
         beginNewPage(); setSystemBars();
         ScrollView scroll = new ScrollView(this); scroll.setFillViewport(true); scroll.setClipToPadding(false); scroll.setBackgroundColor(navy);
         LinearLayout root = new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL); root.setBackgroundColor(navy);
-        scroll.addView(root, new ScrollView.LayoutParams(-1, -2)); setCoachHeroWizardShell(scroll, "Workouts");
+        scroll.addView(root, new ScrollView.LayoutParams(-1, -2)); setCoachHeroWizardShell(scroll, "Plan");
 
         FrameLayout hero = coachHeroBackdrop("Workouts equipment"); root.addView(hero, new LinearLayout.LayoutParams(-1, dp(260)));
         LinearLayout copy = new LinearLayout(this); copy.setOrientation(LinearLayout.VERTICAL);
@@ -5581,7 +5631,7 @@ public final class MainActivity extends FragmentActivity {
         beginNewPage(); setSystemBars();
         ScrollView scroll = new ScrollView(this); scroll.setFillViewport(true); scroll.setClipToPadding(false); scroll.setBackgroundColor(navy);
         LinearLayout root = new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL); root.setBackgroundColor(navy);
-        scroll.addView(root, new ScrollView.LayoutParams(-1, -2)); setCoachHeroWizardShell(scroll, "Workouts");
+        scroll.addView(root, new ScrollView.LayoutParams(-1, -2)); setCoachHeroWizardShell(scroll, "Plan");
 
         FrameLayout hero = coachHeroBackdrop("Workouts exercises"); root.addView(hero, new LinearLayout.LayoutParams(-1, dp(266)));
         LinearLayout copy = new LinearLayout(this); copy.setOrientation(LinearLayout.VERTICAL);
@@ -6033,7 +6083,7 @@ public final class MainActivity extends FragmentActivity {
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(navy);
         scroll.addView(root, new ScrollView.LayoutParams(-1, -2));
-        setCoachHeroWizardShell(scroll, "Workouts");
+        setCoachHeroWizardShell(scroll, "Plan");
 
         FrameLayout hero = coachHeroBackdrop("Custom exercise library");
         root.addView(hero, new LinearLayout.LayoutParams(-1, dp(250)));
@@ -6336,7 +6386,7 @@ public final class MainActivity extends FragmentActivity {
         beginNewPage(); setSystemBars();
         ScrollView scroll = new ScrollView(this); scroll.setFillViewport(true); scroll.setClipToPadding(false); scroll.setBackgroundColor(navy);
         LinearLayout root = new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL); root.setBackgroundColor(navy);
-        scroll.addView(root, new ScrollView.LayoutParams(-1, -2)); setCoachHeroWizardShell(scroll, "Workouts");
+        scroll.addView(root, new ScrollView.LayoutParams(-1, -2)); setCoachHeroWizardShell(scroll, "Plan");
 
         FrameLayout hero = coachHeroBackdrop("Workouts setup"); root.addView(hero, new LinearLayout.LayoutParams(-1, dp(260)));
         LinearLayout copy = new LinearLayout(this); copy.setOrientation(LinearLayout.VERTICAL);
@@ -6582,6 +6632,12 @@ public final class MainActivity extends FragmentActivity {
         }
         persistCurrentWeekSchedule();
         savePlanWithReminder();
+        if (combinedPlanFlow) {
+            combinedPlanWorkoutSaved = true;
+            toast("Workout saved. Step 2 of 2: add your endurance plan.");
+            startEnduranceWizard(EndurancePlanStore.WALKING);
+            return;
+        }
         if (schedulerWorkoutDateLocked) {
             boolean continueToEndurance = schedulerContinueToEndurance;
             schedulerWorkoutDateLocked = false;
@@ -9979,7 +10035,7 @@ public final class MainActivity extends FragmentActivity {
     }
 
     private void showPlanGoal() {
-        LinearLayout body = appPage("Workouts");
+        LinearLayout body = appPage("Plan");
         wizardTitle(body, 1, "Choose your goal", "Your goal adjusts rep targets, rest, and coaching emphasis.");
         RadioGroup options = new RadioGroup(this);
         options.setOrientation(RadioGroup.VERTICAL);
@@ -10010,7 +10066,7 @@ public final class MainActivity extends FragmentActivity {
     }
 
     private void showPlanFocus() {
-        LinearLayout body = appPage("Workouts");
+        LinearLayout body = appPage("Plan");
         wizardTitle(body, 2, "Choose a workout focus", "Pick what you want to train. Your selected coach will demonstrate compatible movements.");
         List<Coach.Exercise> choices = Coach.library().get(target);
         if (choices != null && !choices.isEmpty()) {
@@ -10043,7 +10099,7 @@ public final class MainActivity extends FragmentActivity {
     }
 
     private void showPlanContext() {
-        LinearLayout body = appPage("Workouts");
+        LinearLayout body = appPage("Plan");
         wizardTitle(body, 3, "Set your training context", "Only compatible movements are recommended for the place where you plan to train.");
         body.addView(heading("Where will you train?", 18, Color.WHITE));
         gap(body, 7);
@@ -10087,7 +10143,7 @@ public final class MainActivity extends FragmentActivity {
         beginNewPage(); setSystemBars();
         ScrollView scroll = new ScrollView(this); scroll.setFillViewport(true); scroll.setClipToPadding(false); scroll.setBackgroundColor(navy);
         LinearLayout root = new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL); root.setBackgroundColor(navy);
-        scroll.addView(root, new ScrollView.LayoutParams(-1, -2)); setCoachHeroWizardShell(scroll, "Workouts");
+        scroll.addView(root, new ScrollView.LayoutParams(-1, -2)); setCoachHeroWizardShell(scroll, "Plan");
 
         FrameLayout hero = coachHeroBackdrop("Workouts review"); root.addView(hero, new LinearLayout.LayoutParams(-1, dp(260)));
         LinearLayout copy = new LinearLayout(this); copy.setOrientation(LinearLayout.VERTICAL);
@@ -11719,7 +11775,7 @@ public final class MainActivity extends FragmentActivity {
     private void showLibrary() {
         String trainer = AccountStore.get(this).trainer;
         String trainerName = coachName();
-        LinearLayout body = appPage("Workouts");
+        LinearLayout body = appPage("Plan");
         title(body, "EXERCISE LIBRARY", "Every move, demonstrated", "Open a movement for its neutral Strength Level demonstration and a concise form cue.");
         for (String group : Coach.TARGETS) {
             body.addView(heading(group, 22, Color.WHITE));
@@ -11754,7 +11810,7 @@ public final class MainActivity extends FragmentActivity {
 
     private void showExerciseDetail(Coach.Exercise exercise) {
         String trainer = AccountStore.get(this).trainer;
-        LinearLayout body = appPage("Workouts");
+        LinearLayout body = appPage("Plan");
         title(body, "EXERCISE DEMO", exercise.name, "Smooth local loop • " + exercise.target + " • Offline-ready");
         LinearLayout demoCard = card();
         demoCard.setPadding(0, 0, 0, 0);
@@ -12148,7 +12204,7 @@ public final class MainActivity extends FragmentActivity {
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(navy);
         scroll.addView(root, new ScrollView.LayoutParams(-1, -2));
-        setCoachHeroWizardShell(scroll, "Endurance");
+        setCoachHeroWizardShell(scroll, "Plan");
 
         // This is intentionally the same Coach Hero composition as Workouts.
         FrameLayout hero = coachHeroBackdrop("Endurance");
@@ -12284,7 +12340,7 @@ public final class MainActivity extends FragmentActivity {
         beginNewPage(); setSystemBars();
         ScrollView scroll = new ScrollView(this); scroll.setFillViewport(true); scroll.setClipToPadding(false); scroll.setBackgroundColor(navy);
         LinearLayout root = new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL); root.setBackgroundColor(navy);
-        scroll.addView(root, new ScrollView.LayoutParams(-1, -2)); setCoachHeroWizardShell(scroll, "Endurance");
+        scroll.addView(root, new ScrollView.LayoutParams(-1, -2)); setCoachHeroWizardShell(scroll, "Plan");
 
         FrameLayout hero = coachHeroBackdrop("Endurance step " + step); root.addView(hero, new LinearLayout.LayoutParams(-1, dp(260)));
         String[] labels = {"PLAN", "ACTIVITY", "SCHEDULE", "ROUTE", "REVIEW"};
@@ -12452,10 +12508,55 @@ public final class MainActivity extends FragmentActivity {
         }); body.addView(live, new LinearLayout.LayoutParams(-1, dp(54))); gap(body, 8);
         Button save = action("Save endurance plan", navyPanel, mint);
         save.setOnClickListener(view -> {
-            try { EndurancePlanStore.save(this, enduranceWizardMode, enduranceWizardName, enduranceWizardOrigin, enduranceWizardDestination, enduranceWizardDistanceKm, enduranceWizardMinutes, enduranceWizardEffort); publishEnduranceWizardSchedule(); toast("Endurance plan saved."); showEndurance(); }
+            try {
+                EndurancePlanStore.save(this, enduranceWizardMode, enduranceWizardName, enduranceWizardOrigin, enduranceWizardDestination, enduranceWizardDistanceKm, enduranceWizardMinutes, enduranceWizardEffort);
+                publishEnduranceWizardSchedule();
+                if (combinedPlanFlow && combinedPlanWorkoutSaved) {
+                    toast("Combined plan saved.");
+                    showCombinedPlanReady();
+                } else {
+                    toast("Endurance plan saved.");
+                    showEndurance();
+                }
+            }
             catch (IllegalArgumentException error) { toast(error.getMessage()); }
         }); body.addView(save, new LinearLayout.LayoutParams(-1, dp(52)));
         Button back = new Button(this); back.setText("Back"); back.setTextColor(mint); back.setTextSize(14); back.setAllCaps(false); back.setBackgroundColor(Color.TRANSPARENT); back.setOnClickListener(view -> showEnduranceWizardRoute()); body.addView(back, new LinearLayout.LayoutParams(-1, dp(46)));
+    }
+
+    /** The combined path only composes existing saved plans; it never substitutes a new wizard. */
+    private void showCombinedPlanReady() {
+        LinearLayout body = appPage("Plan");
+        title(body, "COMBINED PLAN READY", "Workout + endurance",
+                "Both parts are saved and appear in your existing workout, endurance, and calendar views.");
+        LinearLayout workout = card();
+        workout.addView(heading("1 · Workout", 19, ink));
+        workout.addView(text(planSchedule(), 14, muted));
+        Button openWorkout = secondary("Review workout plan");
+        openWorkout.setOnClickListener(view -> showPlanReady());
+        LinearLayout.LayoutParams workoutParams = new LinearLayout.LayoutParams(-1, dp(48)); workoutParams.topMargin = dp(10);
+        workout.addView(openWorkout, workoutParams);
+        body.addView(workout); gap(body, 10);
+
+        LinearLayout endurance = card();
+        endurance.addView(heading("2 · " + appointmentAbbreviation(enduranceWizardMode), 19, ink));
+        endurance.addView(text(enduranceWizardName + " · " + formatDistance(enduranceWizardDistanceKm) + " · " + enduranceWizardMinutes + " min", 14, muted));
+        Button openEndurance = secondary("Review endurance plan");
+        openEndurance.setOnClickListener(view -> {
+            combinedPlanFlow = false;
+            showEndurance();
+        });
+        LinearLayout.LayoutParams enduranceParams = new LinearLayout.LayoutParams(-1, dp(48)); enduranceParams.topMargin = dp(10);
+        endurance.addView(openEndurance, enduranceParams);
+        body.addView(endurance); gap(body, 14);
+
+        Button done = primary("Done");
+        done.setOnClickListener(view -> {
+            combinedPlanFlow = false;
+            combinedPlanWorkoutSaved = false;
+            showHome();
+        });
+        addButton(body, done);
     }
 
     /** Mirrors saved Endurance wizard choices into the shared Home/Scheduler calendar. */
@@ -12480,7 +12581,7 @@ public final class MainActivity extends FragmentActivity {
 
     private void showEnduranceCountdown() {
         if (guidedEnduranceMode == null) return;
-        LinearLayout body = appPage("Endurance");
+        LinearLayout body = appPage("Plan");
         String action = enduranceAction(guidedEnduranceMode);
         title(body, "GUIDED ENDURANCE", "Start " + action, "Your timer begins when the visual countdown finishes.");
         LinearLayout countCard = card();
@@ -12496,7 +12597,7 @@ public final class MainActivity extends FragmentActivity {
 
     private void showGuidedEnduranceActive() {
         if (guidedEnduranceMode == null) return;
-        LinearLayout body = appPage("Endurance");
+        LinearLayout body = appPage("Plan");
         final int sessionPage = pageGeneration;
         final String action = enduranceAction(guidedEnduranceMode);
         title(body, "GUIDED ENDURANCE", action + " in progress", "Your timer is running. " + ((EndurancePlanStore.WALKING.equals(guidedEnduranceMode) || EndurancePlanStore.RUNNING.equals(guidedEnduranceMode)) ? "Record a manual lap whenever you reach one." : "Keep a smooth, steady pace."));
@@ -12990,7 +13091,7 @@ public final class MainActivity extends FragmentActivity {
     }
 
     private void showManualEnduranceSession() {
-        LinearLayout body = appPage("Endurance");
+        LinearLayout body = appPage("Plan");
         final int sessionPage = pageGeneration;
         String activity = appointmentAbbreviation(manualEnduranceMode);
         title(body, "ENDURANCE", activity + " in progress", "Timer-only session. Location, map tracing, and live tracking are off.");
@@ -13094,7 +13195,7 @@ public final class MainActivity extends FragmentActivity {
             showEndurance();
             return;
         }
-        LinearLayout body = appPage("Endurance");
+        LinearLayout body = appPage("Plan");
         title(body, "LIVE ENDURANCE", enduranceAction(live.mode) + " in progress",
                 "Your route and totals stay on this phone. You can safely leave this screen while Android keeps tracking.");
         addLiveTrackingCard(body, live);
@@ -13749,7 +13850,7 @@ public final class MainActivity extends FragmentActivity {
         }
         JourneyStore.Snapshot snapshot = JourneyStore.snapshot(this);
         AchievementStore.Snapshot achievementSnapshot = AchievementStore.snapshot(this);
-        LinearLayout body = appPage("Workouts");
+        LinearLayout body = appPage("Plan");
         title(body, "SESSION COMPLETE", "Strong work", "Your " + target + " workout now appears in Progress. Complete a simple fuel check-in to close the loop.");
         LinearLayout linked = card();
         linked.addView(heading(snapshot.workoutsThisWeek + " workouts  •  " + snapshot.activeMinutesThisWeek + " guided min", 19, ink));

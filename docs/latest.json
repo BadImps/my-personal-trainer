@@ -1,14 +1,14 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 139,
-  "versionName": "5.97",
-  "publishedAt": "2026-10-30T10:37:16Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.97/app-production-release.apk",
-  "sha256": "62d0113f4a6007f3a1ec285b28094efd9f5b5b8e59ec34dc3fa32d05814bad05",
+  "versionCode": 140,
+  "versionName": "5.99",
+  "publishedAt": "2026-10-31T07:34:47Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.99/app-production-release.apk",
+  "sha256": "13a78ad47b9bb17541d6f7b91cf64e4f58b08785979bfd5c3d7c9a6e9c475aa8",
   "sizeBytes": 265158908,
-  "watchApkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.97/wear-release.apk",
-  "watchVersionCode": 36059701,
-  "watchSha256": "f040c032dd66d092abc75696cdcfad04cb251a433976c39c0686f5755b282dbd",
-  "watchSizeBytes": 8445557,
-  "notes": "Removes the extra medal-art ring and aligns the phone and Wear OS companion at v5.97 / code 139."
+  "watchApkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.98/wear-release.apk",
+  "watchVersionCode": 36059801,
+  "watchSha256": "ea145363b1256178d3f7a37d117b77428c1ce69a0e31adcb165ac8b50cc4e0d8",
+  "watchSizeBytes": 16008226,
+  "notes": "Unified Plan navigation: choose Workout, Endurance, or Combined while preserving the established wizards. The existing Wear OS companion remains at v5.98."
 }
