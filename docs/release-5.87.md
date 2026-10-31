@@ -1,7 +1,7 @@
-## My Personal Trainer 5.87
+# v5.87 — Full navigation icon themes
 
-- Restores the original GitHub update channel and original Android signing identity, so this release installs over the existing GitHub app.
-- New profiles remain usable immediately on the phone, including when the network is unavailable.
-- New registrations can enroll a verified Supabase account for secure sign-in and recovery on a replacement phone.
+- Adds Enamel sport, Pulse performance, Ice alloy, Championship, and Night spectrum as selectable navigation-icon themes under Appearance.
+- Applies each complete icon set across all ten navigation destinations, including the bottom navigation and coach rails.
+- Keeps Classic as the default and stores the selected navigation theme locally on the device.
 
-Existing workout history remains on its current device. This update does not move existing local history into cloud storage.
+Validation: release build, release unit tests, and lint passed. Functional navigation-theme selection and persistence were checked on the available API 35 emulator. The required MPT_API36 matched-device visual capture remains pending because that AVD cannot boot with its current kernel configuration.

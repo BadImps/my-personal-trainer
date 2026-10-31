@@ -3,11 +3,7 @@ plugins {
 }
 
 def releaseProperties = new Properties()
-def releasePropertiesFile = System.getenv('MPT_SIGNING_PROPERTIES')
-        ? file(System.getenv('MPT_SIGNING_PROPERTIES'))
-        : rootProject.file('release-signing.properties')
-def previewProperties = new Properties()
-def previewPropertiesFile = rootProject.file('signing/upload-signing.properties')
+def releasePropertiesFile = rootProject.file('release-signing.properties')
 def localProperties = new Properties()
 def localPropertiesFile = rootProject.file('local.properties')
 if (localPropertiesFile.exists()) {
@@ -20,59 +16,31 @@ def migrationBridge = project.hasProperty('migrationBridge')
 if (releasePropertiesFile.exists()) {
     releasePropertiesFile.withInputStream { releaseProperties.load(it) }
 }
-if (previewPropertiesFile.exists()) {
-    previewPropertiesFile.withInputStream { previewProperties.load(it) }
-}
 
 android {
     namespace 'com.badimps.personaltrainer'
     compileSdk 36
     signingConfigs {
         production {
-            def configuredStoreFile = releaseProperties.getProperty('storeFile', 'keys/my-personal-trainer-release.jks')
-            // Signing properties normally sit beside the project.  When a protected copy is
-            // supplied from a recovery location, keep its existing app-relative path intact.
-            def signingBase = releasePropertiesFile.parentFile.canonicalPath == rootProject.projectDir.canonicalPath
-                    ? project.projectDir : new File(releasePropertiesFile.parentFile, 'app')
-            storeFile new File(signingBase, configuredStoreFile)
+            storeFile file(releaseProperties.getProperty('storeFile', 'keys/my-personal-trainer-release.jks'))
             storePassword releaseProperties.getProperty('storePassword', '')
             keyAlias releaseProperties.getProperty('keyAlias', 'my-personal-trainer')
             keyPassword releaseProperties.getProperty('keyPassword', '')
-        }
-        preview {
-            storeFile rootProject.file(previewProperties.getProperty('UPLOAD_STORE_FILE', 'signing/my-personal-trainer-upload.jks'))
-            storePassword previewProperties.getProperty('UPLOAD_STORE_PASSWORD', '')
-            keyAlias previewProperties.getProperty('UPLOAD_KEY_ALIAS', 'upload')
-            keyPassword previewProperties.getProperty('UPLOAD_KEY_PASSWORD', '')
         }
     }
     defaultConfig {
         applicationId 'com.badimps.personaltrainer'
         minSdk 26
         targetSdk 36
-        versionCode (migrationBridge ? 73 : 140)
-        versionName (migrationBridge ? '5.31 Migration' : '5.99')
-        resValue 'string', 'app_display_name', 'My Personal Trainer'
-        buildConfigField 'boolean', 'PREVIEW_BUILD', 'false'
+        versionCode (migrationBridge ? 73 : 129)
+        versionName (migrationBridge ? '5.31 Migration' : '5.87')
         // The anon/publishable key is intentionally a client credential. Never place a
         // service-role key in an APK. RLS remains the actual database security boundary.
         buildConfigField 'String', 'SUPABASE_URL', quotedBuildValue(localProperties.getProperty('SUPABASE_URL', ''))
         buildConfigField 'String', 'SUPABASE_ANON_KEY', quotedBuildValue(localProperties.getProperty('SUPABASE_ANON_KEY', ''))
-    }
-    flavorDimensions += 'distribution'
-    productFlavors {
-        production {
-            dimension 'distribution'
-            signingConfig releasePropertiesFile.exists() ? signingConfigs.production : signingConfigs.debug
-        }
-        preview {
-            dimension 'distribution'
-            applicationIdSuffix '.preview'
-            versionNameSuffix '-preview'
-            resValue 'string', 'app_display_name', 'My Personal Trainer Preview'
-            buildConfigField 'boolean', 'PREVIEW_BUILD', 'true'
-            signingConfig previewPropertiesFile.exists() ? signingConfigs.preview : signingConfigs.debug
-        }
+        // GitHub APK delivery remains available for private sideloads. The dedicated
+        // Play build overrides this and removes package-installer capabilities.
+        buildConfigField 'String', 'DISTRIBUTION_CHANNEL', '"direct"'
     }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
     testOptions { unitTests.includeAndroidResources = true }
@@ -85,6 +53,15 @@ android {
         release {
             // CI deliberately has no private key. It may lint the release variant using the
             // debug certificate, while a local production invocation uses the protected key.
+            // Never create a release artifact with the public Android debug certificate.
+            // Without local production credentials Gradle produces an unsigned artifact.
+            signingConfig releasePropertiesFile.exists() ? signingConfigs.production : null
+        }
+        play {
+            initWith release
+            matchingFallbacks = ['release']
+            buildConfigField 'String', 'DISTRIBUTION_CHANNEL', '"play"'
+            signingConfig releasePropertiesFile.exists() ? signingConfigs.production : null
         }
     }
 }
@@ -94,6 +71,7 @@ dependencies {
     implementation 'androidx.activity:activity:1.11.0'
     implementation 'androidx.biometric:biometric:1.1.0'
     implementation 'com.google.android.gms:play-services-wearable:20.0.1'
+    implementation 'androidx.wear:wear-remote-interactions:1.2.0'
     implementation 'org.mapsforge:mapsforge-map-android:0.25.0'
     implementation 'org.mapsforge:mapsforge-themes:0.25.0'
     // GPU-rendered vector map surface. Country data remains app-private and is

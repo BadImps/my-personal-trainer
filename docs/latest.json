@@ -1,14 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 140,
-  "versionName": "5.99",
-  "publishedAt": "2026-10-31T07:34:47Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.99/app-production-release.apk",
-  "sha256": "13a78ad47b9bb17541d6f7b91cf64e4f58b08785979bfd5c3d7c9a6e9c475aa8",
-  "sizeBytes": 265158908,
-  "watchApkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.98/wear-release.apk",
-  "watchVersionCode": 36059801,
-  "watchSha256": "ea145363b1256178d3f7a37d117b77428c1ce69a0e31adcb165ac8b50cc4e0d8",
-  "watchSizeBytes": 16008226,
-  "notes": "Unified Plan navigation: choose Workout, Endurance, or Combined while preserving the established wizards. The existing Wear OS companion remains at v5.98."
+  "versionCode": 129,
+  "versionName": "5.87",
+  "publishedAt": "2026-10-31T00:00:00Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.87/app-release.apk",
+  "sha256": "ff09672d17792ad62ad9cba0ef742f011d4154cda382d9f293202ec52d12129e",
+  "sizeBytes": 233617369,
+  "notes": "Adds five selectable full-navigation icon themes under Appearance while keeping Classic as the default. The selected navigation theme is stored locally and applies across the bottom navigation and coach rails."
 }
