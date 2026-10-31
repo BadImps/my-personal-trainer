@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 130,
-  "versionName": "5.88",
+  "versionCode": 142,
+  "versionName": "6.0",
   "publishedAt": "2026-10-31T00:00:00Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v5.88/app-release.apk",
-  "sha256": "70be72832ef3660fde7fd43c517537ce3bc9caf14830ba47de178ce97e83ab35",
-  "sizeBytes": 233617369,
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v6.0/app-release.apk",
+  "sha256": "a1cb4d2148e022ec01b9a55caad48e970409309d6d25dde581ccbd30dfe080ec",
+  "sizeBytes": 233617365,
   "notes": "Adds five selectable full-navigation icon themes under Appearance while keeping Classic as the default. The selected navigation theme is stored locally and applies across the bottom navigation and coach rails."
 }
