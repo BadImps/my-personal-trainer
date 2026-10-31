@@ -15,16 +15,7 @@ public final class ReleaseNotes {
     }
 
     public static final Entry[] HISTORY = {
-            new Entry("5.97", "Phone & watch aligned", "Removes the extra medal-art ring and aligns the Wear OS companion with the current phone release and protected workout-sync channel."),
-            new Entry("5.96", "Mintfoil & calendar fit", "Centres each Mintfoil symbol in its medal mount, keeps Scheduler plan text inside its date tile, and separates Your Week from the content below."),
-            new Entry("5.95", "Verified calendar stability", "Completes the aligned Home and Scheduler calendar states: clearer Rest Day and completed-workout presentation, safe selection shadows, and verified future-date planning controls."),
-            new Entry("5.94", "Calendar refinements", "Allows screenshots, uses compact missed-plan X markers, aligns moon rest markers, preserves moved plans, and softens future-date selection."),
-            new Entry("5.93", "Calendar plans & incomplete days", "Adds Create a Plan for future dates, four-second plan controls, clear incomplete-day ribbons, and moon-marked rest days."),
-            new Entry("5.92", "Gym Lobby activity & earned rank banners", "Refines Settings, adds a private Gym Lobby Message Center, and gives every training rank its own compact earned banner."),
-            new Entry("5.91", "Ranks, refined achievements & direct signup", "Removes optional coach-motion packs, restores achievement tiers and rank titles, refines medal layout, and creates Supabase accounts with immediate sign-in."),
-            new Entry("5.90", "Original Mintfoil collection restored", "Achievement cards are back to their full tall iron-frame artwork, with distinct milestone symbols and the original tap-to-flip collection details."),
-            new Entry("5.89", "Mintfoil board & watch handoff", "Restores the full iron-framed Mintfoil achievement cards and wakes the installed Wear OS companion when a guided workout starts."),
-            new Entry("5.88", "Gym Lobby", "Adds Gym Lobby, Gym Buddies, private-lobby invitations and join requests, public achievement profiles, and friendly Momentum Points leaderboards."),
+            new Entry("6.1", "Read-only historical schedule days", "Past Home calendar days can no longer be selected for new workouts; completed days remain viewable in history."),
             new Entry("5.86", "Schedule past dates", "Choose an unfinished past calendar day on Home, then schedule a guided or endurance workout for that exact date."),
             new Entry("5.85", "Mintfoil achievement-card refinement", "Achievement cards now use Coach-card-ratio plates that preserve true circular badge mounts. Card copy has more clearance from the lower iron chevron, the flip-back is fully opaque, and Steady Return's shield is optically centred."),
             new Entry("5.84", "Achievement cards, production finish", "Achievement cards now use the approved Mintfoil plate as the single mount and landscape, with new transparent icon-only inserts for every family. Fronts show a clear locked or unlocked state, while exact requirements and progress stay on the flip-back."),

@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 142,
-  "versionName": "6.0",
-  "publishedAt": "2026-10-31T00:00:00Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v6.0/app-release.apk",
-  "sha256": "a1cb4d2148e022ec01b9a55caad48e970409309d6d25dde581ccbd30dfe080ec",
+  "versionCode": 143,
+  "versionName": "6.1",
+  "publishedAt": "2026-10-31T21:46:00Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v6.1/app-release.apk",
+  "sha256": "d1bc7f27ed0fb671a371e9f4cf3410d4f928ef2c95930ac4b6e6687d7c8aff91",
   "sizeBytes": 233617365,
-  "notes": "Adds five selectable full-navigation icon themes under Appearance while keeping Classic as the default. The selected navigation theme is stored locally and applies across the bottom navigation and coach rails."
+  "notes": "Keeps past Home calendar days read-only; completed days remain viewable in history."
 }

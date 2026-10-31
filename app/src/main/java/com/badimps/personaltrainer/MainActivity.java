@@ -3663,8 +3663,10 @@ public final class MainActivity extends FragmentActivity {
         String state = showWorkout ? workoutLabel + " workout" : confirmed ? "Rest Day" : "Open";
         if (endurance) state += ", " + (completedEndurance == null ? enduranceDayLabel(appointments) : "completed " + completedEndurance.target.replace("Endurance · ", ""));
         tile.setContentDescription(weekDays[dayIndex] + " " + homeWeekDate(date, 0) + ", " + state
-                + (completed ? ", completed" : ". Select this date to schedule a workout."));
+                + (completed ? ", completed" : (historical ? ", historical day" : ". Select this date to schedule a workout.")));
         if (!completed) {
+            // Past days are historical records, not editable schedule targets.
+            if (historical) return tile;
             tile.setClickable(true);
             tile.setFocusable(true);
             tile.setOnClickListener(view -> {
@@ -3816,18 +3818,14 @@ public final class MainActivity extends FragmentActivity {
                     activeWorkoutPaused ? "▶" : "↗", "active");
         }
         Calendar today = Calendar.getInstance();
-        // A calendar tap lets a member add a missed or retrospectively planned session
-        // without pretending that it is today's workout.  Completed dates remain review-only.
+        // Completed dates remain review-only. Past days are historical records and
+        // cannot become new schedule targets.
         if (homeSelectedScheduleDate != null && !sameSchedulerDate(homeSelectedScheduleDate, today)) {
             JourneyStore.WorkoutRecord completed = completedWorkoutOn(homeSelectedScheduleDate);
             if (completed != null) {
                 String label = completed.target == null ? "Workout completed" : completed.target.replace("Custom · ", "") + " completed";
                 return new HomeSession(label, new SimpleDateFormat("EEEE, MMM d", Locale.getDefault()).format(homeSelectedScheduleDate.getTime()),
                         "✓  View summary", "completed", homeSelectedScheduleDate);
-            }
-            if (isPastCalendarDate(homeSelectedScheduleDate)) {
-                return new HomeSession("Schedule a workout", new SimpleDateFormat("EEEE, MMM d", Locale.getDefault()).format(homeSelectedScheduleDate.getTime())
-                        + "  •  Add a guided or endurance workout", "+  Schedule workout", "schedule", homeSelectedScheduleDate);
             }
         }
         for (JourneyStore.WorkoutRecord record : JourneyStore.workouts(this)) {
@@ -4050,6 +4048,10 @@ public final class MainActivity extends FragmentActivity {
             return;
         }
         if ("schedule".equals(homeSession.state)) {
+            if (homeSession.selectedDate != null && isPastCalendarDate(homeSession.selectedDate)) {
+                toast("Past dates are locked and cannot be changed.");
+                return;
+            }
             schedulerSelectedDate = (Calendar) homeSession.selectedDate.clone();
             showSchedulerAppointmentSheet(schedulerSelectedDate);
             return;
@@ -12775,6 +12777,10 @@ public final class MainActivity extends FragmentActivity {
 
     /** Date-first Scheduler entry point. The panel stays at the bottom so the selected day remains visible behind it. */
     private void showSchedulerAppointmentSheet(Calendar date) {
+        if (isPastCalendarDate(date)) {
+            toast("Past dates are locked and cannot be changed.");
+            return;
+        }
         schedulerSelectedDate = (Calendar) date.clone();
         final android.app.Dialog sheet = new android.app.Dialog(this);
         LinearLayout content = new LinearLayout(this);
