@@ -15,6 +15,7 @@ public final class ReleaseNotes {
     }
 
     public static final Entry[] HISTORY = {
+            new Entry("6.6", "Hub KPI icons", "Progress and Plan now use six distinct, full-colour KPI icons for Nutrition, Body, Apex, Workout Library, My Calendar, and Plan a Workout."),
             new Entry("6.5", "Progress & Plan hubs", "Progress now groups Nutrition, Body, Apex, and Workout Library in one four-tile hub. Plan now offers My Calendar and Plan a Workout as two clear starting choices."),
             new Entry("6.4", "Gym Lobby restored & Endurance KPI icons", "Gym Lobby is back with public Gym Members, friendly private lobbies, leaderboards, invitations, and Message Center. Endurance now uses premium walking, running, and cycling activity icons."),
             new Entry("6.3", "Unified Plan & live map follow", "Plan is now the single home for Daily, Weekly, and Custom Workout, Endurance, or combined plans. Live walks, runs, and cycles begin from a recent device fix and keep the map following your position. Route fields now have Google Maps pin pickers for exact start and destination locations."),

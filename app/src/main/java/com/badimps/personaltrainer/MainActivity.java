@@ -4061,10 +4061,10 @@ public final class MainActivity extends FragmentActivity {
         LinearLayout body = appPage("Plan");
         title(body, "PLAN", "Your training, clearly arranged", "Open your calendar or build a new Workout, Endurance, or combined plan.");
         addPlanHubTile(body, "My Calendar", "See, edit, and organise your scheduled sessions.",
-                R.drawable.ic_nav_plan, this::showScheduler);
+                R.drawable.ic_kpi_calendar, this::showScheduler);
         gap(body, 12);
         addPlanHubTile(body, "Plan a Workout", "Create a Daily, Weekly, or Custom plan.",
-                R.drawable.ic_nav_workouts, this::showPlanCadence);
+                R.drawable.ic_kpi_plan_workout, this::showPlanCadence);
     }
 
     private void addPlanHubTile(LinearLayout body, String label, String detail, int iconRes, Runnable open) {
@@ -4077,9 +4077,9 @@ public final class MainActivity extends FragmentActivity {
         tile.setBackground(surface(navyPanel, 20, 1, Color.rgb(48, 91, 119)));
         ImageView icon = new ImageView(this);
         icon.setImageResource(iconRes);
-        icon.setImageTintList(ColorStateList.valueOf(mint));
-        icon.setBackground(surface(Color.rgb(12, 45, 66), 99, 1, Color.rgb(70, 129, 148)));
-        icon.setPadding(dp(12), dp(12), dp(12), dp(12));
+        // Hub KPI artwork includes its own badge and deliberate colour treatment.
+        icon.setBackgroundColor(Color.TRANSPARENT);
+        icon.setPadding(0, 0, 0, 0);
         tile.addView(icon, new LinearLayout.LayoutParams(dp(54), dp(54)));
         LinearLayout copy = new LinearLayout(this);
         copy.setOrientation(LinearLayout.VERTICAL);
@@ -6994,18 +6994,18 @@ public final class MainActivity extends FragmentActivity {
     private void addProgressDestinations(LinearLayout body) {
         LinearLayout firstRow = new LinearLayout(this);
         firstRow.setGravity(Gravity.CENTER_VERTICAL);
-        addProgressDestination(firstRow, "Nutrition", "Fuel check-in", R.drawable.ic_nav_nutrition,
+        addProgressDestination(firstRow, "Nutrition", "Fuel check-in", R.drawable.ic_kpi_nutrition,
                 Color.rgb(111, 222, 192), this::showMeals, false);
-        addProgressDestination(firstRow, "Body", "Private context", R.drawable.ic_nav_body,
+        addProgressDestination(firstRow, "Body", "Private context", R.drawable.ic_kpi_body,
                 Color.rgb(112, 190, 244), this::showBodyContext, true);
         body.addView(firstRow, new LinearLayout.LayoutParams(-1, dp(116)));
 
         gap(body, 9);
         LinearLayout secondRow = new LinearLayout(this);
         secondRow.setGravity(Gravity.CENTER_VERTICAL);
-        addProgressDestination(secondRow, "Apex", "Achievements", R.drawable.ic_nav_apex,
+        addProgressDestination(secondRow, "Apex", "Achievements", R.drawable.ic_kpi_apex,
                 coral, this::showApex, false);
-        addProgressDestination(secondRow, "Workout Library", "Explore movements", R.drawable.ic_nav_library_premium,
+        addProgressDestination(secondRow, "Workout Library", "Explore movements", R.drawable.ic_kpi_library,
                 Color.rgb(241, 195, 92), this::showWorkoutLibrary, true);
         body.addView(secondRow, new LinearLayout.LayoutParams(-1, dp(116)));
     }
@@ -7022,9 +7022,9 @@ public final class MainActivity extends FragmentActivity {
         tile.setBackground(surface(navyPanel, 18, 1, Color.argb(170, Color.red(accent), Color.green(accent), Color.blue(accent))));
         ImageView icon = new ImageView(this);
         icon.setImageResource(iconRes);
-        icon.setImageTintList(ColorStateList.valueOf(accent));
-        icon.setBackground(surface(Color.rgb(12, 38, 59), 99, 0, Color.TRANSPARENT));
-        icon.setPadding(dp(8), dp(8), dp(8), dp(8));
+        // Every destination owns a recognisable, full-colour KPI mark.
+        icon.setBackgroundColor(Color.TRANSPARENT);
+        icon.setPadding(0, 0, 0, 0);
         tile.addView(icon, new LinearLayout.LayoutParams(dp(38), dp(38)));
         TextView name = heading(label, label.length() > 12 ? 14 : 16, Color.WHITE);
         name.setGravity(Gravity.CENTER);
