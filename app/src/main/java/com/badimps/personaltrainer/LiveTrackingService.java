@@ -44,6 +44,9 @@ public final class LiveTrackingService extends Service implements LocationListen
             LiveTrackingStore.start(this, intent.getStringExtra(EXTRA_MODE));
             ensureChannel();
             startForeground(NOTIFICATION_ID, notification());
+            // A recent fix is available immediately, before the next GPS update, so the live
+            // map opens at the member's actual location rather than at a country-wide default.
+            seedRecentLocation();
             requestLocations();
             handler.removeCallbacks(tick);
             handler.post(tick);
@@ -90,6 +93,24 @@ public final class LiveTrackingService extends Service implements LocationListen
                 locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 3000L, 5f, this);
             }
         } catch (SecurityException ignored) { }
+    }
+
+    /** Uses only a recent, accurate device fix; stale positions must never start a route. */
+    private void seedRecentLocation() {
+        if (!hasLocationPermission()) return;
+        if (locationManager == null) locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+        if (locationManager == null) return;
+        Location newest = null;
+        String[] providers = {LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER, LocationManager.PASSIVE_PROVIDER};
+        try {
+            for (String provider : providers) {
+                Location candidate = locationManager.getLastKnownLocation(provider);
+                if (candidate != null && (newest == null || candidate.getTime() > newest.getTime())) newest = candidate;
+            }
+        } catch (SecurityException ignored) { return; }
+        if (newest == null || System.currentTimeMillis() - newest.getTime() > 120_000L
+                || (newest.hasAccuracy() && newest.getAccuracy() > 65f)) return;
+        onLocationChanged(newest);
     }
 
     private void stopLocations() {

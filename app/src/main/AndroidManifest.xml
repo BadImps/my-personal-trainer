@@ -17,6 +17,7 @@
         <!-- Empty key means Google features remain off and MapLibre is used instead. -->
         <meta-data android:name="com.google.android.geo.API_KEY" android:value="${MAPS_API_KEY}" />
         <activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTop" android:theme="@style/AppTheme.Starting" android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".RoutePinPickerActivity" android:exported="false" android:theme="@style/AppTheme" android:windowSoftInputMode="adjustResize" />
         <activity android:name=".WorkoutReminderActivity" android:exported="false" android:showWhenLocked="true" android:turnScreenOn="true" />
         <receiver android:name=".WorkoutReminderReceiver" android:exported="false" />
         <service android:name=".LiveTrackingService" android:exported="false" android:foregroundServiceType="location" />

@@ -15,6 +15,7 @@ public final class ReleaseNotes {
     }
 
     public static final Entry[] HISTORY = {
+            new Entry("6.3", "Unified Plan & live map follow", "Plan is now the single home for Daily, Weekly, and Custom Workout, Endurance, or combined plans. Live walks, runs, and cycles begin from a recent device fix and keep the map following your position. Route fields now have Google Maps pin pickers for exact start and destination locations."),
             new Entry("6.1", "Read-only historical schedule days", "Past Home calendar days can no longer be selected for new workouts; completed days remain viewable in history."),
             new Entry("5.86", "Schedule past dates", "Choose an unfinished past calendar day on Home, then schedule a guided or endurance workout for that exact date."),
             new Entry("5.85", "Mintfoil achievement-card refinement", "Achievement cards now use Coach-card-ratio plates that preserve true circular badge mounts. Card copy has more clearance from the lower iron chevron, the flip-back is fully opaque, and Steady Return's shield is optically centred."),

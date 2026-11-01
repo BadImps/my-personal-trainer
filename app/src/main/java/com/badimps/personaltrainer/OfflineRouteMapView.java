@@ -52,6 +52,7 @@ public final class OfflineRouteMapView extends FrameLayout {
     private boolean userNavigated;
     private boolean routeCameraFramed;
     private boolean vectorCameraFramed;
+    private boolean followLatestLocation;
 
     /** Receives normalized replay time without sending the private route anywhere. */
     public interface RouteReplayListener {
@@ -145,8 +146,14 @@ public final class OfflineRouteMapView extends FrameLayout {
     public void setRoute(List<LiveTrackingStore.Point> points) {
         stopRouteReplay();
         currentPoints = points == null ? new ArrayList<>() : new ArrayList<>(points);
-        boolean shouldFrame = !userNavigated && currentPoints.size() > 0 && !routeCameraFramed;
+        boolean shouldFrame = !userNavigated && currentPoints.size() > 0 && (followLatestLocation || !routeCameraFramed);
         renderRoute(currentPoints, shouldFrame);
+    }
+
+    /** Enables live-session camera following; a manual map gesture still opts out. */
+    public void setFollowLatestLocation(boolean enabled) {
+        followLatestLocation = enabled;
+        if (enabled) setRoute(currentPoints);
     }
 
     /** Plays a compact visual time-lapse from the first recorded point to the finish. */
@@ -203,7 +210,7 @@ public final class OfflineRouteMapView extends FrameLayout {
     }
 
     private void renderVectorRoute() {
-        renderVectorRoute(currentPoints, !userNavigated && !vectorCameraFramed && currentPoints.size() > 0);
+        renderVectorRoute(currentPoints, !userNavigated && (followLatestLocation || !vectorCameraFramed) && currentPoints.size() > 0);
     }
 
     private void renderVectorRoute(List<LiveTrackingStore.Point> points, boolean fitCamera) {
@@ -212,7 +219,10 @@ public final class OfflineRouteMapView extends FrameLayout {
         ArrayList<LatLng> line = new ArrayList<>();
         for (LiveTrackingStore.Point point : points) line.add(new LatLng(point.latitude, point.longitude));
         if (line.size() > 1) vectorController.addPolyline(new PolylineOptions().addAll(line).color(0xFFADFF2F).width(6f));
-        if (line.size() > 1 && fitCamera) {
+        if (followLatestLocation && !line.isEmpty() && fitCamera) {
+            vectorController.animateCamera(CameraUpdateFactory.newLatLngZoom(line.get(line.size() - 1), 16d));
+            vectorCameraFramed = true;
+        } else if (line.size() > 1 && fitCamera) {
             double north = -90d, south = 90d, east = -180d, west = 180d;
             for (LatLng point : line) { north = Math.max(north, point.getLatitude()); south = Math.min(south, point.getLatitude()); east = Math.max(east, point.getLongitude()); west = Math.min(west, point.getLongitude()); }
             vectorController.moveCamera(CameraUpdateFactory.newLatLngBounds(LatLngBounds.from(north, east, south, west), dp(28)));

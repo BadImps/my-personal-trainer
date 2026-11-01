@@ -134,6 +134,9 @@ public final class MainActivity extends FragmentActivity {
     private String environment = Coach.ENVIRONMENTS[0];
     private String selectedTrainer = "Female";
     private String planMode = Coach.PLAN_MODES[0];
+    /** A combined plan keeps the established Workout and Endurance wizards in sequence. */
+    private boolean combinedPlanFlow;
+    private boolean combinedPlanWorkoutSaved;
     private String equipmentType = Coach.EQUIPMENT_TYPES[0];
     private final List<String> selectedEquipmentTypes = new ArrayList<>();
     private int sessionMinutes = 45;
@@ -317,6 +320,7 @@ public final class MainActivity extends FragmentActivity {
     private TextView pendingPlaceStatus;
     private String pendingPlaceLabel = "Place";
     private ActivityResultLauncher<Intent> placeAutocompleteLauncher;
+    private ActivityResultLauncher<Intent> routePinPickerLauncher;
     /** Timer-only endurance session: no location request, map trace, or background GPS service. */
     private String manualEnduranceMode;
     private long manualEnduranceStartedAt;
@@ -334,6 +338,7 @@ public final class MainActivity extends FragmentActivity {
         setTheme(R.style.AppTheme);
         super.onCreate(state);
         registerGooglePlaceAutocomplete();
+        registerRoutePinPicker();
         // The user can capture their own progress with Android's normal screenshot gesture.
         // Sensitive information remains protected by the device lock screen and app account;
         // this activity deliberately does not set FLAG_SECURE in release builds.
@@ -1296,7 +1301,7 @@ public final class MainActivity extends FragmentActivity {
         if ("Progress".equals(screen)) return "Your private training story, in focus.";
         if ("Workout Library".equals(screen)) return "Every available movement, ready when you are.";
         if ("Nutrition".equals(screen)) return "Fuel that fits your real life.";
-        if ("Endurance".equals(screen)) return "Plan your distance. Own your pace.";
+        if ("Plan".equals(screen)) return "Build strength, endurance, or both on one clear calendar.";
         if ("Scheduler".equals(screen)) return "Every session, one clear calendar.";
         if ("Body".equals(screen)) return "Your numbers, clearly and privately.";
         if ("Apex".equals(screen)) return "Celebrate progress. Choose your next challenge.";
@@ -1317,11 +1322,10 @@ public final class MainActivity extends FragmentActivity {
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setPadding(dp(8), dp(7), dp(8), dp(8));
         addCoachHeroNavItem(row, "Home", R.drawable.ic_nav_home, activeScreen, view -> navigateDashboard("Home", this::showHome));
-        addCoachHeroNavItem(row, "Workouts", R.drawable.ic_nav_workouts, activeScreen, view -> navigateDashboard("Workouts", this::showPlans));
+        addCoachHeroNavItem(row, "Plan", R.drawable.ic_nav_plan, activeScreen, view -> navigateDashboard("Plan", this::showPlans));
         addCoachHeroNavItem(row, "Workout Library", R.drawable.ic_nav_library_premium, activeScreen, view -> navigateDashboard("Workout Library", this::showWorkoutLibrary));
         addCoachHeroNavItem(row, "Progress", R.drawable.ic_nav_progress, activeScreen, view -> navigateDashboard("Progress", this::showProgress));
         addCoachHeroNavItem(row, "Nutrition", R.drawable.ic_nav_nutrition, activeScreen, view -> navigateDashboard("Nutrition", this::showMeals));
-        addCoachHeroNavItem(row, "Endurance", R.drawable.ic_nav_endurance, activeScreen, view -> navigateDashboard("Endurance", this::showEndurance));
         addCoachHeroNavItem(row, "Scheduler", R.drawable.ic_nav_plan, activeScreen, view -> navigateDashboard("Scheduler", this::showScheduler));
         addCoachHeroNavItem(row, "Body", R.drawable.ic_nav_body, activeScreen, view -> navigateDashboard("Body", this::showBodyContext));
         addCoachHeroNavItem(row, "Apex", R.drawable.ic_nav_apex, activeScreen, view -> navigateDashboard("Apex", this::showApex));
@@ -1343,7 +1347,7 @@ public final class MainActivity extends FragmentActivity {
     }
 
     private int coachHeroNavigationIndex(String screen) {
-        String[] screens = {"Home", "Workouts", "Workout Library", "Progress", "Nutrition", "Endurance", "Scheduler", "Body", "Apex", "Settings"};
+        String[] screens = {"Home", "Plan", "Workout Library", "Progress", "Nutrition", "Scheduler", "Body", "Apex", "Settings"};
         for (int index = 0; index < screens.length; index++) {
             if (screens[index].equals(screen)) return index;
         }
@@ -1613,7 +1617,7 @@ public final class MainActivity extends FragmentActivity {
         else if ("Workout Library".equals(activeDashboardScrollKey)) showWorkoutLibrary();
         else if ("Progress".equals(activeDashboardScrollKey)) showProgress();
         else if ("Nutrition".equals(activeDashboardScrollKey)) showMeals();
-        else if ("Endurance".equals(activeDashboardScrollKey)) showEndurance();
+        else if ("Endurance".equals(activeDashboardScrollKey)) showPlans();
         else if ("Scheduler".equals(activeDashboardScrollKey)) showScheduler();
         else if ("Body".equals(activeDashboardScrollKey)) showBodyContext();
         else if ("Apex".equals(activeDashboardScrollKey)) showApex();
@@ -1937,10 +1941,9 @@ public final class MainActivity extends FragmentActivity {
         rail.addView(divider, dividerParams);
 
         addPlanRailItem(rail, "Home", R.drawable.ic_nav_home, false, view -> navigateDashboard("Home", this::showHome));
-        addPlanRailItem(rail, "Workouts", R.drawable.ic_nav_workouts, true, view -> navigateDashboard("Workouts", this::showPlans));
+        addPlanRailItem(rail, "Plan", R.drawable.ic_nav_plan, true, view -> navigateDashboard("Plan", this::showPlans));
         addPlanRailItem(rail, "Progress", R.drawable.ic_nav_progress, false, view -> navigateDashboard("Progress", this::showProgress));
         addPlanRailItem(rail, "Nutrition", R.drawable.ic_nav_nutrition, false, view -> navigateDashboard("Nutrition", this::showMeals));
-        addPlanRailItem(rail, "Endurance", R.drawable.ic_nav_endurance, false, view -> navigateDashboard("Endurance", this::showEndurance));
         addPlanRailItem(rail, "Scheduler", R.drawable.ic_nav_plan, false, view -> navigateDashboard("Scheduler", this::showScheduler));
         addPlanRailItem(rail, "Body", R.drawable.ic_nav_body, false, view -> navigateDashboard("Body", this::showBodyContext));
         addPlanRailItem(rail, "Apex", R.drawable.ic_nav_apex, false, view -> navigateDashboard("Apex", this::showApex));
@@ -2011,10 +2014,9 @@ public final class MainActivity extends FragmentActivity {
         rail.addView(divider, dividerParams);
 
         addRailItem(rail, "Home", R.drawable.ic_nav_home, activeScreen, view -> navigateDashboard("Home", this::showHome));
-        addRailItem(rail, "Workouts", R.drawable.ic_nav_workouts, activeScreen, view -> navigateDashboard("Workouts", this::showPlans));
+        addRailItem(rail, "Plan", R.drawable.ic_nav_plan, activeScreen, view -> navigateDashboard("Plan", this::showPlans));
         addRailItem(rail, "Progress", R.drawable.ic_nav_progress, activeScreen, view -> navigateDashboard("Progress", this::showProgress));
         addRailItem(rail, "Nutrition", R.drawable.ic_nav_nutrition, activeScreen, view -> navigateDashboard("Nutrition", this::showMeals));
-        addRailItem(rail, "Endurance", R.drawable.ic_nav_endurance, activeScreen, view -> navigateDashboard("Endurance", this::showEndurance));
         addRailItem(rail, "Scheduler", R.drawable.ic_nav_plan, activeScreen, view -> navigateDashboard("Scheduler", this::showScheduler));
         addRailItem(rail, "Body", R.drawable.ic_nav_body, activeScreen, view -> navigateDashboard("Body", this::showBodyContext));
         addRailItem(rail, "Apex", R.drawable.ic_nav_apex, activeScreen, view -> navigateDashboard("Apex", this::showApex));
@@ -4041,7 +4043,90 @@ public final class MainActivity extends FragmentActivity {
 
     private void showPlans() {
         homeShortcutPlanReady = false;
-        showCoachHeroWorkout();
+        combinedPlanFlow = false;
+        combinedPlanWorkoutSaved = false;
+        showPlanCadence();
+    }
+
+    /** Plan is the only navigation entry: choose timing before choosing what to train. */
+    private void showPlanCadence() {
+        LinearLayout body = appPage("Plan");
+        title(body, "CREATE A PLAN", "When do you want to train?",
+                "Choose a planning style first. Then choose Workout, Endurance, or Both.");
+        addPlanCadenceChoice(body, "Daily", "Plan one current or future day.");
+        gap(body, 10);
+        addPlanCadenceChoice(body, "Weekly", "Place different sessions across your week.");
+        gap(body, 10);
+        addPlanCadenceChoice(body, "Custom", "Build a flexible plan with your usual detailed setup.");
+    }
+
+    private void addPlanCadenceChoice(LinearLayout body, String mode, String detail) {
+        LinearLayout card = card();
+        card.addView(heading(mode + " plan", 20, ink));
+        card.addView(text(detail, 14, muted));
+        Button choose = primary("Choose " + mode.toLowerCase(Locale.ROOT) + " plan");
+        choose.setOnClickListener(view -> {
+            planMode = mode;
+            // The endurance wizard shares this calendar decision. Custom remains flexible,
+            // while its existing endurance screen uses its single-day placement control.
+            endurancePlanMode = mode;
+            showPlanKind();
+        });
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(50));
+        params.topMargin = dp(12);
+        card.addView(choose, params);
+        body.addView(card);
+    }
+
+    /** The second decision deliberately routes to the existing focused wizards. */
+    private void showPlanKind() {
+        LinearLayout body = appPage("Plan");
+        title(body, "CREATE A " + planMode.toUpperCase(Locale.ROOT) + " PLAN", "What do you want to plan?",
+                "Your existing Workout and Endurance setup screens stay exactly as they are.");
+
+        LinearLayout workout = card();
+        workout.addView(heading("Workout", 20, ink));
+        workout.addView(text("Strength training with your established workout wizard.", 14, muted));
+        Button workoutOpen = primary("Create workout plan");
+        workoutOpen.setOnClickListener(view -> {
+            combinedPlanFlow = false;
+            beginWorkoutPlanDraft(planMode);
+            showPlanTarget();
+        });
+        LinearLayout.LayoutParams workoutParams = new LinearLayout.LayoutParams(-1, dp(50)); workoutParams.topMargin = dp(12);
+        workout.addView(workoutOpen, workoutParams);
+        body.addView(workout); gap(body, 10);
+
+        LinearLayout endurance = card();
+        endurance.addView(heading("Endurance", 20, ink));
+        endurance.addView(text("Walking, running, or cycling with your established endurance wizard.", 14, muted));
+        Button enduranceOpen = primary("Create endurance plan");
+        enduranceOpen.setOnClickListener(view -> {
+            combinedPlanFlow = false;
+            startEnduranceWizard(EndurancePlanStore.WALKING);
+        });
+        LinearLayout.LayoutParams enduranceParams = new LinearLayout.LayoutParams(-1, dp(50)); enduranceParams.topMargin = dp(12);
+        endurance.addView(enduranceOpen, enduranceParams);
+        body.addView(endurance); gap(body, 10);
+
+        LinearLayout both = card();
+        both.addView(heading("Workout + Endurance", 20, ink));
+        both.addView(text("Build the workout first, then add a run, walk, or cycle to the same plan.", 14, muted));
+        Button bothOpen = primary("Create both");
+        bothOpen.setOnClickListener(view -> {
+            combinedPlanFlow = true;
+            combinedPlanWorkoutSaved = false;
+            beginWorkoutPlanDraft(planMode);
+            toast("Step 1 of 2: build your workout.");
+            showPlanTarget();
+        });
+        LinearLayout.LayoutParams bothParams = new LinearLayout.LayoutParams(-1, dp(50)); bothParams.topMargin = dp(12);
+        both.addView(bothOpen, bothParams);
+        body.addView(both); gap(body, 12);
+
+        Button back = secondary("Back to plan style");
+        back.setOnClickListener(view -> showPlanCadence());
+        addButton(body, back);
     }
 
     /** Home is a shortcut to the already-built plan, not a restart of the planning wizard. */
@@ -4110,7 +4195,7 @@ public final class MainActivity extends FragmentActivity {
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(navy);
         scroll.addView(root, new ScrollView.LayoutParams(-1, -2));
-        setCoachHeroWizardShell(scroll, "Workouts");
+        setCoachHeroWizardShell(scroll, "Plan");
 
         FrameLayout hero = coachHeroBackdrop("Workouts");
         root.addView(hero, new LinearLayout.LayoutParams(-1, dp(388)));
@@ -4348,7 +4433,7 @@ public final class MainActivity extends FragmentActivity {
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(navy);
         scroll.addView(root, new ScrollView.LayoutParams(-1, -2));
-        setCoachHeroWizardShell(scroll, "Workouts");
+        setCoachHeroWizardShell(scroll, "Plan");
 
         FrameLayout hero = coachHeroBackdrop("Workouts schedule");
         root.addView(hero, new LinearLayout.LayoutParams(-1, dp(265)));
@@ -4697,7 +4782,7 @@ public final class MainActivity extends FragmentActivity {
         scroll.setFillViewport(true); scroll.setClipToPadding(false); scroll.setBackgroundColor(navy);
         LinearLayout root = new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL); root.setBackgroundColor(navy);
         scroll.addView(root, new ScrollView.LayoutParams(-1, -2));
-        setCoachHeroWizardShell(scroll, "Workouts");
+        setCoachHeroWizardShell(scroll, "Plan");
 
         FrameLayout hero = coachHeroBackdrop("Workouts training areas");
         root.addView(hero, new LinearLayout.LayoutParams(-1, dp(250)));
@@ -4749,7 +4834,7 @@ public final class MainActivity extends FragmentActivity {
                 schedulerWorkoutDateLocked = false;
                 schedulerContinueToEndurance = false;
                 showScheduler();
-            } else showCoachHeroWorkout();
+            } else showPlanKind();
         }); content.addView(back, new LinearLayout.LayoutParams(-1, dp(46)));
     }
 
@@ -5036,7 +5121,7 @@ public final class MainActivity extends FragmentActivity {
         beginNewPage(); setSystemBars();
         ScrollView scroll = new ScrollView(this); scroll.setFillViewport(true); scroll.setClipToPadding(false); scroll.setBackgroundColor(navy);
         LinearLayout root = new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL); root.setBackgroundColor(navy);
-        scroll.addView(root, new ScrollView.LayoutParams(-1, -2)); setCoachHeroWizardShell(scroll, "Workouts");
+        scroll.addView(root, new ScrollView.LayoutParams(-1, -2)); setCoachHeroWizardShell(scroll, "Plan");
 
         FrameLayout hero = coachHeroBackdrop("Workouts equipment"); root.addView(hero, new LinearLayout.LayoutParams(-1, dp(260)));
         LinearLayout copy = new LinearLayout(this); copy.setOrientation(LinearLayout.VERTICAL);
@@ -5548,7 +5633,7 @@ public final class MainActivity extends FragmentActivity {
         beginNewPage(); setSystemBars();
         ScrollView scroll = new ScrollView(this); scroll.setFillViewport(true); scroll.setClipToPadding(false); scroll.setBackgroundColor(navy);
         LinearLayout root = new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL); root.setBackgroundColor(navy);
-        scroll.addView(root, new ScrollView.LayoutParams(-1, -2)); setCoachHeroWizardShell(scroll, "Workouts");
+        scroll.addView(root, new ScrollView.LayoutParams(-1, -2)); setCoachHeroWizardShell(scroll, "Plan");
 
         FrameLayout hero = coachHeroBackdrop("Workouts exercises"); root.addView(hero, new LinearLayout.LayoutParams(-1, dp(266)));
         LinearLayout copy = new LinearLayout(this); copy.setOrientation(LinearLayout.VERTICAL);
@@ -6000,7 +6085,7 @@ public final class MainActivity extends FragmentActivity {
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(navy);
         scroll.addView(root, new ScrollView.LayoutParams(-1, -2));
-        setCoachHeroWizardShell(scroll, "Workouts");
+        setCoachHeroWizardShell(scroll, "Plan");
 
         FrameLayout hero = coachHeroBackdrop("Custom exercise library");
         root.addView(hero, new LinearLayout.LayoutParams(-1, dp(250)));
@@ -6303,7 +6388,7 @@ public final class MainActivity extends FragmentActivity {
         beginNewPage(); setSystemBars();
         ScrollView scroll = new ScrollView(this); scroll.setFillViewport(true); scroll.setClipToPadding(false); scroll.setBackgroundColor(navy);
         LinearLayout root = new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL); root.setBackgroundColor(navy);
-        scroll.addView(root, new ScrollView.LayoutParams(-1, -2)); setCoachHeroWizardShell(scroll, "Workouts");
+        scroll.addView(root, new ScrollView.LayoutParams(-1, -2)); setCoachHeroWizardShell(scroll, "Plan");
 
         FrameLayout hero = coachHeroBackdrop("Workouts setup"); root.addView(hero, new LinearLayout.LayoutParams(-1, dp(260)));
         LinearLayout copy = new LinearLayout(this); copy.setOrientation(LinearLayout.VERTICAL);
@@ -6549,6 +6634,15 @@ public final class MainActivity extends FragmentActivity {
         }
         persistCurrentWeekSchedule();
         savePlanWithReminder();
+        if (combinedPlanFlow) {
+            combinedPlanWorkoutSaved = true;
+            // Preserve the exact cadence selected before the Workout branch.
+            endurancePlanMode = planMode;
+            if ("Daily".equals(planMode)) enduranceDailyDay = dailyScheduledDay;
+            toast("Workout saved. Step 2 of 2: add your endurance plan.");
+            startEnduranceWizard(EndurancePlanStore.WALKING);
+            return;
+        }
         if (schedulerWorkoutDateLocked) {
             boolean continueToEndurance = schedulerContinueToEndurance;
             schedulerWorkoutDateLocked = false;
@@ -10101,7 +10195,7 @@ public final class MainActivity extends FragmentActivity {
         beginNewPage(); setSystemBars();
         ScrollView scroll = new ScrollView(this); scroll.setFillViewport(true); scroll.setClipToPadding(false); scroll.setBackgroundColor(navy);
         LinearLayout root = new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL); root.setBackgroundColor(navy);
-        scroll.addView(root, new ScrollView.LayoutParams(-1, -2)); setCoachHeroWizardShell(scroll, "Workouts");
+        scroll.addView(root, new ScrollView.LayoutParams(-1, -2)); setCoachHeroWizardShell(scroll, "Plan");
 
         FrameLayout hero = coachHeroBackdrop("Workouts review"); root.addView(hero, new LinearLayout.LayoutParams(-1, dp(260)));
         LinearLayout copy = new LinearLayout(this); copy.setOrientation(LinearLayout.VERTICAL);
@@ -12390,7 +12484,7 @@ public final class MainActivity extends FragmentActivity {
         beginNewPage(); setSystemBars();
         ScrollView scroll = new ScrollView(this); scroll.setFillViewport(true); scroll.setClipToPadding(false); scroll.setBackgroundColor(navy);
         LinearLayout root = new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL); root.setBackgroundColor(navy);
-        scroll.addView(root, new ScrollView.LayoutParams(-1, -2)); setCoachHeroWizardShell(scroll, "Endurance");
+        scroll.addView(root, new ScrollView.LayoutParams(-1, -2)); setCoachHeroWizardShell(scroll, "Plan");
 
         FrameLayout hero = coachHeroBackdrop("Endurance step " + step); root.addView(hero, new LinearLayout.LayoutParams(-1, dp(260)));
         String[] labels = {"ACTIVITY", "SCHEDULE", "ROUTE", "REVIEW"};
@@ -12503,12 +12597,12 @@ public final class MainActivity extends FragmentActivity {
         body.addView(text("Set a clear name, distance, and duration for your " + enduranceAction(enduranceWizardMode).toLowerCase(Locale.ROOT) + ".", 13, muted));
         gap(body, 14);
         EditText name = input("Session name", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES); name.setText(enduranceWizardName); body.addView(name); gap(body, 8);
-        EditText origin = input("Starting point or address (optional)", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES); origin.setText(enduranceWizardOrigin); body.addView(origin);
-        TextView originMarker = text("Type an address, then move to the next field to check its pin.", 12, muted); body.addView(originMarker); gap(body, 8);
-        addPlacePickerAction(body, origin, originMarker, "Starting point");
-        EditText destination = input("Destination or loop landmark (optional)", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES); destination.setText(enduranceWizardDestination); body.addView(destination);
-        TextView destinationMarker = text("Type an address, then move to the next field to check its pin.", 12, muted); body.addView(destinationMarker); gap(body, 8);
-        addPlacePickerAction(body, destination, destinationMarker, "Destination or landmark");
+        EditText origin = input("Starting point or address (optional)", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES); origin.setText(enduranceWizardOrigin);
+        TextView originMarker = text("Type an address, or tap the map pin to choose the exact starting point.", 12, muted);
+        addRouteAddressField(body, origin, originMarker, "Starting point"); body.addView(originMarker); gap(body, 8);
+        EditText destination = input("Destination or loop landmark (optional)", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES); destination.setText(enduranceWizardDestination);
+        TextView destinationMarker = text("Type an address, or tap the map pin to choose the exact destination.", 12, muted);
+        addRouteAddressField(body, destination, destinationMarker, "Destination or landmark"); body.addView(destinationMarker); gap(body, 8);
         bindRouteAddressField(origin, originMarker, "Starting point");
         bindRouteAddressField(destination, destinationMarker, "Destination");
         EditText distance = input("Target distance in km", InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL); distance.setText(String.valueOf(enduranceWizardDistanceKm)); body.addView(distance); gap(body, 8);
@@ -12536,6 +12630,24 @@ public final class MainActivity extends FragmentActivity {
         field.setOnFocusChangeListener((view, hasFocus) -> {
             if (!hasFocus) resolveRouteAddress(field, markerStatus, label);
         });
+    }
+
+    /** One compact field: type a place, or tap its trailing pin to choose it on Google Maps. */
+    private void addRouteAddressField(LinearLayout body, EditText field, TextView markerStatus, String label) {
+        LinearLayout row = new LinearLayout(this);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        field.setLayoutParams(new LinearLayout.LayoutParams(0, dp(54), 1));
+        row.addView(field);
+        ImageButton pin = new ImageButton(this);
+        pin.setImageResource(android.R.drawable.ic_menu_mylocation);
+        pin.setImageTintList(ColorStateList.valueOf(mint));
+        pin.setBackground(surface(navyPanel, 14, 1, mint));
+        pin.setContentDescription("Open Google Maps to pin " + label.toLowerCase(Locale.ROOT));
+        pin.setOnClickListener(view -> launchRoutePinPicker(field, markerStatus, label));
+        LinearLayout.LayoutParams pinParams = new LinearLayout.LayoutParams(dp(54), dp(54));
+        pinParams.leftMargin = dp(8);
+        row.addView(pin, pinParams);
+        body.addView(row, new LinearLayout.LayoutParams(-1, dp(54)));
     }
 
     private void addPlacePickerAction(LinearLayout body, EditText field, TextView markerStatus, String label) {
@@ -12582,6 +12694,36 @@ public final class MainActivity extends FragmentActivity {
                         });
                     }
                 });
+    }
+
+    private void registerRoutePinPicker() {
+        routePinPickerLauncher = registerForActivityResult(
+                new ActivityResultContracts.StartActivityForResult(), result -> {
+                    if (result.getResultCode() != RESULT_OK || result.getData() == null
+                            || pendingPlaceField == null || pendingPlaceStatus == null) return;
+                    String address = result.getData().getStringExtra(RoutePinPickerActivity.EXTRA_ADDRESS);
+                    double latitude = result.getData().getDoubleExtra(RoutePinPickerActivity.EXTRA_LATITUDE, Double.NaN);
+                    double longitude = result.getData().getDoubleExtra(RoutePinPickerActivity.EXTRA_LONGITUDE, Double.NaN);
+                    if (address == null || address.trim().isEmpty()) address = String.format(Locale.US, "%.5f, %.5f", latitude, longitude);
+                    pendingPlaceField.setText(address);
+                    pendingPlaceField.setSelection(address.length());
+                    pendingPlaceStatus.setText(String.format(Locale.US, "✓ %s pin ready · %.5f, %.5f", pendingPlaceLabel, latitude, longitude));
+                    pendingPlaceStatus.setTextColor(Color.rgb(28, 112, 96));
+                });
+    }
+
+    private void launchRoutePinPicker(EditText field, TextView status, String label) {
+        if (!GoogleMapsConfig.isConfigured()) {
+            launchPlaceAutocomplete(field, status, label);
+            return;
+        }
+        pendingPlaceField = field;
+        pendingPlaceStatus = status;
+        pendingPlaceLabel = label;
+        Intent picker = new Intent(this, RoutePinPickerActivity.class)
+                .putExtra(RoutePinPickerActivity.EXTRA_QUERY, field.getText().toString().trim())
+                .putExtra(RoutePinPickerActivity.EXTRA_LABEL, label);
+        routePinPickerLauncher.launch(picker);
     }
 
     private void launchPlaceAutocomplete(EditText field, TextView status, String label) {
@@ -12672,7 +12814,17 @@ public final class MainActivity extends FragmentActivity {
         }); body.addView(live, new LinearLayout.LayoutParams(-1, dp(54))); gap(body, 8);
         Button save = action("Save endurance plan", navyPanel, mint);
         save.setOnClickListener(view -> {
-            try { EndurancePlanStore.save(this, enduranceWizardMode, enduranceWizardName, enduranceWizardOrigin, enduranceWizardDestination, enduranceWizardDistanceKm, enduranceWizardMinutes, enduranceWizardEffort); publishEnduranceWizardSchedule(); toast("Endurance plan saved."); showEndurance(); }
+            try {
+                EndurancePlanStore.save(this, enduranceWizardMode, enduranceWizardName, enduranceWizardOrigin, enduranceWizardDestination, enduranceWizardDistanceKm, enduranceWizardMinutes, enduranceWizardEffort);
+                publishEnduranceWizardSchedule();
+                if (combinedPlanFlow && combinedPlanWorkoutSaved) {
+                    toast("Workout + endurance plan saved.");
+                    showCombinedPlanReady();
+                } else {
+                    toast("Endurance plan saved.");
+                    showPlans();
+                }
+            }
             catch (IllegalArgumentException error) { toast(error.getMessage()); }
         }); body.addView(save, new LinearLayout.LayoutParams(-1, dp(52)));
         Button back = new Button(this); back.setText("Back"); back.setTextColor(mint); back.setTextSize(14); back.setAllCaps(false); back.setBackgroundColor(Color.TRANSPARENT); back.setOnClickListener(view -> showEnduranceWizardRoute()); body.addView(back, new LinearLayout.LayoutParams(-1, dp(46)));
@@ -12688,6 +12840,37 @@ public final class MainActivity extends FragmentActivity {
         } else {
             SchedulerStore.saveIfMissing(this, enduranceWizardMode, selectedWeekDate(enduranceDailyDay), enduranceWizardMinutes);
         }
+    }
+
+    /** Confirms that both existing planners were saved without replacing either wizard. */
+    private void showCombinedPlanReady() {
+        LinearLayout body = appPage("Plan");
+        title(body, "PLAN READY", "Workout + endurance", "Both sessions are saved and appear together on your calendar.");
+        LinearLayout workout = card();
+        workout.addView(heading("1 · Workout", 19, ink));
+        workout.addView(text(planSchedule(), 14, muted));
+        Button reviewWorkout = secondary("Review workout plan");
+        reviewWorkout.setOnClickListener(view -> showPlanReady());
+        LinearLayout.LayoutParams workoutParams = new LinearLayout.LayoutParams(-1, dp(48)); workoutParams.topMargin = dp(10);
+        workout.addView(reviewWorkout, workoutParams);
+        body.addView(workout); gap(body, 10);
+
+        LinearLayout endurance = card();
+        endurance.addView(heading("2 · " + appointmentAbbreviation(enduranceWizardMode), 19, ink));
+        endurance.addView(text(enduranceWizardName + " · " + formatDistance(enduranceWizardDistanceKm) + " · " + enduranceWizardMinutes + " min", 14, muted));
+        Button reviewEndurance = secondary("Review endurance plan");
+        reviewEndurance.setOnClickListener(view -> showEndurance());
+        LinearLayout.LayoutParams enduranceParams = new LinearLayout.LayoutParams(-1, dp(48)); enduranceParams.topMargin = dp(10);
+        endurance.addView(reviewEndurance, enduranceParams);
+        body.addView(endurance); gap(body, 14);
+
+        Button done = primary("Done");
+        done.setOnClickListener(view -> {
+            combinedPlanFlow = false;
+            combinedPlanWorkoutSaved = false;
+            showHome();
+        });
+        addButton(body, done);
     }
 
     /** Guided endurance shares the Coach 5-to-1 ritual with the strength workout flow. */
@@ -13240,6 +13423,7 @@ public final class MainActivity extends FragmentActivity {
         } else if (OfflineMapStore.hasAnyMap(this)) {
             try {
                 OfflineRouteMapView map = new OfflineRouteMapView(this, OfflineMapStore.mapFile(this), live.points);
+                map.setFollowLatestLocation(true);
                 LinearLayout.LayoutParams mapParams = new LinearLayout.LayoutParams(-1, dp(235)); mapParams.topMargin = dp(10);
                 tracker.addView(map, mapParams); routeRenderer = map::setRoute;
             } catch (RuntimeException error) {

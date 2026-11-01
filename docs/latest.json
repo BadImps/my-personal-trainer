@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 144,
-  "versionName": "6.2",
-  "publishedAt": "2026-10-31T22:00:00Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v6.2/app-release.apk",
-  "sha256": "7c9ab9bdf5dfdb8903c6cc095e0dc97a9cb16d282b5b3902a7a4c2c8150444ef",
-  "sizeBytes": 269973083,
-  "notes": "Adds Google Maps and address selection to Endurance while retaining MapLibre as the offline fallback."
+  "versionCode": 145,
+  "versionName": "6.3",
+  "publishedAt": "2026-11-01T02:21:26Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v6.3/app-release.apk",
+  "sha256": "2dd09bc16ae350aaf8938fb7126184b1520f604fd34d415782056fbb56ec579d",
+  "sizeBytes": 269973111,
+  "notes": "Unifies planning under Plan, follows live GPS on endurance maps, and adds Google Maps start and destination pin pickers while retaining MapLibre as the offline fallback."
 }
