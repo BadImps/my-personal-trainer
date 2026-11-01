@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 148,
-  "versionName": "6.6",
-  "publishedAt": "2026-11-01T06:52:29Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v6.6/app-release.apk",
-  "sha256": "cb98e101d82e20b67e9c054a1ab0146042eee1fff527e531c7787e259da76310",
-  "sizeBytes": 269996309,
-  "notes": "Progress and Plan now use six distinct, full-colour KPI icons for Nutrition, Body, Apex, Workout Library, My Calendar, and Plan a Workout."
+  "versionCode": 149,
+  "versionName": "6.7",
+  "publishedAt": "2026-11-01T13:25:25Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v6.7/app-release.apk",
+  "sha256": "637971651203ad760006f2ed64342dea5f94259b3f31802528476deddc432615",
+  "sizeBytes": 292377009,
+  "notes": "Progress now uses full-artwork tiles for Nutrition, Body, Apex, Endurance, Guided Workouts, and Energy & Weight. Workout Library moves to Plan beside My Calendar and Plan a Workout."
 }

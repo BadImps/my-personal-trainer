@@ -4060,40 +4060,66 @@ public final class MainActivity extends FragmentActivity {
     private void showPlanHub() {
         LinearLayout body = appPage("Plan");
         title(body, "PLAN", "Your training, clearly arranged", "Open your calendar or build a new Workout, Endurance, or combined plan.");
-        addPlanHubTile(body, "My Calendar", "See, edit, and organise your scheduled sessions.",
-                R.drawable.ic_kpi_calendar, this::showScheduler);
-        gap(body, 12);
-        addPlanHubTile(body, "Plan a Workout", "Create a Daily, Weekly, or Custom plan.",
-                R.drawable.ic_kpi_plan_workout, this::showPlanCadence);
+        LinearLayout topTiles = new LinearLayout(this);
+        topTiles.setGravity(Gravity.CENTER_VERTICAL);
+        addPlanHubTile(topTiles, "My Calendar", "See and edit scheduled sessions.",
+                R.drawable.bg_tile_calendar, this::showScheduler, false, 1);
+        addPlanHubTile(topTiles, "Plan a Workout", "Create Daily, Weekly, or Custom.",
+                R.drawable.bg_tile_plan_workout, this::showPlanCadence, true, 1);
+        body.addView(topTiles, new LinearLayout.LayoutParams(-1, dp(222)));
+        gap(body, 10);
+        LinearLayout lowerTiles = new LinearLayout(this);
+        lowerTiles.setGravity(Gravity.CENTER_VERTICAL);
+        lowerTiles.addView(new View(this), new LinearLayout.LayoutParams(0, -1, 1));
+        addPlanHubTile(lowerTiles, "Workout Library", "Browse movements and equipment.",
+                R.drawable.bg_tile_workout_library, this::showWorkoutLibrary, false, 2);
+        lowerTiles.addView(new View(this), new LinearLayout.LayoutParams(0, -1, 1));
+        body.addView(lowerTiles, new LinearLayout.LayoutParams(-1, dp(222)));
     }
 
-    private void addPlanHubTile(LinearLayout body, String label, String detail, int iconRes, Runnable open) {
-        LinearLayout tile = new LinearLayout(this);
-        tile.setGravity(Gravity.CENTER_VERTICAL);
-        tile.setPadding(dp(18), dp(17), dp(16), dp(17));
+    /** Two upright action cards deliberately echo the Progress collage instead of using long list rows. */
+    private void addPlanHubTile(LinearLayout row, String label, String detail, int artworkRes, Runnable open,
+                                boolean second, int weight) {
+        FrameLayout tile = new FrameLayout(this);
         tile.setClickable(true);
         tile.setFocusable(true);
         tile.setContentDescription("Open " + label);
         tile.setBackground(surface(navyPanel, 20, 1, Color.rgb(48, 91, 119)));
-        ImageView icon = new ImageView(this);
-        icon.setImageResource(iconRes);
-        // Hub KPI artwork includes its own badge and deliberate colour treatment.
-        icon.setBackgroundColor(Color.TRANSPARENT);
-        icon.setPadding(0, 0, 0, 0);
-        tile.addView(icon, new LinearLayout.LayoutParams(dp(54), dp(54)));
+        tile.setClipToOutline(true);
+        addTileArtwork(tile, artworkRes, Color.argb(126, 4, 20, 38));
         LinearLayout copy = new LinearLayout(this);
         copy.setOrientation(LinearLayout.VERTICAL);
-        copy.addView(heading(label, 20, Color.WHITE));
-        copy.addView(text(detail, 13, Color.rgb(205, 225, 237)));
-        LinearLayout.LayoutParams copyParams = new LinearLayout.LayoutParams(0, -2, 1);
-        copyParams.leftMargin = dp(14);
-        tile.addView(copy, copyParams);
-        TextView arrow = heading("›", 30, mint);
+        copy.setGravity(Gravity.CENTER);
+        copy.setPadding(dp(10), dp(18), dp(10), dp(14));
+        TextView name = heading(label, label.length() > 12 ? 16 : 18, Color.WHITE);
+        name.setGravity(Gravity.CENTER);
+        name.setMaxLines(2);
+        copy.addView(name, new LinearLayout.LayoutParams(-1, dp(44)));
+        TextView description = text(detail, 12, Color.rgb(205, 225, 237));
+        description.setGravity(Gravity.CENTER);
+        description.setMaxLines(2);
+        copy.addView(description, new LinearLayout.LayoutParams(-1, dp(39)));
+        TextView arrow = heading("Open  ›", 13, mint);
         arrow.setGravity(Gravity.CENTER);
-        tile.addView(arrow, new LinearLayout.LayoutParams(dp(30), dp(54)));
+        FrameLayout.LayoutParams arrowParams = new FrameLayout.LayoutParams(-1, dp(26), Gravity.BOTTOM);
+        tile.addView(copy, new FrameLayout.LayoutParams(-1, -1));
+        tile.addView(arrow, arrowParams);
         tile.setOnClickListener(view -> open.run());
         applyPressMotion(tile);
-        body.addView(tile, new LinearLayout.LayoutParams(-1, dp(98)));
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, -1, weight);
+        if (second) params.leftMargin = dp(10);
+        row.addView(tile, params);
+    }
+
+    /** A restrained navy veil protects tile labels while preserving the full image artwork. */
+    private void addTileArtwork(FrameLayout tile, int artworkRes, int overlayColor) {
+        ImageView artwork = new ImageView(this);
+        artwork.setImageResource(artworkRes);
+        artwork.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        tile.addView(artwork, new FrameLayout.LayoutParams(-1, -1));
+        View overlay = new View(this);
+        overlay.setBackgroundColor(overlayColor);
+        tile.addView(overlay, new FrameLayout.LayoutParams(-1, -1));
     }
 
     /** Plan is the only navigation entry: choose timing before choosing what to train. */
@@ -6885,11 +6911,6 @@ public final class MainActivity extends FragmentActivity {
         JourneyStore.Snapshot snapshot = JourneyStore.snapshot(this);
         int planned = plannedSessionsThisWeek();
 
-        // The combined report deliberately appears before history. It answers “what did my
-        // whole week add up to?” before the member drills into individual completed sessions.
-        addWeeklyActivityReport(body);
-        gap(body, 12);
-
         LinearLayout history = card();
         history.addView(heading("This week’s completed plan history", 19, ink));
         history.addView(text("Green = completed  •  Red = planned, not completed  •  Gray = no plan", 12, muted));
@@ -6990,50 +7011,56 @@ public final class MainActivity extends FragmentActivity {
         body.addView(trend);
     }
 
-    /** Four related destinations stay available without turning the dashboard navigation into a long strip. */
+    /** Personal destinations plus the real weekly-report sections form one image-led Progress collage. */
     private void addProgressDestinations(LinearLayout body) {
         LinearLayout firstRow = new LinearLayout(this);
         firstRow.setGravity(Gravity.CENTER_VERTICAL);
-        addProgressDestination(firstRow, "Nutrition", "Fuel check-in", R.drawable.ic_kpi_nutrition,
+        addProgressDestination(firstRow, "Nutrition", "Fuel check-in", R.drawable.bg_tile_nutrition,
                 Color.rgb(111, 222, 192), this::showMeals, false);
-        addProgressDestination(firstRow, "Body", "Private context", R.drawable.ic_kpi_body,
+        addProgressDestination(firstRow, "Body", "Private context", R.drawable.bg_tile_body,
                 Color.rgb(112, 190, 244), this::showBodyContext, true);
-        body.addView(firstRow, new LinearLayout.LayoutParams(-1, dp(116)));
+        body.addView(firstRow, new LinearLayout.LayoutParams(-1, dp(128)));
 
         gap(body, 9);
         LinearLayout secondRow = new LinearLayout(this);
         secondRow.setGravity(Gravity.CENTER_VERTICAL);
-        addProgressDestination(secondRow, "Apex", "Achievements", R.drawable.ic_kpi_apex,
+        addProgressDestination(secondRow, "Apex", "Achievements", R.drawable.bg_tile_apex,
                 coral, this::showApex, false);
-        addProgressDestination(secondRow, "Workout Library", "Explore movements", R.drawable.ic_kpi_library,
-                Color.rgb(241, 195, 92), this::showWorkoutLibrary, true);
-        body.addView(secondRow, new LinearLayout.LayoutParams(-1, dp(116)));
+        addProgressDestination(secondRow, "Endurance", "Distance · time · pace", R.drawable.bg_tile_endurance,
+                Color.rgb(111, 222, 192), this::showWeeklyProgressReport, true);
+        body.addView(secondRow, new LinearLayout.LayoutParams(-1, dp(128)));
+        gap(body, 9);
+        LinearLayout thirdRow = new LinearLayout(this);
+        thirdRow.setGravity(Gravity.CENTER_VERTICAL);
+        addProgressDestination(thirdRow, "Guided Workouts", "Sessions · sets · active time", R.drawable.bg_tile_guided_workouts,
+                coral, this::showWeeklyProgressReport, false);
+        addProgressDestination(thirdRow, "Energy & Weight", "Energy range · trend", R.drawable.bg_tile_energy_weight,
+                Color.rgb(241, 195, 92), this::showWeeklyProgressReport, true);
+        body.addView(thirdRow, new LinearLayout.LayoutParams(-1, dp(128)));
     }
 
-    private void addProgressDestination(LinearLayout row, String label, String detail, int iconRes, int accent,
+    private void addProgressDestination(LinearLayout row, String label, String detail, int artworkRes, int accent,
                                         Runnable open, boolean second) {
-        LinearLayout tile = new LinearLayout(this);
-        tile.setOrientation(LinearLayout.VERTICAL);
-        tile.setGravity(Gravity.CENTER_VERTICAL);
-        tile.setPadding(dp(12), dp(11), dp(12), dp(10));
+        FrameLayout tile = new FrameLayout(this);
         tile.setClickable(true);
         tile.setFocusable(true);
         tile.setContentDescription("Open " + label);
         tile.setBackground(surface(navyPanel, 18, 1, Color.argb(170, Color.red(accent), Color.green(accent), Color.blue(accent))));
-        ImageView icon = new ImageView(this);
-        icon.setImageResource(iconRes);
-        // Every destination owns a recognisable, full-colour KPI mark.
-        icon.setBackgroundColor(Color.TRANSPARENT);
-        icon.setPadding(0, 0, 0, 0);
-        tile.addView(icon, new LinearLayout.LayoutParams(dp(38), dp(38)));
+        tile.setClipToOutline(true);
+        addTileArtwork(tile, artworkRes, Color.argb(138, 4, 20, 38));
+        LinearLayout copy = new LinearLayout(this);
+        copy.setOrientation(LinearLayout.VERTICAL);
+        copy.setGravity(Gravity.CENTER);
+        copy.setPadding(dp(8), dp(9), dp(8), dp(8));
         TextView name = heading(label, label.length() > 12 ? 14 : 16, Color.WHITE);
         name.setGravity(Gravity.CENTER);
-        name.setSingleLine(true);
-        tile.addView(name, new LinearLayout.LayoutParams(-1, dp(27)));
-        TextView subtitle = text(detail, 11, Color.rgb(196, 216, 230));
+        name.setMaxLines(2);
+        copy.addView(name, new LinearLayout.LayoutParams(-1, dp(40)));
+        TextView subtitle = text(detail, 11, Color.rgb(222, 235, 244));
         subtitle.setGravity(Gravity.CENTER);
-        subtitle.setSingleLine(true);
-        tile.addView(subtitle, new LinearLayout.LayoutParams(-1, dp(18)));
+        subtitle.setMaxLines(2);
+        copy.addView(subtitle, new LinearLayout.LayoutParams(-1, dp(31)));
+        tile.addView(copy, new FrameLayout.LayoutParams(-1, -1));
         tile.setOnClickListener(view -> open.run());
         applyPressMotion(tile);
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, -1, 1);
@@ -7095,7 +7122,19 @@ public final class MainActivity extends FragmentActivity {
         return totals;
     }
 
-    /** Top-of-Progress report: endurance, guided work, combined time, then energy—before history. */
+    /** Opens the expanded version of the three weekly sections represented in the Progress collage. */
+    private void showWeeklyProgressReport() {
+        LinearLayout body = appPage("Progress");
+        title(body, "WEEKLY PROGRESS REPORT", "Your week at a glance",
+                "Review endurance, guided workouts, time breakdown, energy, and your private weight trend together.");
+        addWeeklyActivityReport(body);
+        gap(body, 12);
+        Button back = secondary("Back to Progress");
+        back.setOnClickListener(view -> showProgress());
+        addButton(body, back);
+    }
+
+    /** Expanded weekly report: endurance, guided work, combined time, then energy. */
     private void addWeeklyActivityReport(LinearLayout body) {
         WeeklyActivityTotals totals = weeklyActivityTotals();
         body.addView(heading("WEEKLY ACTIVITY REPORT", 11, mint));
