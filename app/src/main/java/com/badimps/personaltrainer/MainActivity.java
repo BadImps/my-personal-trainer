@@ -1294,7 +1294,24 @@ public final class MainActivity extends FragmentActivity {
         FrameLayout.LayoutParams copyParams = new FrameLayout.LayoutParams(dp(245), -2, Gravity.LEFT | Gravity.BOTTOM);
         copyParams.leftMargin = dp(18); copyParams.bottomMargin = dp(20);
         hero.addView(copy, copyParams);
+        addGymLobbyBell(hero);
         return hero;
+    }
+
+    /** A single unoutlined inbox entry point keeps lobby activity visible across the app. */
+    private void addGymLobbyBell(FrameLayout hero) {
+        if (!GymLobbyClient.available(this)) return;
+        ImageButton bell = new ImageButton(this);
+        bell.setImageResource(R.drawable.ic_nav_notifications);
+        bell.setImageTintList(ColorStateList.valueOf(mint));
+        bell.setBackgroundColor(Color.TRANSPARENT);
+        bell.setPadding(dp(10), dp(10), dp(10), dp(10));
+        bell.setContentDescription("Open Message Center");
+        bell.setOnClickListener(view -> showMessageCenter());
+        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(dp(48), dp(48), Gravity.RIGHT | Gravity.TOP);
+        params.rightMargin = dp(15);
+        params.topMargin = dp(14);
+        hero.addView(bell, params);
     }
 
     private String coachHeroSubtitle(String screen) {
@@ -1328,6 +1345,7 @@ public final class MainActivity extends FragmentActivity {
         addCoachHeroNavItem(row, "Nutrition", R.drawable.ic_nav_nutrition, activeScreen, view -> navigateDashboard("Nutrition", this::showMeals));
         addCoachHeroNavItem(row, "Scheduler", R.drawable.ic_nav_plan, activeScreen, view -> navigateDashboard("Scheduler", this::showScheduler));
         addCoachHeroNavItem(row, "Body", R.drawable.ic_nav_body, activeScreen, view -> navigateDashboard("Body", this::showBodyContext));
+        addCoachHeroNavItem(row, "Gym Lobby", R.drawable.ic_nav_gym_lobby, activeScreen, view -> navigateDashboard("Gym Lobby", this::showGymLobby));
         addCoachHeroNavItem(row, "Apex", R.drawable.ic_nav_apex, activeScreen, view -> navigateDashboard("Apex", this::showApex));
         addCoachHeroNavItem(row, "Settings", R.drawable.ic_nav_settings, activeScreen, view -> navigateDashboard("Settings", this::showProfile));
         scroll.addView(row, new HorizontalScrollView.LayoutParams(-2, -1));
@@ -1347,7 +1365,7 @@ public final class MainActivity extends FragmentActivity {
     }
 
     private int coachHeroNavigationIndex(String screen) {
-        String[] screens = {"Home", "Plan", "Workout Library", "Progress", "Nutrition", "Scheduler", "Body", "Apex", "Settings"};
+        String[] screens = {"Home", "Plan", "Workout Library", "Progress", "Nutrition", "Scheduler", "Body", "Gym Lobby", "Apex", "Settings"};
         for (int index = 0; index < screens.length; index++) {
             if (screens[index].equals(screen)) return index;
         }
@@ -1620,6 +1638,7 @@ public final class MainActivity extends FragmentActivity {
         else if ("Endurance".equals(activeDashboardScrollKey)) showPlans();
         else if ("Scheduler".equals(activeDashboardScrollKey)) showScheduler();
         else if ("Body".equals(activeDashboardScrollKey)) showBodyContext();
+        else if ("Gym Lobby".equals(activeDashboardScrollKey)) showGymLobby();
         else if ("Apex".equals(activeDashboardScrollKey)) showApex();
         else if ("Settings".equals(activeDashboardScrollKey)) showProfile();
         else showPlans();
@@ -1946,6 +1965,7 @@ public final class MainActivity extends FragmentActivity {
         addPlanRailItem(rail, "Nutrition", R.drawable.ic_nav_nutrition, false, view -> navigateDashboard("Nutrition", this::showMeals));
         addPlanRailItem(rail, "Scheduler", R.drawable.ic_nav_plan, false, view -> navigateDashboard("Scheduler", this::showScheduler));
         addPlanRailItem(rail, "Body", R.drawable.ic_nav_body, false, view -> navigateDashboard("Body", this::showBodyContext));
+        addPlanRailItem(rail, "Gym Lobby", R.drawable.ic_nav_gym_lobby, false, view -> navigateDashboard("Gym Lobby", this::showGymLobby));
         addPlanRailItem(rail, "Apex", R.drawable.ic_nav_apex, false, view -> navigateDashboard("Apex", this::showApex));
         addPlanRailItem(rail, "Settings", R.drawable.ic_nav_settings, false, view -> navigateDashboard("Settings", this::showProfile));
         return rail;
@@ -2019,6 +2039,7 @@ public final class MainActivity extends FragmentActivity {
         addRailItem(rail, "Nutrition", R.drawable.ic_nav_nutrition, activeScreen, view -> navigateDashboard("Nutrition", this::showMeals));
         addRailItem(rail, "Scheduler", R.drawable.ic_nav_plan, activeScreen, view -> navigateDashboard("Scheduler", this::showScheduler));
         addRailItem(rail, "Body", R.drawable.ic_nav_body, activeScreen, view -> navigateDashboard("Body", this::showBodyContext));
+        addRailItem(rail, "Gym Lobby", R.drawable.ic_nav_gym_lobby, activeScreen, view -> navigateDashboard("Gym Lobby", this::showGymLobby));
         addRailItem(rail, "Apex", R.drawable.ic_nav_apex, activeScreen, view -> navigateDashboard("Apex", this::showApex));
         addRailItem(rail, "Settings", R.drawable.ic_nav_settings, activeScreen, view -> navigateDashboard("Settings", this::showProfile));
         return rail;
@@ -8392,6 +8413,334 @@ public final class MainActivity extends FragmentActivity {
     }
 
     /** Dedicated Achievement + Apex hub. It is intentionally a first-class navigation page, before Settings. */
+    private void showGymLobby() {
+        LinearLayout body = appPage("Gym Lobby");
+        lobbySlogan(body);
+        if (!GymLobbyClient.available(this)) {
+            LinearLayout notice = card();
+            notice.addView(heading("Verified sign-in required", 20, navy));
+            notice.addView(text("The Gym Lobby uses your secure account so invitations and lobby membership can follow you between devices. Your email, workouts, body information, meals, and routes are never shown here.", 14, muted));
+            gap(notice, 12);
+            Button signIn = primary("Sign in to enter Gym Lobby");
+            signIn.setOnClickListener(view -> showLogin());
+            notice.addView(signIn, new LinearLayout.LayoutParams(-1, dp(52)));
+            body.addView(notice);
+            return;
+        }
+        LinearLayout loading = darkCard();
+        loading.addView(heading("Opening Gym Lobby…", 20, Color.WHITE));
+        loading.addView(text("Refreshing Gym Members, invitations, and private lobbies.", 13, Color.rgb(211, 225, 233)));
+        body.addView(loading);
+        GymLobbyClient.publishAndLoad(this, (snapshot, error) -> runOnUiThread(() -> {
+            if (!"Gym Lobby".equals(activeDashboardScrollKey)) return;
+            if (error != null) renderGymLobbyError(error);
+            else renderGymLobby(snapshot);
+        }));
+    }
+
+    private void renderGymLobbyError(String error) {
+        LinearLayout body = appPage("Gym Lobby");
+        lobbySlogan(body);
+        LinearLayout notice = card();
+        notice.addView(heading("Could not open Gym Lobby", 20, navy));
+        notice.addView(text(error, 14, muted));
+        gap(notice, 12);
+        Button retry = primary("Try again");
+        retry.setOnClickListener(view -> showGymLobby());
+        notice.addView(retry, new LinearLayout.LayoutParams(-1, dp(52)));
+        body.addView(notice);
+    }
+
+    private void renderGymLobby(GymLobbyClient.Snapshot snapshot) {
+        LinearLayout body = appPage("Gym Lobby");
+        lobbySlogan(body);
+
+        body.addView(heading("YOUR PRIVATE LOBBIES", 13, mint));
+        gap(body, 7);
+        if (snapshot.lobbies.isEmpty()) {
+            body.addView(text("Your private lobby will appear after your account is published.", 14, Color.rgb(211, 225, 233)));
+        } else {
+            for (GymLobbyClient.Lobby lobby : snapshot.lobbies) {
+                Button open = secondary(lobby.ownerName + "’s Private Lobby");
+                open.setContentDescription("Open " + lobby.ownerName + "'s private lobby leaderboard");
+                open.setOnClickListener(view -> showPrivateGymLobby(lobby.ownerId, lobby.ownerName));
+                addButton(body, open);
+                gap(body, 8);
+            }
+        }
+        gap(body, 8);
+        body.addView(heading(snapshot.members.size() + " GYM MEMBERS", 13, mint));
+        gap(body, 7);
+        if (snapshot.members.isEmpty()) {
+            LinearLayout empty = card();
+            empty.addView(heading("You’re first in the lobby", 19, navy));
+            empty.addView(text("Other verified Gym Members will appear here after they install this update and sign in.", 14, muted));
+            body.addView(empty);
+        } else {
+            for (GymLobbyClient.Member member : snapshot.members) {
+                LinearLayout memberCard = gymMemberCard(member);
+                View.OnClickListener openMenu = view -> showGymMemberMenu(view, member);
+                memberCard.setOnClickListener(openMenu);
+                memberCard.setOnLongClickListener(view -> { showGymMemberMenu(view, member); return true; });
+                body.addView(memberCard);
+                gap(body, 9);
+            }
+        }
+    }
+
+    private LinearLayout gymMemberCard(GymLobbyClient.Member member) {
+        LinearLayout view = settingsPanel();
+        view.setPadding(dp(14), dp(13), dp(12), dp(13));
+        view.setOrientation(LinearLayout.HORIZONTAL);
+        view.setGravity(Gravity.CENTER_VERTICAL);
+        view.setClickable(true);
+        view.setFocusable(true);
+        view.setContentDescription(member.name + ", level " + member.level + ", " + lobbyRankTitle(member.level) + ". " + member.achievements.size() + " achievement cards. Tap or hold for member actions.");
+        view.addView(gymMemberAvatar(member.name), new LinearLayout.LayoutParams(dp(52), dp(52)));
+        LinearLayout copy = new LinearLayout(this);
+        copy.setOrientation(LinearLayout.VERTICAL);
+        copy.addView(heading(member.name, 17, ink));
+        copy.addView(text("Level " + member.level + (member.buddy ? "  ·  Gym Buddy" : ""), 13, muted));
+        copy.addView(text(member.achievements.size() + " achievement cards", 12, Color.rgb(65, 104, 105)));
+        LinearLayout.LayoutParams copyParams = new LinearLayout.LayoutParams(0, -2, 1); copyParams.leftMargin = dp(13); view.addView(copy, copyParams);
+        RankBannerView rankTile = new RankBannerView(this);
+        String rankTitle = lobbyRankTitle(member.level);
+        rankTile.bind(rankTitle);
+        LinearLayout.LayoutParams rankParams = new LinearLayout.LayoutParams(
+                dp(rankTitle.length() >= 9 ? 132 : 116), dp(34));
+        rankParams.leftMargin = dp(8);
+        view.addView(rankTile, rankParams);
+        return view;
+    }
+
+    /** A privacy-safe WhatsApp-style avatar: the lobby never uploads a member's real photo. */
+    private TextView gymMemberAvatar(String name) {
+        String clean = name == null ? "" : name.trim();
+        String[] parts = clean.split("\\s+");
+        String initials = "GM";
+        if (parts.length == 1 && !parts[0].isEmpty()) initials = parts[0].substring(0, Math.min(2, parts[0].length()));
+        else if (parts.length > 1 && !parts[0].isEmpty() && !parts[parts.length - 1].isEmpty()) initials = "" + parts[0].charAt(0) + parts[parts.length - 1].charAt(0);
+        TextView avatar = heading(initials.toUpperCase(Locale.ROOT), 15, navy);
+        avatar.setGravity(Gravity.CENTER); avatar.setContentDescription(clean.isEmpty() ? "Gym Member avatar" : clean + " avatar");
+        avatar.setBackground(surface(mint, 99, 2, Color.argb(120, 255, 255, 255)));
+        return avatar;
+    }
+
+    /** The Lobby displays the same clear eight-rank ladder used by its premium banner artwork. */
+    private String lobbyRankTitle(int level) {
+        if (level <= 10) return "Beginner";
+        if (level <= 25) return "Novice";
+        if (level <= 40) return "Contender";
+        if (level <= 60) return "Competitor";
+        if (level <= 80) return "Athlete";
+        if (level <= 100) return "Elite";
+        if (level <= 150) return "Champion";
+        return "Apex";
+    }
+
+    private void lobbySlogan(LinearLayout body) {
+        TextView slogan = heading("Small wins, shared strength.", 20, Color.WHITE);
+        body.addView(slogan);
+        TextView privacy = text("Friendly connections only. Your workouts, health details, and real profile photo stay private.", 13, Color.rgb(211, 225, 233));
+        privacy.setPadding(0, dp(4), 0, dp(15)); body.addView(privacy);
+    }
+
+    private void showGymMemberMenu(View anchor, GymLobbyClient.Member member) {
+        PopupMenu menu = new PopupMenu(this, anchor);
+        menu.getMenu().add(0, 1, 0, member.buddy ? "Gym Buddy" : "Add as Gym Buddy").setEnabled(!member.buddy);
+        menu.getMenu().add(0, 2, 1, "Invite to my private lobby");
+        menu.getMenu().add(0, 3, 2, "Join private lobby");
+        menu.getMenu().add(0, 4, 3, "View Profile");
+        menu.getMenu().add(0, 5, 4, "Send message");
+        menu.getMenu().add(0, 6, 5, "Close");
+        menu.setOnMenuItemClickListener(item -> {
+            if (item.getItemId() == 1) sendGymLobbyAction(member, "buddy", "Gym Buddy request sent.");
+            else if (item.getItemId() == 2) sendGymLobbyAction(member, "invite", "Private lobby invitation sent.");
+            else if (item.getItemId() == 3) sendGymLobbyAction(member, "join", "Request to join private lobby sent.");
+            else if (item.getItemId() == 4) showGymMemberProfile(member);
+            else if (item.getItemId() == 5) showGymMessageComposer(member);
+            return true;
+        });
+        menu.show();
+    }
+
+    private void sendGymLobbyAction(GymLobbyClient.Member member, String kind, String success) {
+        GymLobbyClient.send(this, member.id, kind, (sent, error) -> runOnUiThread(() -> {
+            toast(error == null ? success : error);
+            if (error == null && "Gym Lobby".equals(activeDashboardScrollKey)) showGymLobby();
+        }));
+    }
+
+    private void respondToGymRequest(GymLobbyClient.Request request, boolean accept) {
+        GymLobbyClient.respond(this, request.id, accept, (saved, error) -> runOnUiThread(() -> {
+            toast(error == null ? (accept ? "Invitation accepted." : "Invitation declined.") : error);
+            if (error == null) showMessageCenter();
+        }));
+    }
+
+    private void showMessageCenter() {
+        LinearLayout body = appPage("Message Center", "Gym Lobby");
+        title(body, "MESSAGE CENTER", "Gym Lobby activity", "Private lobby invitations, join requests, Gym Buddy requests, and messages appear here.");
+        if (!GymLobbyClient.available(this)) {
+            LinearLayout notice = card();
+            notice.addView(heading("Sign in to see messages", 19, navy));
+            notice.addView(text("The Message Center uses your secure account to keep lobby activity with you across devices.", 14, muted));
+            gap(notice, 10);
+            Button signIn = primary("Sign in"); signIn.setOnClickListener(view -> showLogin()); addButton(notice, signIn);
+            body.addView(notice); return;
+        }
+        LinearLayout loading = darkCard();
+        loading.addView(heading("Opening Message Center…", 20, Color.WHITE));
+        loading.addView(text("Refreshing private lobby activity.", 13, Color.rgb(211, 225, 233)));
+        body.addView(loading);
+        GymLobbyClient.inbox(this, (inbox, error) -> runOnUiThread(() -> {
+            if (!"Gym Lobby".equals(activeDashboardScrollKey)) return;
+            if (error != null || inbox == null) { toast(error == null ? "Could not load the Message Center." : error); showGymLobby(); return; }
+            renderMessageCenter(inbox);
+            GymLobbyClient.markMessagesRead(this, (ignored, readError) -> { });
+        }));
+    }
+
+    private void renderMessageCenter(GymLobbyClient.Inbox inbox) {
+        LinearLayout body = appPage("Message Center", "Gym Lobby");
+        title(body, "MESSAGE CENTER", "Gym Lobby activity", "Friendly connection requests and messages. Your private training details are never shared here.");
+        if (inbox.requests.isEmpty() && inbox.messages.isEmpty()) {
+            LinearLayout empty = card();
+            empty.addView(heading("All caught up", 20, navy));
+            empty.addView(text("Private-lobby invitations, join requests, Gym Buddy requests, and messages will appear here.", 14, muted));
+            body.addView(empty);
+        }
+        if (!inbox.requests.isEmpty()) {
+            body.addView(heading("REQUESTS", 13, mint)); gap(body, 7);
+            for (GymLobbyClient.Request request : inbox.requests) { body.addView(gymRequestMessageCard(request)); gap(body, 9); }
+        }
+        if (!inbox.messages.isEmpty()) {
+            body.addView(heading("MESSAGES", 13, mint)); gap(body, 7);
+            for (GymLobbyClient.Message message : inbox.messages) { body.addView(gymMessageCard(message)); gap(body, 9); }
+        }
+        Button back = secondary("Back to Gym Lobby"); back.setOnClickListener(view -> showGymLobby()); addButton(body, back);
+    }
+
+    private LinearLayout gymRequestMessageCard(GymLobbyClient.Request request) {
+        LinearLayout card = card();
+        card.addView(heading(GymLobbyClient.requestTitle(request.kind), 18, ink));
+        card.addView(text(GymLobbyClient.requestDescription(request.kind, request.senderName, request.lobbyOwnerName), 14, muted));
+        gap(card, 10);
+        LinearLayout actions = new LinearLayout(this); actions.setOrientation(LinearLayout.HORIZONTAL);
+        Button accept = primary("Accept"); Button decline = lightAction("Decline");
+        accept.setOnClickListener(view -> respondToGymRequest(request, true)); decline.setOnClickListener(view -> respondToGymRequest(request, false));
+        actions.addView(accept, new LinearLayout.LayoutParams(0, dp(48), 1));
+        LinearLayout.LayoutParams declineParams = new LinearLayout.LayoutParams(0, dp(48), 1); declineParams.leftMargin = dp(8); actions.addView(decline, declineParams);
+        card.addView(actions); return card;
+    }
+
+    private LinearLayout gymMessageCard(GymLobbyClient.Message message) {
+        LinearLayout card = card();
+        card.setPadding(dp(14), dp(13), dp(14), dp(13));
+        LinearLayout row = new LinearLayout(this); row.setGravity(Gravity.CENTER_VERTICAL);
+        row.addView(gymMemberAvatar(message.senderName), new LinearLayout.LayoutParams(dp(42), dp(42)));
+        LinearLayout copy = new LinearLayout(this); copy.setOrientation(LinearLayout.VERTICAL);
+        copy.addView(heading(message.senderName, 16, ink)); copy.addView(text(message.body, 13, muted));
+        LinearLayout.LayoutParams copyParams = new LinearLayout.LayoutParams(0, -2, 1); copyParams.leftMargin = dp(11); row.addView(copy, copyParams);
+        if (message.unread) { TextView unread = heading("NEW", 10, coral); unread.setGravity(Gravity.CENTER); row.addView(unread, new LinearLayout.LayoutParams(dp(38), dp(28))); }
+        card.addView(row); return card;
+    }
+
+    private void showGymMessageComposer(GymLobbyClient.Member member) {
+        EditText input = input("Write a friendly message", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES | InputType.TYPE_TEXT_FLAG_MULTI_LINE);
+        input.setMinLines(3); input.setMaxLines(5);
+        new AlertDialog.Builder(this).setTitle("Message " + member.name).setView(input)
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Send", (dialog, which) -> {
+                    String body = input.getText().toString().trim();
+                    if (body.isEmpty()) { toast("Write a message first."); return; }
+                    GymLobbyClient.sendMessage(this, member.id, body, (sent, error) -> runOnUiThread(() ->
+                            toast(error == null ? "Message sent." : error)));
+                }).show();
+    }
+
+    private void showGymMemberProfile(GymLobbyClient.Member member) {
+        LinearLayout body = appPage("Gym Member", "Gym Lobby");
+        title(body, "GYM MEMBER PROFILE", member.name, "Public training milestones shared for friendly motivation.");
+        LinearLayout overview = darkCard();
+        String memberRank = lobbyRankTitle(member.level);
+        overview.addView(heading("LEVEL " + member.level + " · " + memberRank, 23, Color.WHITE));
+        overview.addView(text("Your current Gym Lobby rank", 11, mint));
+        overview.addView(text(member.achievements.size() + " achievement cards shared for friendly motivation.", 14, Color.rgb(211, 225, 233)));
+        body.addView(overview);
+        gap(body, 14);
+        body.addView(heading("ACHIEVEMENT CARDS", 13, mint));
+        gap(body, 7);
+        if (member.achievements.isEmpty()) {
+            LinearLayout empty = card();
+            empty.addView(text("No achievement cards shared yet.", 14, muted));
+            body.addView(empty);
+        } else {
+            GridLayout grid = new GridLayout(this);
+            grid.setColumnCount(2);
+            for (int index = 0; index < member.achievements.size(); index++) {
+                AchievementStore.Badge badge = new AchievementStore.Badge("ACHIEVEMENT", member.achievements.get(index), "Earned achievement.", 1, 1);
+                addAchievementBadgeTile(grid, badge, index);
+            }
+            body.addView(grid);
+        }
+        gap(body, 14);
+        Button back = secondary("Back to Gym Lobby");
+        back.setOnClickListener(view -> showGymLobby());
+        addButton(body, back);
+    }
+
+    private void showPrivateGymLobby(String ownerId, String ownerName) {
+        LinearLayout body = appPage("Private Lobby", "Gym Lobby");
+        title(body, "FRIENDLY COMPETITION", ownerName + "’s Lobby", "Loading the private leaderboard…");
+        GymLobbyClient.leaderboard(this, ownerId, (leaderboard, error) -> runOnUiThread(() -> {
+            if (!"Gym Lobby".equals(activeDashboardScrollKey)) return;
+            if (error != null) {
+                toast(error);
+                showGymLobby();
+            } else renderPrivateGymLobby(leaderboard);
+        }));
+    }
+
+    private void renderPrivateGymLobby(GymLobbyClient.Leaderboard leaderboard) {
+        LinearLayout body = appPage("Private Lobby", "Gym Lobby");
+        title(body, "FRIENDLY COMPETITION", leaderboard.ownerName + "’s Lobby", "A friendly member order. Training data remains private, and the board is designed for encouragement—not judgment.");
+        if (leaderboard.members.isEmpty()) {
+            LinearLayout empty = card();
+            empty.addView(heading("No members yet", 19, navy));
+            empty.addView(text("Accepted invitations and join requests will appear here.", 14, muted));
+            body.addView(empty);
+        } else {
+            for (int index = 0; index < leaderboard.members.size(); index++) {
+                GymLobbyClient.Member member = leaderboard.members.get(index);
+                int rank = member.rank > 0 ? member.rank : index + 1;
+                LinearLayout row = rank <= 3 ? darkCard() : card();
+                LinearLayout line = new LinearLayout(this);
+                line.setOrientation(LinearLayout.HORIZONTAL);
+                line.setGravity(Gravity.CENTER_VERTICAL);
+                TextView placement = heading(GymLobbyClient.rankLabel(rank), 18, rank <= 3 ? mint : coral);
+                line.addView(placement, new LinearLayout.LayoutParams(dp(58), -2));
+                LinearLayout copy = new LinearLayout(this);
+                copy.setOrientation(LinearLayout.VERTICAL);
+                copy.addView(heading(member.name, 18, rank <= 3 ? Color.WHITE : navy));
+                copy.addView(text(lobbyRankTitle(member.level) + " · Level " + member.level + "  •  " + member.achievements.size() + " achievement cards", 12, rank <= 3 ? Color.rgb(211, 225, 233) : muted));
+                line.addView(copy, new LinearLayout.LayoutParams(0, -2, 1));
+                row.addView(line);
+                row.setClickable(true);
+                row.setFocusable(true);
+                row.setContentDescription(GymLobbyClient.rankLabel(rank) + ", " + member.name + ", level " + member.level + ". Open profile.");
+                row.setOnClickListener(view -> showGymMemberProfile(member));
+                body.addView(row);
+                gap(body, 9);
+            }
+        }
+        Button back = secondary("Back to Gym Lobby");
+        back.setOnClickListener(view -> showGymLobby());
+        addButton(body, back);
+    }
+
+    /** Dedicated Achievement + Apex hub. It is intentionally a first-class navigation page, before Settings. */
+
     private void showApex() {
         LinearLayout body = appPage("Apex");
         AchievementStore.Snapshot snapshot = AchievementStore.snapshot(this);
@@ -12513,16 +12862,16 @@ public final class MainActivity extends FragmentActivity {
     }
 
     private int enduranceActivityIcon(String mode) {
-        if (EndurancePlanStore.RUNNING.equals(mode)) return R.drawable.ic_endurance_running;
-        if (EndurancePlanStore.CYCLING.equals(mode)) return R.drawable.ic_endurance_cycling;
-        return R.drawable.ic_endurance_walking;
+        if (EndurancePlanStore.RUNNING.equals(mode)) return R.drawable.ic_kpi_run;
+        if (EndurancePlanStore.CYCLING.equals(mode)) return R.drawable.ic_kpi_cycle;
+        return R.drawable.ic_kpi_walk;
     }
 
     private LinearLayout enduranceModeTile(String mode, String label, String copy) {
         boolean selected = mode.equals(enduranceWizardMode);
         LinearLayout tile = new LinearLayout(this); tile.setGravity(Gravity.CENTER_VERTICAL); tile.setPadding(dp(14), dp(13), dp(14), dp(13));
         tile.setBackground(surface(paper, 18, selected ? 2 : 1, selected ? mint : cardLine)); tile.setClickable(true); tile.setFocusable(true);
-        ImageView icon = new ImageView(this); icon.setImageResource(enduranceActivityIcon(mode)); icon.setImageTintList(ColorStateList.valueOf(navy)); icon.setPadding(dp(11), dp(11), dp(11), dp(11)); icon.setBackground(surface(mint, 99, 0, Color.TRANSPARENT)); tile.addView(icon, new LinearLayout.LayoutParams(dp(48), dp(48)));
+        ImageView icon = new ImageView(this); icon.setImageResource(enduranceActivityIcon(mode)); icon.setContentDescription(label + " activity icon"); tile.addView(icon, new LinearLayout.LayoutParams(dp(48), dp(48)));
         LinearLayout copyColumn = new LinearLayout(this); copyColumn.setOrientation(LinearLayout.VERTICAL); copyColumn.addView(heading(label, 18, ink)); copyColumn.addView(text(copy, 13, muted));
         LinearLayout.LayoutParams copyParams = new LinearLayout.LayoutParams(0, -2, 1); copyParams.leftMargin = dp(12); tile.addView(copyColumn, copyParams);
         if (selected) { TextView check = heading("✓", 18, navy); check.setGravity(Gravity.CENTER); check.setBackground(surface(mint, 99, 0, Color.TRANSPARENT)); tile.addView(check, new LinearLayout.LayoutParams(dp(32), dp(32))); }
@@ -12550,7 +12899,7 @@ public final class MainActivity extends FragmentActivity {
         calendar.setBackground(surface(Color.rgb(10, 29, 50), 24, 1, Color.rgb(41, 83, 115)));
         LinearLayout header = new LinearLayout(this); header.setGravity(Gravity.CENTER_VERTICAL);
         FrameLayout activityBadge = new FrameLayout(this); activityBadge.setBackground(surface(Color.rgb(17, 62, 80), 99, 1, mint));
-        ImageView glyph = new ImageView(this); glyph.setImageResource(enduranceActivityIcon(enduranceWizardMode)); glyph.setImageTintList(ColorStateList.valueOf(mint)); glyph.setPadding(dp(7), dp(7), dp(7), dp(7)); activityBadge.addView(glyph, new FrameLayout.LayoutParams(-1, -1));
+        ImageView glyph = new ImageView(this); glyph.setImageResource(enduranceActivityIcon(enduranceWizardMode)); glyph.setContentDescription(enduranceWizardMode + " activity icon"); activityBadge.addView(glyph, new FrameLayout.LayoutParams(-1, -1));
         header.addView(activityBadge, new LinearLayout.LayoutParams(dp(32), dp(32)));
         TextView weekTitle = heading(selectedWeekTitle().replace("Week of ", ""), 18, Color.WHITE); weekTitle.setGravity(Gravity.CENTER_VERTICAL);
         LinearLayout.LayoutParams weekParams = new LinearLayout.LayoutParams(0, dp(42), 1); weekParams.leftMargin = dp(8); header.addView(weekTitle, weekParams);
@@ -12580,7 +12929,7 @@ public final class MainActivity extends FragmentActivity {
             final int day = i; boolean selected = weekly ? enduranceWorkoutDays[i] : enduranceDailyDay == i;
             boolean historical = isPastCalendarDate(selectedWeekDate(i));
             LinearLayout detail = new LinearLayout(this); detail.setOrientation(LinearLayout.VERTICAL); detail.setGravity(Gravity.CENTER); detail.setClickable(true); detail.setPadding(dp(2), dp(7), dp(2), dp(6)); detail.setBackground(surface(selected ? Color.rgb(18, 63, 81) : Color.rgb(20, 46, 72), 10, selected ? 1 : 0, selected ? mint : Color.TRANSPARENT));
-            ImageView icon = new ImageView(this); icon.setImageResource(selected ? enduranceActivityIcon(enduranceWizardMode) : R.drawable.ic_home_rest); icon.setImageTintList(ColorStateList.valueOf(selected ? mint : Color.rgb(154, 178, 205))); icon.setScaleType(ImageView.ScaleType.CENTER_INSIDE); LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(-1, dp(22)); iconParams.leftMargin = dp(6); iconParams.rightMargin = dp(6); detail.addView(icon, iconParams);
+            ImageView icon = new ImageView(this); icon.setImageResource(selected ? enduranceActivityIcon(enduranceWizardMode) : R.drawable.ic_home_rest); if (!selected) icon.setImageTintList(ColorStateList.valueOf(Color.rgb(154, 178, 205))); icon.setScaleType(ImageView.ScaleType.CENTER_INSIDE); LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(-1, dp(22)); iconParams.leftMargin = dp(6); iconParams.rightMargin = dp(6); detail.addView(icon, iconParams);
             TextView label = heading(selected ? appointmentAbbreviation(enduranceWizardMode) : "Rest", 9, selected ? Color.WHITE : Color.rgb(180, 200, 220)); label.setGravity(Gravity.CENTER); label.setSingleLine(true); detail.addView(label, new LinearLayout.LayoutParams(-1, dp(19)));
             TextView note = text(selected ? "Planned" : "Recover", 8, selected ? Color.rgb(180, 235, 222) : Color.rgb(132, 159, 188)); note.setGravity(Gravity.CENTER); detail.addView(note, new LinearLayout.LayoutParams(-1, dp(17)));
             detail.setOnClickListener(v -> { if (isPastCalendarDate(selectedWeekDate(day))) { toast("Past dates are locked and cannot be changed."); return; } if (weekly) enduranceWorkoutDays[day] = !enduranceWorkoutDays[day]; else enduranceDailyDay = day; refreshCurrentPageKeepingScroll(this::showEnduranceWizardSchedule); });
