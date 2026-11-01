@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 146,
-  "versionName": "6.4",
-  "publishedAt": "2026-11-01T02:52:01Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v6.4/app-release.apk",
-  "sha256": "bc252322ae448654453686ea72867ebe1023d900ce06b599ed4a230240242663",
+  "versionCode": 147,
+  "versionName": "6.5",
+  "publishedAt": "2026-11-01T06:35:11Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v6.5/app-release.apk",
+  "sha256": "7484b21bb659db4dcbd49a4905f16816fdd3944ac6efec871f34aa21e715f4b1",
   "sizeBytes": 269991928,
-  "notes": "Restores Gym Lobby and its Message Center, private-lobby features, member profiles, and friendly leaderboards. Endurance now uses premium walking, running, and cycling KPI icons."
+  "notes": "Progress now groups Nutrition, Body, Apex, and Workout Library in one four-tile hub. Plan now offers My Calendar and Plan a Workout as two clear starting choices."
 }

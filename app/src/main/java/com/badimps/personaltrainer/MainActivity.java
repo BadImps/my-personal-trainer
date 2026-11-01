@@ -1340,13 +1340,8 @@ public final class MainActivity extends FragmentActivity {
         row.setPadding(dp(8), dp(7), dp(8), dp(8));
         addCoachHeroNavItem(row, "Home", R.drawable.ic_nav_home, activeScreen, view -> navigateDashboard("Home", this::showHome));
         addCoachHeroNavItem(row, "Plan", R.drawable.ic_nav_plan, activeScreen, view -> navigateDashboard("Plan", this::showPlans));
-        addCoachHeroNavItem(row, "Workout Library", R.drawable.ic_nav_library_premium, activeScreen, view -> navigateDashboard("Workout Library", this::showWorkoutLibrary));
         addCoachHeroNavItem(row, "Progress", R.drawable.ic_nav_progress, activeScreen, view -> navigateDashboard("Progress", this::showProgress));
-        addCoachHeroNavItem(row, "Nutrition", R.drawable.ic_nav_nutrition, activeScreen, view -> navigateDashboard("Nutrition", this::showMeals));
-        addCoachHeroNavItem(row, "Scheduler", R.drawable.ic_nav_plan, activeScreen, view -> navigateDashboard("Scheduler", this::showScheduler));
-        addCoachHeroNavItem(row, "Body", R.drawable.ic_nav_body, activeScreen, view -> navigateDashboard("Body", this::showBodyContext));
         addCoachHeroNavItem(row, "Gym Lobby", R.drawable.ic_nav_gym_lobby, activeScreen, view -> navigateDashboard("Gym Lobby", this::showGymLobby));
-        addCoachHeroNavItem(row, "Apex", R.drawable.ic_nav_apex, activeScreen, view -> navigateDashboard("Apex", this::showApex));
         addCoachHeroNavItem(row, "Settings", R.drawable.ic_nav_settings, activeScreen, view -> navigateDashboard("Settings", this::showProfile));
         scroll.addView(row, new HorizontalScrollView.LayoutParams(-2, -1));
         scroll.setOnScrollChangeListener((view, scrollX, scrollY, oldScrollX, oldScrollY) ->
@@ -1365,7 +1360,7 @@ public final class MainActivity extends FragmentActivity {
     }
 
     private int coachHeroNavigationIndex(String screen) {
-        String[] screens = {"Home", "Plan", "Workout Library", "Progress", "Nutrition", "Scheduler", "Body", "Gym Lobby", "Apex", "Settings"};
+        String[] screens = {"Home", "Plan", "Progress", "Gym Lobby", "Settings"};
         for (int index = 0; index < screens.length; index++) {
             if (screens[index].equals(screen)) return index;
         }
@@ -1962,11 +1957,7 @@ public final class MainActivity extends FragmentActivity {
         addPlanRailItem(rail, "Home", R.drawable.ic_nav_home, false, view -> navigateDashboard("Home", this::showHome));
         addPlanRailItem(rail, "Plan", R.drawable.ic_nav_plan, true, view -> navigateDashboard("Plan", this::showPlans));
         addPlanRailItem(rail, "Progress", R.drawable.ic_nav_progress, false, view -> navigateDashboard("Progress", this::showProgress));
-        addPlanRailItem(rail, "Nutrition", R.drawable.ic_nav_nutrition, false, view -> navigateDashboard("Nutrition", this::showMeals));
-        addPlanRailItem(rail, "Scheduler", R.drawable.ic_nav_plan, false, view -> navigateDashboard("Scheduler", this::showScheduler));
-        addPlanRailItem(rail, "Body", R.drawable.ic_nav_body, false, view -> navigateDashboard("Body", this::showBodyContext));
         addPlanRailItem(rail, "Gym Lobby", R.drawable.ic_nav_gym_lobby, false, view -> navigateDashboard("Gym Lobby", this::showGymLobby));
-        addPlanRailItem(rail, "Apex", R.drawable.ic_nav_apex, false, view -> navigateDashboard("Apex", this::showApex));
         addPlanRailItem(rail, "Settings", R.drawable.ic_nav_settings, false, view -> navigateDashboard("Settings", this::showProfile));
         return rail;
     }
@@ -2036,11 +2027,7 @@ public final class MainActivity extends FragmentActivity {
         addRailItem(rail, "Home", R.drawable.ic_nav_home, activeScreen, view -> navigateDashboard("Home", this::showHome));
         addRailItem(rail, "Plan", R.drawable.ic_nav_plan, activeScreen, view -> navigateDashboard("Plan", this::showPlans));
         addRailItem(rail, "Progress", R.drawable.ic_nav_progress, activeScreen, view -> navigateDashboard("Progress", this::showProgress));
-        addRailItem(rail, "Nutrition", R.drawable.ic_nav_nutrition, activeScreen, view -> navigateDashboard("Nutrition", this::showMeals));
-        addRailItem(rail, "Scheduler", R.drawable.ic_nav_plan, activeScreen, view -> navigateDashboard("Scheduler", this::showScheduler));
-        addRailItem(rail, "Body", R.drawable.ic_nav_body, activeScreen, view -> navigateDashboard("Body", this::showBodyContext));
         addRailItem(rail, "Gym Lobby", R.drawable.ic_nav_gym_lobby, activeScreen, view -> navigateDashboard("Gym Lobby", this::showGymLobby));
-        addRailItem(rail, "Apex", R.drawable.ic_nav_apex, activeScreen, view -> navigateDashboard("Apex", this::showApex));
         addRailItem(rail, "Settings", R.drawable.ic_nav_settings, activeScreen, view -> navigateDashboard("Settings", this::showProfile));
         return rail;
     }
@@ -4066,7 +4053,47 @@ public final class MainActivity extends FragmentActivity {
         homeShortcutPlanReady = false;
         combinedPlanFlow = false;
         combinedPlanWorkoutSaved = false;
-        showPlanCadence();
+        showPlanHub();
+    }
+
+    /** Plan starts as a short choice board: calendar management or a fresh planning flow. */
+    private void showPlanHub() {
+        LinearLayout body = appPage("Plan");
+        title(body, "PLAN", "Your training, clearly arranged", "Open your calendar or build a new Workout, Endurance, or combined plan.");
+        addPlanHubTile(body, "My Calendar", "See, edit, and organise your scheduled sessions.",
+                R.drawable.ic_nav_plan, this::showScheduler);
+        gap(body, 12);
+        addPlanHubTile(body, "Plan a Workout", "Create a Daily, Weekly, or Custom plan.",
+                R.drawable.ic_nav_workouts, this::showPlanCadence);
+    }
+
+    private void addPlanHubTile(LinearLayout body, String label, String detail, int iconRes, Runnable open) {
+        LinearLayout tile = new LinearLayout(this);
+        tile.setGravity(Gravity.CENTER_VERTICAL);
+        tile.setPadding(dp(18), dp(17), dp(16), dp(17));
+        tile.setClickable(true);
+        tile.setFocusable(true);
+        tile.setContentDescription("Open " + label);
+        tile.setBackground(surface(navyPanel, 20, 1, Color.rgb(48, 91, 119)));
+        ImageView icon = new ImageView(this);
+        icon.setImageResource(iconRes);
+        icon.setImageTintList(ColorStateList.valueOf(mint));
+        icon.setBackground(surface(Color.rgb(12, 45, 66), 99, 1, Color.rgb(70, 129, 148)));
+        icon.setPadding(dp(12), dp(12), dp(12), dp(12));
+        tile.addView(icon, new LinearLayout.LayoutParams(dp(54), dp(54)));
+        LinearLayout copy = new LinearLayout(this);
+        copy.setOrientation(LinearLayout.VERTICAL);
+        copy.addView(heading(label, 20, Color.WHITE));
+        copy.addView(text(detail, 13, Color.rgb(205, 225, 237)));
+        LinearLayout.LayoutParams copyParams = new LinearLayout.LayoutParams(0, -2, 1);
+        copyParams.leftMargin = dp(14);
+        tile.addView(copy, copyParams);
+        TextView arrow = heading("›", 30, mint);
+        arrow.setGravity(Gravity.CENTER);
+        tile.addView(arrow, new LinearLayout.LayoutParams(dp(30), dp(54)));
+        tile.setOnClickListener(view -> open.run());
+        applyPressMotion(tile);
+        body.addView(tile, new LinearLayout.LayoutParams(-1, dp(98)));
     }
 
     /** Plan is the only navigation entry: choose timing before choosing what to train. */
@@ -6853,6 +6880,8 @@ public final class MainActivity extends FragmentActivity {
     private void showProgress() {
         LinearLayout body = appPage("Progress");
         title(body, "PROGRESS NEXUS", "See the whole picture", "Your workout completions, active time, simple fuel check-ins, and private body trend now inform one next step.");
+        addProgressDestinations(body);
+        gap(body, 14);
         JourneyStore.Snapshot snapshot = JourneyStore.snapshot(this);
         int planned = plannedSessionsThisWeek();
 
@@ -6959,6 +6988,57 @@ public final class MainActivity extends FragmentActivity {
         weight.setOnClickListener(view -> showWeightTracker());
         addButton(trend, weight);
         body.addView(trend);
+    }
+
+    /** Four related destinations stay available without turning the dashboard navigation into a long strip. */
+    private void addProgressDestinations(LinearLayout body) {
+        LinearLayout firstRow = new LinearLayout(this);
+        firstRow.setGravity(Gravity.CENTER_VERTICAL);
+        addProgressDestination(firstRow, "Nutrition", "Fuel check-in", R.drawable.ic_nav_nutrition,
+                Color.rgb(111, 222, 192), this::showMeals, false);
+        addProgressDestination(firstRow, "Body", "Private context", R.drawable.ic_nav_body,
+                Color.rgb(112, 190, 244), this::showBodyContext, true);
+        body.addView(firstRow, new LinearLayout.LayoutParams(-1, dp(116)));
+
+        gap(body, 9);
+        LinearLayout secondRow = new LinearLayout(this);
+        secondRow.setGravity(Gravity.CENTER_VERTICAL);
+        addProgressDestination(secondRow, "Apex", "Achievements", R.drawable.ic_nav_apex,
+                coral, this::showApex, false);
+        addProgressDestination(secondRow, "Workout Library", "Explore movements", R.drawable.ic_nav_library_premium,
+                Color.rgb(241, 195, 92), this::showWorkoutLibrary, true);
+        body.addView(secondRow, new LinearLayout.LayoutParams(-1, dp(116)));
+    }
+
+    private void addProgressDestination(LinearLayout row, String label, String detail, int iconRes, int accent,
+                                        Runnable open, boolean second) {
+        LinearLayout tile = new LinearLayout(this);
+        tile.setOrientation(LinearLayout.VERTICAL);
+        tile.setGravity(Gravity.CENTER_VERTICAL);
+        tile.setPadding(dp(12), dp(11), dp(12), dp(10));
+        tile.setClickable(true);
+        tile.setFocusable(true);
+        tile.setContentDescription("Open " + label);
+        tile.setBackground(surface(navyPanel, 18, 1, Color.argb(170, Color.red(accent), Color.green(accent), Color.blue(accent))));
+        ImageView icon = new ImageView(this);
+        icon.setImageResource(iconRes);
+        icon.setImageTintList(ColorStateList.valueOf(accent));
+        icon.setBackground(surface(Color.rgb(12, 38, 59), 99, 0, Color.TRANSPARENT));
+        icon.setPadding(dp(8), dp(8), dp(8), dp(8));
+        tile.addView(icon, new LinearLayout.LayoutParams(dp(38), dp(38)));
+        TextView name = heading(label, label.length() > 12 ? 14 : 16, Color.WHITE);
+        name.setGravity(Gravity.CENTER);
+        name.setSingleLine(true);
+        tile.addView(name, new LinearLayout.LayoutParams(-1, dp(27)));
+        TextView subtitle = text(detail, 11, Color.rgb(196, 216, 230));
+        subtitle.setGravity(Gravity.CENTER);
+        subtitle.setSingleLine(true);
+        tile.addView(subtitle, new LinearLayout.LayoutParams(-1, dp(18)));
+        tile.setOnClickListener(view -> open.run());
+        applyPressMotion(tile);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, -1, 1);
+        if (second) params.leftMargin = dp(9);
+        row.addView(tile, params);
     }
 
     /** One local-only roll-up used by the combined endurance + guided-workout Progress report. */
@@ -13310,8 +13390,8 @@ public final class MainActivity extends FragmentActivity {
 
     /** One calendar joins strength templates, rest days, and separately booked endurance appointments. */
     private void showScheduler() {
-        LinearLayout body = appPage("Scheduler");
-        title(body, "SCHEDULER", "Your training calendar", "See existing work plans, rest days, and endurance appointments in one place. Select a date, then choose Schedule a workout.");
+        LinearLayout body = appPage("My Calendar", "Plan");
+        title(body, "MY CALENDAR", "Your training calendar", "See existing work plans, rest days, and endurance appointments in one place. Select a date, then choose Schedule a workout.");
         if (pendingCoachRecommendation != null && !pendingCoachRecommendation.trim().isEmpty()) {
             LinearLayout recommendation = card();
             recommendation.addView(heading("COACH RECOMMENDATION", 11, mint));
