@@ -13,54 +13,29 @@ import java.util.Set;
 /**
  * Computes the private Achievement and Apex experience from completed local sessions.
  *
- * <p>The detailed history remains on-device. Authenticated members may publish only the resulting
- * level, Momentum Points, Apex lane, and earned badge names through {@link GymLobbyClient} for an
- * optional friendly leaderboard. There is no calorie requirement or penalty for a missed day, and
- * every normal workout and coach remains available regardless of this system.</p>
+ * <p>There is deliberately no server score, social ranking, calorie requirement, or penalty for
+ * a missed day. A member can keep using every normal workout and coach regardless of this system.
+ * Apex is an optional consistency lane, not a prescription for intensity.</p>
  */
 public final class AchievementStore {
-    /** A stable, human-readable rank for every level range shown in Apex and the Gym Lobby. */
-    public static final class Rank {
-        public final String title;
-        public final int firstLevel;
-        public final int lastLevel;
-
-        Rank(String title, int firstLevel, int lastLevel) {
-            this.title = title;
-            this.firstLevel = firstLevel;
-            this.lastLevel = lastLevel;
-        }
-
-        public String rangeLabel() {
-            return lastLevel == Integer.MAX_VALUE
-                    ? "LEVEL " + firstLevel + "+"
-                    : "LEVELS " + firstLevel + "–" + lastLevel;
-        }
-    }
-
     public static final class Badge {
         public final String family;
         public final String name;
         public final String description;
         public final int current;
         public final int required;
-        /** 0–3: Copper, Bronze, Silver, Gold. Later family milestones remain Gold. */
-        public final int tier;
 
-        Badge(String family, String name, String description, int current, int required, int tier) {
+        Badge(String family, String name, String description, int current, int required) {
             this.family = family;
             this.name = name;
             this.description = description;
             this.current = Math.max(0, current);
             this.required = Math.max(1, required);
-            this.tier = Math.max(0, Math.min(3, tier));
         }
 
         public boolean unlocked() { return current >= required; }
         public int progressPercent() { return Math.min(100, Math.round(100f * current / required)); }
         public String progressLabel() { return unlocked() ? "Unlocked" : current + " / " + required; }
-        public String tierName() { return new String[]{"COPPER", "BRONZE", "SILVER", "GOLD"}[tier]; }
-        public int tierColor() { return new int[]{0xFFB87333, 0xFFCD7F32, 0xFFC0C0C0, 0xFFFFD54F}[tier]; }
     }
 
     public static final class ApexTier {
@@ -131,26 +106,20 @@ public final class AchievementStore {
             for (ApexTier tier : apexTiers) if (tier.unlocked(level)) current = tier;
             return current;
         }
-
-        public Rank rank() { return rankForLevel(level); }
     }
 
     public static Snapshot snapshot(Context context) {
         List<JourneyStore.WorkoutRecord> records = JourneyStore.workouts(context);
-        int sessions = records.size();
-        int minutes = 0;
-        int endurance = 0;
-        Set<String> targets = new HashSet<>();
+        AchievementProgressStore.Snapshot durable = AchievementProgressStore.snapshot(context);
+        int sessions = durable.lifetimeSessions;
+        int minutes = durable.lifetimeMinutes;
+        int endurance = durable.lifetimeEnduranceSessions;
         Set<String> activeDays = new HashSet<>();
         for (JourneyStore.WorkoutRecord record : records) {
-            minutes += Math.max(0, record.minutes);
-            String target = record.target == null ? "Workout" : record.target.trim();
-            if (!target.isEmpty()) targets.add(target.toLowerCase(Locale.ROOT));
-            if (isEnduranceTarget(target)) endurance++;
             activeDays.add(dayKey(record.timestamp));
         }
         int streak = currentOrLatestStreak(activeDays);
-        int xp = sessions * 100 + minutes * 2 + endurance * 40 + Math.max(0, targets.size() - 1) * 25;
+        int xp = sessions * 100 + minutes * 2 + endurance * 40 + Math.max(0, durable.focusVariety - 1) * 25;
         int level = Math.max(1, xp / 500 + 1);
         int levelProgress = xp % 500;
         ArrayList<Badge> badges = new ArrayList<>();
@@ -161,36 +130,29 @@ public final class AchievementStore {
         addSeries(badges, "RHYTHM", new String[]{"Back Again", "Three-Day Rhythm", "Five-Day Rhythm", "Week of Momentum", "Two-Week Rhythm"},
                 new int[]{2, 3, 5, 7, 14}, streak, "consecutive active days");
         addSeries(badges, "EXPLORER", new String[]{"Two Focuses", "Balanced Builder", "Movement Explorer", "Complete Toolkit"},
-                new int[]{2, 4, 6, 9}, targets.size(), "training focuses explored");
+                new int[]{2, 4, 6, 9}, durable.focusVariety, "training focuses explored");
         addSeries(badges, "ENDURANCE", new String[]{"First Route", "Road Ready", "Distance Habit", "Route Keeper"},
                 new int[]{1, 3, 10, 25}, endurance, "completed walk, run, or cycling sessions");
+        addSeries(badges, "RECOVERY", new String[]{"Warm Start", "Recovery Rhythm", "Finish Well"},
+                new int[]{1, 5, 25}, durable.warmupsCompleted + durable.cooldownsCompleted,
+                "completed five-minute warm-up or cool-down timers");
+        addSeries(badges, "RETURN", new String[]{"Ready Again", "Steady Return", "Resilient Rhythm"},
+                new int[]{1, 3, 10}, durable.returnsAfterBreak, "healthy returns after a seven-day break");
 
         ArrayList<ApexTier> tiers = new ArrayList<>();
         tiers.add(new ApexTier("Foundation", "Build a repeatable rhythm at your own pace.", 1, 0, 14, 0));
         tiers.add(new ApexTier("Momentum", "Complete three sessions in any 14-day window.", 2, 3, 14, sessionsInLastDays(records, 14)));
-        tiers.add(new ApexTier("Performance", "Complete six sessions in any 28-day window.", 4, 8, 28, sessionsInLastDays(records, 28)));
-        tiers.add(new ApexTier("Apex", "Complete twelve sessions in any 42-day window. Recovery days count as part of the plan.", 7, 20, 42, sessionsInLastDays(records, 42)));
-        return new Snapshot(sessions, minutes, endurance, targets.size(), streak, xp, level, levelProgress,
+        tiers.add(new ApexTier("Performance", "Complete six sessions in any 28-day window.", 4, 6, 28, sessionsInLastDays(records, 28)));
+        tiers.add(new ApexTier("Apex", "Complete twelve sessions in any 42-day window. Recovery days count as part of the plan.", 7, 12, 42, sessionsInLastDays(records, 42)));
+        return new Snapshot(sessions, minutes, endurance, durable.focusVariety, streak, xp, level, levelProgress,
                 500 - levelProgress, badges, tiers);
-    }
-
-    public static Rank rankForLevel(int level) {
-        int safeLevel = Math.max(1, level);
-        if (safeLevel <= 10) return new Rank("BEGINNER", 1, 10);
-        if (safeLevel <= 25) return new Rank("NOVICE", 11, 25);
-        if (safeLevel <= 50) return new Rank("CONTENDER", 26, 50);
-        if (safeLevel <= 75) return new Rank("COMPETITOR", 51, 75);
-        if (safeLevel <= 100) return new Rank("ATHLETE", 76, 100);
-        if (safeLevel <= 150) return new Rank("ELITE", 101, 150);
-        if (safeLevel <= 200) return new Rank("CHAMPION", 151, 200);
-        return new Rank("APEX", 201, Integer.MAX_VALUE);
     }
 
     private static void addSeries(List<Badge> badges, String family, String[] names, int[] requirements,
             int current, String unit) {
         for (int index = 0; index < Math.min(names.length, requirements.length); index++) {
             int required = requirements[index];
-            badges.add(new Badge(family, names[index], "Reach " + required + " " + unit + ".", current, required, Math.min(index, 3)));
+            badges.add(new Badge(family, names[index], "Reach " + required + " " + unit + ".", current, required));
         }
     }
 

@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 143,
-  "versionName": "6.1",
-  "publishedAt": "2026-10-31T21:46:00Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v6.1/app-release.apk",
-  "sha256": "d1bc7f27ed0fb671a371e9f4cf3410d4f928ef2c95930ac4b6e6687d7c8aff91",
-  "sizeBytes": 233617365,
-  "notes": "Keeps past Home calendar days read-only; completed days remain viewable in history."
+  "versionCode": 144,
+  "versionName": "6.2",
+  "publishedAt": "2026-10-31T22:00:00Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v6.2/app-release.apk",
+  "sha256": "7c9ab9bdf5dfdb8903c6cc095e0dc97a9cb16d282b5b3902a7a4c2c8150444ef",
+  "sizeBytes": 269973083,
+  "notes": "Adds Google Maps and address selection to Endurance while retaining MapLibre as the offline fallback."
 }

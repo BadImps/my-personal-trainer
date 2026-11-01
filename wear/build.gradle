@@ -33,6 +33,7 @@ android {
         versionName '5.98'
     }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+    buildFeatures { buildConfig true }
     buildTypes {
         release {
             signingConfig releasePropertiesFile.exists() ? signingConfigs.production : signingConfigs.debug

@@ -1,0 +1,18 @@
+package com.badimps.personaltrainer;
+
+import android.content.Context;import android.content.SharedPreferences;import java.util.*;
+
+/** Watch-measured guided-workout health metrics; no account or cloud storage. */
+public final class GuidedHealthStore {
+    private static final String FILE="guided_health_metrics", ENTRIES="entries";
+    public static final class Metrics {public final String sessionId;public final long timestamp,duration;public final float calories,heartRate;Metrics(String id,long t,long d,float c,float h){sessionId=id;timestamp=t;duration=d;calories=c;heartRate=h;}}
+    public static void expect(Context c,String sessionId){if(sessionId!=null&&!sessionId.isEmpty())prefs(c).edit().putString("expected_session",sessionId).apply();}
+    public static boolean expects(Context c,String sessionId){return sessionId!=null&&!sessionId.isEmpty()&&sessionId.equals(prefs(c).getString("expected_session",""));}
+    public static void setLive(Context c,String sessionId,long timestamp,long duration,float calories,float heart){prefs(c).edit().putBoolean("live",true).putString("live_session",sessionId).putLong("live_timestamp",timestamp).putLong("live_duration",duration).putFloat("live_calories",calories).putFloat("live_heart",heart).apply();}
+    public static Metrics live(Context c){SharedPreferences p=prefs(c);return p.getBoolean("live",false)?new Metrics(p.getString("live_session",""),p.getLong("live_timestamp",0),p.getLong("live_duration",0),p.getFloat("live_calories",0),p.getFloat("live_heart",0)):null;}
+    public static void finish(Context c,String sessionId,long timestamp,long duration,float calories,float heart){ArrayList<String> rows=new ArrayList<>();String old=prefs(c).getString(ENTRIES,"");if(!old.isEmpty())rows.addAll(Arrays.asList(old.split("\n")));rows.removeIf(row->row.startsWith(sessionId+"|")||row.startsWith(timestamp+"|"));rows.add(sessionId+"|"+timestamp+"|"+duration+"|"+calories+"|"+heart);while(rows.size()>180)rows.remove(0);prefs(c).edit().putString(ENTRIES,String.join("\n",rows)).putBoolean("live",false).remove("expected_session").apply();}
+    public static Metrics forWorkout(Context c,long timestamp){Metrics best=null;long delta=Long.MAX_VALUE;for(Metrics m:all(c)){long d=Math.abs(m.timestamp-timestamp);if(d<delta&&d<10*60_000L){best=m;delta=d;}}return best;}
+    public static Metrics thisWeek(Context c){Calendar k=Calendar.getInstance();k.set(Calendar.DAY_OF_WEEK,Calendar.MONDAY);k.set(Calendar.HOUR_OF_DAY,0);k.set(Calendar.MINUTE,0);k.set(Calendar.SECOND,0);k.set(Calendar.MILLISECOND,0);long from=k.getTimeInMillis(),duration=0;float calories=0,weightedHeart=0,heartDuration=0;for(Metrics m:all(c))if(m.timestamp>=from){duration+=m.duration;calories+=m.calories;if(m.heartRate>0){weightedHeart+=m.heartRate*Math.max(1,m.duration);heartDuration+=Math.max(1,m.duration);}}return new Metrics("",from,duration,calories,heartDuration>0?weightedHeart/heartDuration:0);}
+    private static List<Metrics> all(Context c){ArrayList<Metrics> out=new ArrayList<>();String raw=prefs(c).getString(ENTRIES,"");if(raw.isEmpty())return out;for(String row:raw.split("\n")){String[] v=row.split("\\|");try{if(v.length==5)out.add(new Metrics(v[0],Long.parseLong(v[1]),Long.parseLong(v[2]),Float.parseFloat(v[3]),Float.parseFloat(v[4])));else if(v.length==4)out.add(new Metrics("",Long.parseLong(v[0]),Long.parseLong(v[1]),Float.parseFloat(v[2]),Float.parseFloat(v[3])));}catch(NumberFormatException ignored){}}return out;}
+    private static SharedPreferences prefs(Context c){return c.getSharedPreferences(FILE,Context.MODE_PRIVATE);}private GuidedHealthStore(){}
+}

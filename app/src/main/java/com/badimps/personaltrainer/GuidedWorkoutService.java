@@ -18,6 +18,7 @@ public final class GuidedWorkoutService extends Service {
     public static final String ACTION_END = "com.badimps.personaltrainer.workout.END";
     public static final String ACTION_COMPLETE = "com.badimps.personaltrainer.workout.COMPLETE";
     public static final String ACTION_PREVIOUS = "com.badimps.personaltrainer.workout.PREVIOUS";
+    public static final String ACTION_SKIP_RECOVERY = "com.badimps.personaltrainer.workout.SKIP_RECOVERY";
     private static final String CHANNEL = "guided_workout";
     private static final int ID = 7301;
 
@@ -41,6 +42,10 @@ public final class GuidedWorkoutService extends Service {
             WorkoutSessionStore.completeCurrentSet(this);
         } else if (ACTION_PREVIOUS.equals(action)) {
             WorkoutSessionStore.previousExercise(this);
+        } else if (ACTION_SKIP_RECOVERY.equals(action)) {
+            // Recovery timing is currently rendered by the activity. Refreshing keeps the phone
+            // and watch in sync without incorrectly completing an active training set.
+            WorkoutSessionStore.setPaused(this, false);
         } else if (ACTION_END.equals(action)) {
             WorkoutSessionStore.clear(this);
         }

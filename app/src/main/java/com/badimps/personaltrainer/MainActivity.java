@@ -22,6 +22,8 @@ import android.graphics.RectF;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
+import android.location.Address;
+import android.location.Geocoder;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -72,9 +74,21 @@ import android.widget.Toast;
 import androidx.core.content.FileProvider;
 import androidx.core.content.ContextCompat;
 import androidx.activity.OnBackPressedCallback;
+import androidx.activity.result.ActivityResult;
+import androidx.activity.result.ActivityResultCallback;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.biometric.BiometricManager;
 import androidx.biometric.BiometricPrompt;
 import androidx.fragment.app.FragmentActivity;
+
+import com.google.android.libraries.places.api.Places;
+import com.google.android.libraries.places.api.model.AutocompletePrediction;
+import com.google.android.libraries.places.api.model.Place;
+import com.google.android.libraries.places.api.net.FetchPlaceRequest;
+import com.google.android.libraries.places.api.net.PlacesClient;
+import com.google.android.libraries.places.widget.PlaceAutocomplete;
+import com.google.android.libraries.places.widget.PlaceAutocompleteActivity;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -298,6 +312,11 @@ public final class MainActivity extends FragmentActivity {
     private float enduranceWizardDistanceKm = 3f;
     private int enduranceWizardMinutes = 35;
     private String enduranceWizardEffort = "Steady";
+    /** The address field currently requesting an authenticated Google Places selection. */
+    private EditText pendingPlaceField;
+    private TextView pendingPlaceStatus;
+    private String pendingPlaceLabel = "Place";
+    private ActivityResultLauncher<Intent> placeAutocompleteLauncher;
     /** Timer-only endurance session: no location request, map trace, or background GPS service. */
     private String manualEnduranceMode;
     private long manualEnduranceStartedAt;
@@ -314,6 +333,7 @@ public final class MainActivity extends FragmentActivity {
         // before content is created.
         setTheme(R.style.AppTheme);
         super.onCreate(state);
+        registerGooglePlaceAutocomplete();
         // The user can capture their own progress with Android's normal screenshot gesture.
         // Sensitive information remains protected by the device lock screen and app account;
         // this activity deliberately does not set FLAG_SECURE in release builds.
@@ -401,7 +421,7 @@ public final class MainActivity extends FragmentActivity {
             return;
         }
         if (BuildConfig.DEBUG && "com.badimps.personaltrainer.DEBUG_ENDURANCE_PLAN_TYPE".equals(getIntent().getAction())) {
-            showEnduranceWizardPlanType();
+            startEnduranceWizard(EndurancePlanStore.WALKING);
             return;
         }
         if (BuildConfig.DEBUG && "com.badimps.personaltrainer.DEBUG_ENDURANCE_ACTIVITY".equals(getIntent().getAction())) {
@@ -12205,8 +12225,7 @@ public final class MainActivity extends FragmentActivity {
             showLiveTrackingSession();
             return;
         }
-        // Endurance starts at the same first decision as Workouts: plan type.
-        // Activity selection follows on the next wizard page.
+        // Plan type is chosen in the shared Plan flow. Endurance begins directly with activity.
         startEnduranceWizard(EndurancePlanStore.WALKING);
     }
 
@@ -12220,7 +12239,7 @@ public final class MainActivity extends FragmentActivity {
         enduranceWizardDistanceKm = existing == null ? defaultDistance(mode) : existing.distanceKm;
         enduranceWizardMinutes = existing == null ? defaultMinutes(mode) : existing.minutes;
         enduranceWizardEffort = existing == null ? "Steady" : existing.effort;
-        showEnduranceWizardPlanType();
+        showEnduranceWizardActivity();
     }
 
     /** Endurance follows the workout wizard rhythm, without workout-only steps. */
@@ -12374,7 +12393,7 @@ public final class MainActivity extends FragmentActivity {
         scroll.addView(root, new ScrollView.LayoutParams(-1, -2)); setCoachHeroWizardShell(scroll, "Endurance");
 
         FrameLayout hero = coachHeroBackdrop("Endurance step " + step); root.addView(hero, new LinearLayout.LayoutParams(-1, dp(260)));
-        String[] labels = {"PLAN", "ACTIVITY", "SCHEDULE", "ROUTE", "REVIEW"};
+        String[] labels = {"ACTIVITY", "SCHEDULE", "ROUTE", "REVIEW"};
         addCoachHeroWizardSteps(hero, labels, step - 1);
         LinearLayout copy = new LinearLayout(this); copy.setOrientation(LinearLayout.VERTICAL);
         TextView eyebrow = heading("PLAN YOUR ENDURANCE · STEP " + step, 10, mint); eyebrow.setLetterSpacing(.14f); copy.addView(eyebrow);
@@ -12388,7 +12407,7 @@ public final class MainActivity extends FragmentActivity {
     }
 
     private void showEnduranceWizardActivity() {
-        LinearLayout body = enduranceWizardPage(2, "Choose your\nactivity", "Build a simple outdoor or indoor session. Use live tracking, an external map, or a timer-only session.");
+        LinearLayout body = enduranceWizardPage(1, "Choose your\nactivity", "Build a simple outdoor or indoor session with live tracking or a timer-only session.");
         body.addView(heading("Move your way", 23, ink));
         body.addView(text("Pick one activity for this endurance plan.", 13, muted));
         gap(body, 14);
@@ -12396,7 +12415,7 @@ public final class MainActivity extends FragmentActivity {
         body.addView(enduranceModeTile(EndurancePlanStore.RUNNING, "Running", "Pace-focused route or treadmill")); gap(body, 8);
         body.addView(enduranceModeTile(EndurancePlanStore.CYCLING, "Cycling", "Road, bike path, or indoor bike")); gap(body, 14);
         Button next = action("Next: choose schedule  →", coral, Color.WHITE); next.setOnClickListener(view -> showEnduranceWizardSchedule()); body.addView(next, new LinearLayout.LayoutParams(-1, dp(54)));
-        Button back = new Button(this); back.setText("Back"); back.setTextColor(mint); back.setTextSize(14); back.setAllCaps(false); back.setBackgroundColor(Color.TRANSPARENT); back.setOnClickListener(view -> showEnduranceWizardPlanType()); body.addView(back, new LinearLayout.LayoutParams(-1, dp(46)));
+        Button back = new Button(this); back.setText("Back"); back.setTextColor(mint); back.setTextSize(14); back.setAllCaps(false); back.setBackgroundColor(Color.TRANSPARENT); back.setOnClickListener(view -> { if (!returnToPreviousPage()) showPlans(); }); body.addView(back, new LinearLayout.LayoutParams(-1, dp(46)));
     }
 
     private int enduranceActivityIcon(String mode) {
@@ -12420,7 +12439,7 @@ public final class MainActivity extends FragmentActivity {
     /** Schedule step shared by Daily and Weekly endurance plans. */
     private void showEnduranceWizardSchedule() {
         boolean weekly = "Weekly".equals(endurancePlanMode);
-        LinearLayout body = enduranceWizardPage(3, weekly ? "Choose your\ntraining week" : "Choose your\nactivity day", weekly ? "Tap days to add or remove an endurance session. Rest days stay clear." : "Choose one day for this " + enduranceAction(enduranceWizardMode).toLowerCase(Locale.ROOT) + " session.");
+        LinearLayout body = enduranceWizardPage(2, weekly ? "Choose your\ntraining week" : "Choose your\nactivity day", weekly ? "Tap days to add or remove an endurance session. Rest days stay clear." : "Choose one day for this " + enduranceAction(enduranceWizardMode).toLowerCase(Locale.ROOT) + " session.");
         body.addView(heading(weekly ? "Place your sessions" : "Choose your day", 23, ink));
         body.addView(text(weekly ? "Build a balanced week with recovery left visible." : "Your selected activity will appear on this day across your plan.", 13, muted));
         gap(body, 14);
@@ -12479,22 +12498,25 @@ public final class MainActivity extends FragmentActivity {
     }
 
     private void showEnduranceWizardRoute() {
-        LinearLayout body = enduranceWizardPage(4, "Set your route\nand time", "Use Google Maps for a planned route, or leave the route blank for an indoor session.");
+        LinearLayout body = enduranceWizardPage(3, "Set your route\nand time", "Enter a place name or street address. We will check the place and prepare its marker for your plan.");
         body.addView(heading("Route details", 23, ink));
         body.addView(text("Set a clear name, distance, and duration for your " + enduranceAction(enduranceWizardMode).toLowerCase(Locale.ROOT) + ".", 13, muted));
         gap(body, 14);
         EditText name = input("Session name", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES); name.setText(enduranceWizardName); body.addView(name); gap(body, 8);
-        EditText origin = input("Starting point (optional)", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES); origin.setText(enduranceWizardOrigin); body.addView(origin); gap(body, 8);
-        EditText destination = input("Destination or loop landmark (optional)", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES); destination.setText(enduranceWizardDestination); body.addView(destination); gap(body, 8);
+        EditText origin = input("Starting point or address (optional)", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES); origin.setText(enduranceWizardOrigin); body.addView(origin);
+        TextView originMarker = text("Type an address, then move to the next field to check its pin.", 12, muted); body.addView(originMarker); gap(body, 8);
+        addPlacePickerAction(body, origin, originMarker, "Starting point");
+        EditText destination = input("Destination or loop landmark (optional)", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES); destination.setText(enduranceWizardDestination); body.addView(destination);
+        TextView destinationMarker = text("Type an address, then move to the next field to check its pin.", 12, muted); body.addView(destinationMarker); gap(body, 8);
+        addPlacePickerAction(body, destination, destinationMarker, "Destination or landmark");
+        bindRouteAddressField(origin, originMarker, "Starting point");
+        bindRouteAddressField(destination, destinationMarker, "Destination");
         EditText distance = input("Target distance in km", InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL); distance.setText(String.valueOf(enduranceWizardDistanceKm)); body.addView(distance); gap(body, 8);
         EditText minutes = input("Target minutes", InputType.TYPE_CLASS_NUMBER); minutes.setText(String.valueOf(enduranceWizardMinutes)); body.addView(minutes); gap(body, 10);
         body.addView(heading("Effort", 17, ink));
         RadioGroup effort = new RadioGroup(this); effort.setOrientation(RadioGroup.HORIZONTAL); addEnduranceEffort(effort, "Relaxed", enduranceWizardEffort); addEnduranceEffort(effort, "Steady", enduranceWizardEffort); addEnduranceEffort(effort, "Challenging", enduranceWizardEffort);
         for (int index = 0; index < effort.getChildCount(); index++) ((RadioButton) effort.getChildAt(index)).setTextColor(ink);
         body.addView(effort); gap(body, 13);
-        Button maps = action("Open route in Google Maps", navyPanel, mint);
-        maps.setOnClickListener(view -> openEnduranceMap(enduranceWizardMode, origin.getText().toString(), destination.getText().toString()));
-        body.addView(maps, new LinearLayout.LayoutParams(-1, dp(52))); gap(body, 8);
         Button next = action("Next: review plan  →", coral, Color.WHITE);
         next.setOnClickListener(view -> {
             try {
@@ -12509,8 +12531,122 @@ public final class MainActivity extends FragmentActivity {
         Button back = new Button(this); back.setText("Back"); back.setTextColor(mint); back.setTextSize(14); back.setAllCaps(false); back.setBackgroundColor(Color.TRANSPARENT); back.setOnClickListener(view -> showEnduranceWizardSchedule()); body.addView(back, new LinearLayout.LayoutParams(-1, dp(46)));
     }
 
+    /** Google Places is primary when configured; the device geocoder keeps the offline fallback usable. */
+    private void bindRouteAddressField(EditText field, TextView markerStatus, String label) {
+        field.setOnFocusChangeListener((view, hasFocus) -> {
+            if (!hasFocus) resolveRouteAddress(field, markerStatus, label);
+        });
+    }
+
+    private void addPlacePickerAction(LinearLayout body, EditText field, TextView markerStatus, String label) {
+        Button picker = new Button(this);
+        picker.setAllCaps(false);
+        picker.setText(GoogleMapsConfig.isConfigured() ? "Find on Google Maps" : "Find address");
+        picker.setTextColor(mint);
+        picker.setTextSize(13);
+        picker.setBackgroundColor(Color.TRANSPARENT);
+        picker.setGravity(Gravity.LEFT | Gravity.CENTER_VERTICAL);
+        picker.setOnClickListener(view -> launchPlaceAutocomplete(field, markerStatus, label));
+        body.addView(picker, new LinearLayout.LayoutParams(-1, dp(38)));
+    }
+
+    private void registerGooglePlaceAutocomplete() {
+        placeAutocompleteLauncher = registerForActivityResult(
+                new ActivityResultContracts.StartActivityForResult(),
+                new ActivityResultCallback<ActivityResult>() {
+                    @Override public void onActivityResult(ActivityResult result) {
+                        if (result.getResultCode() != PlaceAutocompleteActivity.RESULT_OK || result.getData() == null) return;
+                        AutocompletePrediction prediction = PlaceAutocomplete.getPredictionFromIntent(result.getData());
+                        if (prediction == null || pendingPlaceField == null || pendingPlaceStatus == null) return;
+                        final EditText field = pendingPlaceField;
+                        final TextView status = pendingPlaceStatus;
+                        final String label = pendingPlaceLabel;
+                        status.setText("Pinning " + label.toLowerCase(Locale.ROOT) + "…");
+                        PlacesClient client = Places.createClient(MainActivity.this);
+                        FetchPlaceRequest request = FetchPlaceRequest.builder(prediction.getPlaceId(),
+                                java.util.Arrays.asList(Place.Field.DISPLAY_NAME, Place.Field.FORMATTED_ADDRESS, Place.Field.LOCATION)).build();
+                        client.fetchPlace(request).addOnSuccessListener(response -> {
+                            String address = response.getPlace().getFormattedAddress();
+                            if (address == null || address.trim().isEmpty()) address = prediction.getFullText(null).toString();
+                            field.setText(address);
+                            field.setSelection(address.length());
+                            if (response.getPlace().getLocation() != null) {
+                                status.setText(String.format(Locale.US, "✓ %s pin ready · %.5f, %.5f", label,
+                                        response.getPlace().getLocation().latitude,
+                                        response.getPlace().getLocation().longitude));
+                            } else status.setText("✓ " + label + " selected");
+                            status.setTextColor(Color.rgb(28, 112, 96));
+                        }).addOnFailureListener(error -> {
+                            status.setText("Google Maps could not finish that pin. Your typed place is still saved.");
+                            status.setTextColor(muted);
+                        });
+                    }
+                });
+    }
+
+    private void launchPlaceAutocomplete(EditText field, TextView status, String label) {
+        if (!GoogleMapsConfig.initializePlaces(this)) {
+            status.setText("Google Maps is not configured on this build. MapLibre and the phone address checker remain available.");
+            status.setTextColor(muted);
+            field.requestFocus();
+            return;
+        }
+        pendingPlaceField = field;
+        pendingPlaceStatus = status;
+        pendingPlaceLabel = label;
+        try {
+            Intent intent = new PlaceAutocomplete.IntentBuilder()
+                    .setInitialQuery(field.getText().toString().trim())
+                    .build(this);
+            placeAutocompleteLauncher.launch(intent);
+        } catch (RuntimeException error) {
+            status.setText("Google Maps search could not open. You can still type an address for the MapLibre fallback.");
+            status.setTextColor(muted);
+        }
+    }
+
+    private void resolveRouteAddress(EditText field, TextView markerStatus, String label) {
+        String entered = field.getText().toString().trim();
+        if (entered.isEmpty()) {
+            markerStatus.setText(label + " left open — no marker will be placed.");
+            markerStatus.setTextColor(muted);
+            return;
+        }
+        final int requestPage = pageGeneration;
+        markerStatus.setText("Checking " + label.toLowerCase(Locale.ROOT) + "…");
+        markerStatus.setTextColor(muted);
+        new Thread(() -> {
+            try {
+                List<Address> matches = new Geocoder(this, Locale.getDefault()).getFromLocationName(entered, 1);
+                runOnUiThread(() -> {
+                    if (pageGeneration != requestPage) return;
+                    if (matches == null || matches.isEmpty()) {
+                        markerStatus.setText("No exact pin found. Keep the place name, or add a fuller address.");
+                        markerStatus.setTextColor(coral);
+                        return;
+                    }
+                    Address match = matches.get(0);
+                    String resolved = match.getAddressLine(0);
+                    if (resolved != null && !resolved.trim().isEmpty()) {
+                        field.setText(resolved);
+                        field.setSelection(resolved.length());
+                    }
+                    markerStatus.setText(String.format(Locale.US, "✓ %s pin ready · %.5f, %.5f", label,
+                            match.getLatitude(), match.getLongitude()));
+                    markerStatus.setTextColor(Color.rgb(28, 112, 96));
+                });
+            } catch (IOException | RuntimeException error) {
+                runOnUiThread(() -> {
+                    if (pageGeneration != requestPage) return;
+                    markerStatus.setText("Address check is unavailable right now. Your typed place will still be saved.");
+                    markerStatus.setTextColor(muted);
+                });
+            }
+        }).start();
+    }
+
     private void showEnduranceWizardReview() {
-        LinearLayout body = enduranceWizardPage(5, "Review your\n" + enduranceAction(enduranceWizardMode), "Open your route if you need it, then start the in-app guided timer when you are ready.");
+        LinearLayout body = enduranceWizardPage(4, "Review your\n" + enduranceAction(enduranceWizardMode), "Your saved route details stay in the app. Start the guided timer whenever you are ready.");
         body.addView(heading("Ready to move", 23, ink));
         body.addView(text("Your endurance plan is ready to save, track, or start right away.", 13, muted));
         gap(body, 14);
@@ -12518,9 +12654,6 @@ public final class MainActivity extends FragmentActivity {
         review.addView(heading(appointmentAbbreviation(enduranceWizardMode) + " · " + enduranceWizardName, 20, ink));
         review.addView(text(formatDistance(enduranceWizardDistanceKm) + "  •  " + enduranceWizardMinutes + " min  •  " + enduranceWizardEffort, 14, muted));
         review.addView(text(enduranceWizardDestination.isEmpty() ? "Indoor or open route" : "Destination: " + enduranceWizardDestination, 13, muted)); body.addView(review); gap(body, 13);
-        Button maps = action("Open route in Google Maps", navyPanel, mint);
-        maps.setOnClickListener(view -> openEnduranceMap(enduranceWizardMode, enduranceWizardOrigin, enduranceWizardDestination));
-        body.addView(maps, new LinearLayout.LayoutParams(-1, dp(52))); gap(body, 8);
         Button start = action("Start " + appointmentAbbreviation(enduranceWizardMode) + "  →", coral, Color.WHITE);
         start.setOnClickListener(view -> {
             try {
@@ -13000,10 +13133,6 @@ public final class MainActivity extends FragmentActivity {
             tile.addView(text(plan.name + "  •  " + formatDistance(plan.distanceKm) + "  •  " + plan.minutes + " min  •  " + plan.effort, 14, ink));
             tile.addView(text("Destination: " + plan.destination, 13, muted));
             gap(tile, 9);
-            Button map = lightAction("Open saved route in Maps");
-            map.setOnClickListener(view -> openEnduranceMap(plan));
-            addButton(tile, map);
-            gap(tile, 7);
             Button complete = primary("Log " + plan.minutes + " min to Progress");
             complete.setOnClickListener(view -> {
                 long completedAt = System.currentTimeMillis();
@@ -13093,11 +13222,22 @@ public final class MainActivity extends FragmentActivity {
         tracker.addView(state);
         tracker.addView(stats);
         OfflineMapStore.MapRecord selectedMap = OfflineMapStore.selectedMap(this);
-        tracker.addView(text(OfflineMapStore.hasAnyMap(this)
-                ? "MapLibre vector streets are available for this private route."
-                : "GPS route trace is local to this phone. Download a MapLibre vector pack in Settings for detailed streets.", 13, muted));
+        tracker.addView(text(GoogleMapsConfig.isConfigured()
+                ? "Google Maps is showing this live route. If it is unavailable, your private MapLibre route view remains the fallback."
+                : (OfflineMapStore.hasAnyMap(this)
+                    ? "MapLibre vector streets are available for this private route."
+                    : "GPS route trace is local to this phone. Download a MapLibre vector pack in Settings for detailed streets."), 13, muted));
         LiveRouteRenderer routeRenderer;
-        if (OfflineMapStore.hasAnyMap(this)) {
+        if (GoogleMapsConfig.isConfigured()) {
+            try {
+                GoogleRouteMapView map = new GoogleRouteMapView(this, live.points);
+                LinearLayout.LayoutParams mapParams = new LinearLayout.LayoutParams(-1, dp(235)); mapParams.topMargin = dp(10);
+                tracker.addView(map, mapParams); routeRenderer = map::setRoute;
+            } catch (RuntimeException error) {
+                RouteTraceView trace = new RouteTraceView(this); trace.setPoints(live.points);
+                tracker.addView(trace, new LinearLayout.LayoutParams(-1, dp(150))); routeRenderer = trace::setPoints;
+            }
+        } else if (OfflineMapStore.hasAnyMap(this)) {
             try {
                 OfflineRouteMapView map = new OfflineRouteMapView(this, OfflineMapStore.mapFile(this), live.points);
                 LinearLayout.LayoutParams mapParams = new LinearLayout.LayoutParams(-1, dp(235)); mapParams.topMargin = dp(10);
@@ -13227,7 +13367,7 @@ public final class MainActivity extends FragmentActivity {
         EndurancePlanStore.Plan existing = EndurancePlanStore.load(this, mode);
         LinearLayout body = appPage("Endurance");
         String action = enduranceAction(mode);
-        title(body, "ENDURANCE ROUTE", "Plan your " + action, "Set a destination or loop landmark, a target distance, and a time. You choose whether to open an external map app.");
+        title(body, "ENDURANCE ROUTE", "Plan your " + action, "Set a starting place, destination or loop landmark, a target distance, and a time.");
 
         EditText name = input("Route name", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
         EditText origin = input("Starting point (optional)", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
@@ -13258,16 +13398,6 @@ public final class MainActivity extends FragmentActivity {
         body.addView(effort);
         gap(body, 12);
 
-        Button map = lightAction("Preview route in Maps");
-        map.setOnClickListener(view -> {
-            if (destination.getText().toString().trim().isEmpty()) {
-                destination.setError("Add a destination or loop landmark first");
-                return;
-            }
-            openEnduranceMap(mode, origin.getText().toString(), destination.getText().toString());
-        });
-        addButton(body, map);
-        gap(body, 8);
         Button save = primary("Save " + action + " plan");
         save.setOnClickListener(view -> saveEndurancePlan(mode, name, origin, destination, distance, minutes, effort));
         addButton(body, save);
@@ -13314,64 +13444,6 @@ public final class MainActivity extends FragmentActivity {
             toast("Enter a valid distance and target minutes.");
         } catch (IllegalArgumentException e) {
             toast(e.getMessage());
-        }
-    }
-
-    private void openEnduranceMap(EndurancePlanStore.Plan plan) {
-        openEnduranceMap(plan.mode, plan.origin, plan.destination);
-    }
-
-    /** Route planning is deliberately Google Maps-only; no alternate map app is offered. */
-    private void openEnduranceMap(String mode, String origin, String destination) {
-        String safeDestination = destination == null ? "" : destination.trim();
-        if (safeDestination.isEmpty()) {
-            toast("Add a Google Maps destination or loop landmark first.");
-            return;
-        }
-        if (!isGoogleMapsInstalled()) {
-            showGoogleMapsInstallPrompt();
-            return;
-        }
-        Uri.Builder route = new Uri.Builder().scheme("https").authority("www.google.com")
-                .appendPath("maps").appendPath("dir")
-                .appendQueryParameter("api", "1")
-                .appendQueryParameter("destination", safeDestination)
-                .appendQueryParameter("travelmode", EndurancePlanStore.CYCLING.equals(mode) ? "bicycling" : "walking");
-        if (origin != null && !origin.trim().isEmpty()) route.appendQueryParameter("origin", origin.trim());
-        try {
-            Intent googleMaps = new Intent(Intent.ACTION_VIEW, route.build());
-            googleMaps.setPackage("com.google.android.apps.maps");
-            startActivity(googleMaps);
-        } catch (RuntimeException e) {
-            showGoogleMapsInstallPrompt();
-        }
-    }
-
-    private boolean isGoogleMapsInstalled() {
-        try {
-            getPackageManager().getPackageInfo("com.google.android.apps.maps", 0);
-            return true;
-        } catch (PackageManager.NameNotFoundException ignored) {
-            return false;
-        }
-    }
-
-    private void showGoogleMapsInstallPrompt() {
-        new AlertDialog.Builder(this)
-                .setTitle("Google Maps required")
-                .setMessage("Walking, running, and cycling routes open only in Google Maps. Install Google Maps from the Play Store, then return here to continue.")
-                .setNegativeButton("Not now", null)
-                .setPositiveButton("Install Google Maps", (dialog, which) -> openGoogleMapsPlayStore())
-                .show();
-    }
-
-    private void openGoogleMapsPlayStore() {
-        Intent store = new Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=com.google.android.apps.maps"));
-        store.setPackage("com.android.vending");
-        try {
-            startActivity(store);
-        } catch (RuntimeException unavailable) {
-            toast("Open Google Play and install Google Maps to plan routes.");
         }
     }
 
@@ -14144,25 +14216,6 @@ public final class MainActivity extends FragmentActivity {
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
         FrameLayout stage = new FrameLayout(this);
         stage.setPadding(dp(22), dp(28), dp(22), dp(28));
-
-        // First Step has an approved completed-state source image. Use it intact rather than
-        // recreating its typography or frame with generic Android shapes.
-        if ("First Step".equalsIgnoreCase(badge.name)) {
-            ImageView approvedCard = new ImageView(this);
-            approvedCard.setImageResource(R.drawable.achievement_first_step_master);
-            approvedCard.setScaleType(ImageView.ScaleType.FIT_XY);
-            approvedCard.setContentDescription("First Step achievement earned. You've completed your first guided session.");
-            approvedCard.setOnClickListener(view -> { dialog.dismiss(); showApex(); });
-            stage.addView(approvedCard, new FrameLayout.LayoutParams(dp(342), dp(608), Gravity.CENTER));
-            addAchievementRewardLife(stage, approvedCard, "FIRST STEP · EARNED");
-            dialog.setContentView(stage);
-            dialog.show();
-            if (dialog.getWindow() != null) {
-                dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
-                dialog.getWindow().setLayout(-1, -1);
-            }
-            return;
-        }
 
         FrameLayout card = new FrameLayout(this);
         card.addView(mintfoilAchievementTemplate(true), new FrameLayout.LayoutParams(-1, -1));

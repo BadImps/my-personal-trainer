@@ -72,18 +72,25 @@ public final class UpdateManager {
         public final String sha;
         public final long sizeBytes;
         public final String notes;
+        /** The Wear OS package install code published beside this phone manifest, when present. */
+        public final long watchVersionCode;
 
         Info(int code, String name, String url, String sha, long sizeBytes) {
             this(code, name, url, sha, sizeBytes, "");
         }
 
         Info(int code, String name, String url, String sha, long sizeBytes, String notes) {
+            this(code, name, url, sha, sizeBytes, notes, -1L);
+        }
+
+        Info(int code, String name, String url, String sha, long sizeBytes, String notes, long watchVersionCode) {
             this.code = code;
             this.name = name;
             this.url = url;
             this.sha = sha;
             this.sizeBytes = sizeBytes;
             this.notes = notes == null ? "" : notes.trim();
+            this.watchVersionCode = watchVersionCode;
         }
     }
 
@@ -107,6 +114,12 @@ public final class UpdateManager {
 
     /** Checks the HTTPS manifest and returns a newer compatible package, if one exists. */
     public static Info check() throws Exception {
+        Info manifest = latestManifest();
+        return manifest.code > BuildConfig.VERSION_CODE ? manifest : null;
+    }
+
+    /** Reads and validates the published channel manifest without changing OTA state. */
+    public static Info latestManifest() throws Exception {
         try {
             return checkEndpoint(ENDPOINT);
         } catch (IOException primaryError) {
@@ -138,9 +151,10 @@ public final class UpdateManager {
         if (!BuildConfig.APPLICATION_ID.equals(applicationId)) throw new SecurityException("Update is for a different app");
         int code = json.getInt("versionCode");
         Info info = new Info(code, json.getString("versionName"), json.getString("apkUrl"),
-                json.getString("sha256").toLowerCase(Locale.US), json.optLong("sizeBytes", -1L), json.optString("notes", ""));
+                json.getString("sha256").toLowerCase(Locale.US), json.optLong("sizeBytes", -1L), json.optString("notes", ""),
+                json.optLong("watchVersionCode", -1L));
         validate(info);
-        return info.code > BuildConfig.VERSION_CODE ? info : null;
+        return info;
     }
 
     /** Starts a durable system download. Mobile data must be explicitly allowed by the caller. */

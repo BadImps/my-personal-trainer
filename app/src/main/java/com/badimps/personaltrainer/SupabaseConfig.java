@@ -28,5 +28,12 @@ public final class SupabaseConfig {
         return base + "/rest/v1" + path;
     }
 
+    /** URL for an authenticated Supabase Edge Function. The service-role key stays server-side. */
+    public static String functionEndpoint(String functionName) {
+        String base = BuildConfig.SUPABASE_URL.trim();
+        while (base.endsWith("/")) base = base.substring(0, base.length() - 1);
+        return base + "/functions/v1/" + functionName;
+    }
+
     private SupabaseConfig() { }
 }

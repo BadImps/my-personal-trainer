@@ -3,7 +3,10 @@ plugins {
 }
 
 def releaseProperties = new Properties()
-def releasePropertiesFile = rootProject.file('release-signing.properties')
+def releasePropertiesPath = project.findProperty('releaseSigningPropertiesPath')
+def releasePropertiesFile = releasePropertiesPath == null || releasePropertiesPath.trim().isEmpty()
+        ? rootProject.file('release-signing.properties')
+        : file(releasePropertiesPath)
 def localProperties = new Properties()
 def localPropertiesFile = rootProject.file('local.properties')
 if (localPropertiesFile.exists()) {
@@ -16,13 +19,20 @@ def migrationBridge = project.hasProperty('migrationBridge')
 if (releasePropertiesFile.exists()) {
     releasePropertiesFile.withInputStream { releaseProperties.load(it) }
 }
+def releaseStoreFile = new File(releaseProperties.getProperty('storeFile', 'keys/my-personal-trainer-release.jks'))
+if (!releaseStoreFile.isAbsolute()) releaseStoreFile = new File(releasePropertiesFile.parentFile, releaseStoreFile.path)
+// Older private signing files used a path relative to a different checkout. Prefer the keystore
+// stored beside this signing file when that old relative path is no longer valid.
+if (!releaseStoreFile.exists() && releasePropertiesFile.parentFile != null) {
+    releaseStoreFile = new File(new File(releasePropertiesFile.parentFile, 'keys'), releaseStoreFile.name)
+}
 
 android {
     namespace 'com.badimps.personaltrainer'
     compileSdk 36
     signingConfigs {
         production {
-            storeFile file(releaseProperties.getProperty('storeFile', 'keys/my-personal-trainer-release.jks'))
+            storeFile releaseStoreFile
             storePassword releaseProperties.getProperty('storePassword', '')
             keyAlias releaseProperties.getProperty('keyAlias', 'my-personal-trainer')
             keyPassword releaseProperties.getProperty('keyPassword', '')
@@ -32,8 +42,8 @@ android {
         applicationId 'com.badimps.personaltrainer'
         minSdk 26
         targetSdk 36
-        versionCode (migrationBridge ? 73 : 143)
-        versionName (migrationBridge ? '5.31 Migration' : '6.1')
+        versionCode (migrationBridge ? 73 : 144)
+        versionName (migrationBridge ? '5.31 Migration' : '6.2')
         // The anon/publishable key is intentionally a client credential. Never place a
         // service-role key in an APK. RLS remains the actual database security boundary.
         buildConfigField 'String', 'SUPABASE_URL', quotedBuildValue(localProperties.getProperty('SUPABASE_URL', ''))
@@ -41,6 +51,11 @@ android {
         // GitHub APK delivery remains available for private sideloads. The dedicated
         // Play build overrides this and removes package-installer capabilities.
         buildConfigField 'String', 'DISTRIBUTION_CHANNEL', '"direct"'
+        buildConfigField 'boolean', 'PREVIEW_BUILD', 'false'
+        // A public Android-restricted client key. The real value stays only in local.properties
+        // (or CI secrets); an empty value keeps MapLibre as the safe offline fallback.
+        buildConfigField 'String', 'GOOGLE_MAPS_API_KEY', quotedBuildValue(localProperties.getProperty('GOOGLE_MAPS_API_KEY', ''))
+        manifestPlaceholders = [MAPS_API_KEY: localProperties.getProperty('GOOGLE_MAPS_API_KEY', '')]
     }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
     testOptions { unitTests.includeAndroidResources = true }
@@ -71,6 +86,11 @@ dependencies {
     implementation 'androidx.activity:activity:1.11.0'
     implementation 'androidx.biometric:biometric:1.1.0'
     implementation 'com.google.android.gms:play-services-wearable:20.0.1'
+    implementation 'com.google.android.gms:play-services-maps:20.0.0'
+    implementation 'com.google.android.material:material:1.12.0'
+    // 4.3.1 includes the current Place Autocomplete widget while remaining compatible with
+    // this project's Android Gradle/Kotlin toolchain.
+    implementation 'com.google.android.libraries.places:places:4.3.1'
     implementation 'androidx.wear:wear-remote-interactions:1.2.0'
     implementation 'org.mapsforge:mapsforge-map-android:0.25.0'
     implementation 'org.mapsforge:mapsforge-themes:0.25.0'

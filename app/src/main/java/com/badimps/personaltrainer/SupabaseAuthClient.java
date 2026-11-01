@@ -2,6 +2,9 @@ package com.badimps.personaltrainer;
 
 import org.json.JSONObject;
 
+import android.net.Uri;
+import android.util.Base64;
+
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -26,27 +29,11 @@ public final class SupabaseAuthClient {
 
     private static final ExecutorService NETWORK = Executors.newSingleThreadExecutor();
 
-    /**
-     * Creates the Supabase Auth account. With email confirmation disabled, Supabase returns a
-     * usable session immediately; callers must save it so the new member is recognised by the
-     * Gym Lobby without an unnecessary second sign-in.
-     */
-    public static void signUp(String email, String password, String displayName, Callback<AuthResult> callback) {
+    public static void signUp(String email, String password, Callback<Boolean> callback) {
         JSONObject body = new JSONObject();
         put(body, "email", normalizeEmail(email)); put(body, "password", password);
-        JSONObject metadata = new JSONObject();
-        put(metadata, "display_name", displayName == null ? "" : displayName.trim());
-        put(body, "data", metadata);
-        request("POST", "/signup", body, null,
-                (json, error) -> {
-                    if (error != null) { callback.complete(null, friendly(error)); return; }
-                    AuthResult result = authResult(json, normalizeEmail(email));
-                    if (!result.session().isUsable()) {
-                        callback.complete(null, "Registration must sign in immediately. Turn off Confirm email in Supabase Authentication settings, then try again.");
-                        return;
-                    }
-                    callback.complete(result, null);
-                });
+        request("POST", "/signup?redirect_to=com.badimps.personaltrainer%3A%2F%2Fauth%2Fverified", body, null,
+                (json, error) -> callback.complete(error == null, error == null ? null : friendly(error)));
     }
 
     public static void signIn(String email, String password, Callback<AuthResult> callback) {
@@ -87,6 +74,51 @@ public final class SupabaseAuthClient {
 
     public static void signOut(String accessToken, Callback<Boolean> callback) {
         request("POST", "/logout", new JSONObject(), accessToken, (json, error) -> callback.complete(error == null, error));
+    }
+
+    /** Deletes the authenticated cloud identity through a server-side function. */
+    public static void deleteAccount(String accessToken, Callback<Boolean> callback) {
+        if (!SupabaseConfig.isConfigured()) { callback.complete(false, "Secure account service is not configured yet."); return; }
+        NETWORK.execute(() -> {
+            HttpURLConnection connection = null;
+            try {
+                connection = (HttpURLConnection) new URL(SupabaseConfig.functionEndpoint("delete-account")).openConnection();
+                connection.setRequestMethod("POST");
+                connection.setConnectTimeout(15_000); connection.setReadTimeout(20_000);
+                connection.setRequestProperty("apikey", BuildConfig.SUPABASE_ANON_KEY);
+                connection.setRequestProperty("Authorization", "Bearer " + accessToken);
+                connection.setRequestProperty("Content-Type", "application/json");
+                connection.setFixedLengthStreamingMode(2);
+                connection.setDoOutput(true);
+                try (OutputStream output = connection.getOutputStream()) { output.write("{}".getBytes(StandardCharsets.UTF_8)); }
+                int status = connection.getResponseCode();
+                if (status >= 200 && status < 300) callback.complete(true, null);
+                else callback.complete(false, friendly(read(connection.getErrorStream())));
+            } catch (Exception error) {
+                callback.complete(false, "Unable to reach the secure account service. Check your connection and try again.");
+            } finally { if (connection != null) connection.disconnect(); }
+        });
+    }
+
+    /** Reads the verified Supabase session returned through the app's private auth deep link. */
+    public static AuthResult fromRedirect(Uri uri) {
+        if (uri == null || !"com.badimps.personaltrainer".equalsIgnoreCase(uri.getScheme())
+                || !"auth".equalsIgnoreCase(uri.getHost())) return null;
+        String fragment = uri.getFragment();
+        if (fragment == null || fragment.isEmpty()) return null;
+        Uri values = Uri.parse("https://local.invalid/?" + fragment);
+        String access = values.getQueryParameter("access_token");
+        String refresh = values.getQueryParameter("refresh_token");
+        if (access == null || refresh == null) return null;
+        String id = "", email = "";
+        try {
+            String[] parts = access.split("\\.");
+            if (parts.length > 1) {
+                JSONObject claims = new JSONObject(new String(Base64.decode(parts[1], Base64.URL_SAFE | Base64.NO_WRAP | Base64.NO_PADDING), StandardCharsets.UTF_8));
+                id = claims.optString("sub", ""); email = claims.optString("email", "");
+            }
+        } catch (Exception ignored) { }
+        return id.isEmpty() ? null : new AuthResult(access, refresh, id, email);
     }
 
     private interface JsonCallback { void complete(JSONObject json, String error); }
@@ -131,7 +163,7 @@ public final class SupabaseAuthClient {
     private static String friendly(String value) {
         if (value == null) return "Request could not be completed.";
         String lower = value.toLowerCase(Locale.ROOT);
-        if (lower.contains("email not confirmed")) return "This account requires email confirmation, which is disabled for this app. Confirm it in Supabase or create the account again.";
+        if (lower.contains("email not confirmed")) return "Verify your email before signing in.";
         if (lower.contains("invalid login")) return "That email or password is not correct.";
         if (lower.contains("already registered") || lower.contains("already been registered")) return "An account already exists for this email.";
         if (lower.contains("expired") || lower.contains("invalid token")) return "That verification code is invalid or has expired.";

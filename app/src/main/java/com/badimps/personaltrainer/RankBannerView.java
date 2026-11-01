@@ -25,8 +25,8 @@ public final class RankBannerView extends View {
         setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_YES);
     }
 
-    public void bind(AchievementStore.Rank value) {
-        rank = value == null ? "BEGINNER" : value.title;
+    public void bind(String value) {
+        rank = value == null || value.trim().isEmpty() ? "BEGINNER" : value.trim().toUpperCase(java.util.Locale.ROOT);
         setContentDescription(rank + " rank");
         invalidate();
     }

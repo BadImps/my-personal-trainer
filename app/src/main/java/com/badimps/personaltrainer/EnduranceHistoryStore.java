@@ -21,6 +21,10 @@ public final class EnduranceHistoryStore {
         public final long activeMillis;
         public final float distanceMeters;
         public final List<LiveTrackingStore.Point> points;
+        /** Optional sensor metrics. Older saved entries intentionally default to zero. */
+        public final float averageHeartRate;
+        public final float elevationGain;
+        public final float measuredCalories;
 
         Entry(long timestamp, String mode, long activeMillis, float distanceMeters, List<LiveTrackingStore.Point> points) {
             this.timestamp = timestamp;
@@ -28,6 +32,9 @@ public final class EnduranceHistoryStore {
             this.activeMillis = activeMillis;
             this.distanceMeters = distanceMeters;
             this.points = Collections.unmodifiableList(points);
+            this.averageHeartRate = 0f;
+            this.elevationGain = 0f;
+            this.measuredCalories = 0f;
         }
     }
 
