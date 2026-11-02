@@ -1208,6 +1208,32 @@ public final class MainActivity extends FragmentActivity {
         return body;
     }
 
+    /**
+     * The My Calendar reference is a complete, calm planning surface rather than a
+     * Coach Hero variation. It therefore owns its full viewport and deliberately
+     * does not insert the portrait header or bottom navigation above/below the
+     * approved calendar composition. Android Back returns to the Plan hub.
+     */
+    private LinearLayout lockedCalendarPage() {
+        beginNewPage();
+        setSystemBars();
+        ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(true);
+        scroll.setClipToPadding(false);
+        scroll.setBackgroundColor(navy);
+        LinearLayout body = new LinearLayout(this);
+        body.setOrientation(LinearLayout.VERTICAL);
+        body.setPadding(dp(18), dp(30), dp(18), dp(34));
+        body.setBackgroundColor(navy);
+        body.setClipChildren(false);
+        scroll.addView(body, new ScrollView.LayoutParams(-1, -2));
+        mountScreen(scroll);
+        activeDashboardScrollKey = "Plan";
+        activateScroll(scroll);
+        animatePage(scroll);
+        return body;
+    }
+
     /** A focused collector screen uses one compact Coach Hero header instead of nesting it under Settings. */
     private LinearLayout coachCollectionPage() {
         beginNewPage();
@@ -13660,8 +13686,11 @@ public final class MainActivity extends FragmentActivity {
 
     /** One calendar joins strength templates, rest days, and separately booked endurance appointments. */
     private void showScheduler() {
-        LinearLayout body = appPage("My Calendar", "Plan");
-        title(body, "MY CALENDAR", "Your training calendar", "See existing work plans, rest days, and endurance appointments in one place. Select a date, then choose Schedule a workout.");
+        LinearLayout body = lockedCalendarPage();
+        // Design lock: this hierarchy and calendar composition mirror the approved
+        // My Calendar reference. Keep the Coach Hero page chrome, but do not substitute
+        // a generic white card or a separate scheduling section below the board.
+        title(body, "PLAN · MY CALENDAR", "My Calendar", "A full-month view with your training rhythm in one place.");
         if (pendingCoachRecommendation != null && !pendingCoachRecommendation.trim().isEmpty()) {
             LinearLayout recommendation = card();
             recommendation.addView(heading("COACH RECOMMENDATION", 11, mint));
@@ -13674,40 +13703,28 @@ public final class MainActivity extends FragmentActivity {
             body.addView(recommendation); gap(body, 12);
         }
         Calendar month = schedulerMonth();
-        LinearLayout header = new LinearLayout(this);
-        header.setGravity(Gravity.CENTER_VERTICAL);
-        Button previous = action("‹", navyPanel, mint);
-        previous.setContentDescription("Previous month");
-        previous.setOnClickListener(view -> {
-            schedulerMonthOffset--;
-            schedulerSelectedDate = schedulerMonth();
-            refreshCurrentPageKeepingScroll(this::showScheduler);
-        });
-        header.addView(previous, new LinearLayout.LayoutParams(dp(48), dp(46)));
-        TextView label = heading(new SimpleDateFormat("MMMM yyyy", Locale.getDefault()).format(month.getTime()), 27, Color.WHITE);
-        label.setGravity(Gravity.CENTER);
-        header.addView(label, new LinearLayout.LayoutParams(0, -2, 1f));
-        Button next = action("›", navyPanel, mint);
-        next.setContentDescription("Next month");
-        next.setOnClickListener(view -> {
-            schedulerMonthOffset++;
-            schedulerSelectedDate = schedulerMonth();
-            refreshCurrentPageKeepingScroll(this::showScheduler);
-        });
-        header.addView(next, new LinearLayout.LayoutParams(dp(48), dp(46)));
-        body.addView(header);
-        gap(body, 10);
-
         LinearLayout calendarCard = new LinearLayout(this);
         calendarCard.setOrientation(LinearLayout.VERTICAL);
-        calendarCard.setPadding(dp(12), dp(13), dp(12), dp(12));
-        calendarCard.setBackground(surface(Color.rgb(16, 43, 68), 22, 1, Color.rgb(70, 109, 141)));
-        TextView monthView = heading("MONTH VIEW", 11, Color.rgb(174, 220, 211));
-        monthView.setLetterSpacing(.1f);
-        calendarCard.addView(monthView);
-        calendarCard.addView(text("Mint = complete  •  Coral = planned / today  •  Slate = rest day", 12, Color.rgb(202, 216, 234)));
-        View weekdayDivider = new View(this); weekdayDivider.setBackgroundColor(Color.rgb(77, 111, 141));
-        LinearLayout.LayoutParams weekdayDividerParams = new LinearLayout.LayoutParams(-1, dp(1)); weekdayDividerParams.topMargin = dp(10); calendarCard.addView(weekdayDivider, weekdayDividerParams);
+        calendarCard.setPadding(dp(14), dp(16), dp(14), dp(14));
+        calendarCard.setBackground(surface(Color.rgb(16, 42, 67), 30, 2, coral));
+        TextView monthLabel = heading(new SimpleDateFormat("MMMM yyyy", Locale.getDefault()).format(month.getTime()), 28, Color.WHITE);
+        calendarCard.addView(monthLabel);
+        LinearLayout monthSwitch = new LinearLayout(this);
+        monthSwitch.setGravity(Gravity.CENTER_VERTICAL);
+        Button previous = action("‹", Color.TRANSPARENT, Color.rgb(190, 215, 234));
+        previous.setTextSize(18); previous.setContentDescription("Previous month");
+        previous.setOnClickListener(view -> { schedulerMonthOffset--; schedulerSelectedDate = schedulerMonth(); refreshCurrentPageKeepingScroll(this::showScheduler); });
+        monthSwitch.addView(previous, new LinearLayout.LayoutParams(dp(32), dp(36)));
+        TextView fullMonth = text("Full month", 14, Color.rgb(190, 215, 234));
+        fullMonth.setGravity(Gravity.CENTER_VERTICAL);
+        monthSwitch.addView(fullMonth, new LinearLayout.LayoutParams(0, dp(36), 1f));
+        Button next = action("›", Color.TRANSPARENT, Color.rgb(190, 215, 234));
+        next.setTextSize(18); next.setContentDescription("Next month");
+        next.setOnClickListener(view -> { schedulerMonthOffset++; schedulerSelectedDate = schedulerMonth(); refreshCurrentPageKeepingScroll(this::showScheduler); });
+        monthSwitch.addView(next, new LinearLayout.LayoutParams(dp(32), dp(36)));
+        calendarCard.addView(monthSwitch);
+        View weekdayDivider = new View(this); weekdayDivider.setBackgroundColor(Color.rgb(56, 84, 110));
+        LinearLayout.LayoutParams weekdayDividerParams = new LinearLayout.LayoutParams(-1, dp(1)); weekdayDividerParams.topMargin = dp(3); calendarCard.addView(weekdayDivider, weekdayDividerParams);
         // Use weighted rows rather than fixed-width grid cells. The sidebar changes available
         // width on phones and tablets, so fixed 39dp cells could crop the last calendar days.
         LinearLayout grid = new LinearLayout(this);
@@ -13728,7 +13745,7 @@ public final class MainActivity extends FragmentActivity {
                     int day = index - first + 1;
                     Calendar date = null;
                     if (day >= 1 && day <= max) { date = (Calendar) month.clone(); date.set(Calendar.DAY_OF_MONTH, day); }
-                    cell = schedulerCalendarCell(date); cellHeight = 72;
+                    cell = schedulerCalendarCell(date); cellHeight = 82;
                 }
                 LinearLayout.LayoutParams cellParams = new LinearLayout.LayoutParams(0, dp(cellHeight), 1f);
                 cellParams.setMargins(dp(1), dp(1), dp(1), dp(1));
@@ -13737,15 +13754,76 @@ public final class MainActivity extends FragmentActivity {
             grid.addView(row, new LinearLayout.LayoutParams(-1, -2));
         }
         calendarCard.addView(grid);
-        View gridDivider = new View(this); gridDivider.setBackgroundColor(Color.rgb(63, 94, 125));
-        LinearLayout.LayoutParams gridDividerParams = new LinearLayout.LayoutParams(-1, dp(1)); gridDividerParams.topMargin = dp(8); calendarCard.addView(gridDivider, gridDividerParams);
+        View gridDivider = new View(this); gridDivider.setBackgroundColor(Color.rgb(56, 84, 110));
+        LinearLayout.LayoutParams gridDividerParams = new LinearLayout.LayoutParams(-1, dp(1)); gridDividerParams.topMargin = dp(9); calendarCard.addView(gridDivider, gridDividerParams);
+        addSchedulerLegend(calendarCard);
+        addSchedulerSelectedDayPreview(calendarCard, schedulerSelectedDate);
         body.addView(calendarCard);
-        gap(body, 12);
-        addSchedulerDayAgenda(body, schedulerSelectedDate);
-        gap(body, 10);
-        Button book = primary("Schedule a workout");
-        book.setOnClickListener(view -> showSchedulerAppointmentSheet(schedulerSelectedDate));
-        addButton(body, book);
+        TextView behavior = text("Tile behavior: tap a day to open its plan. Tap Plan a Workout to create a plan. Use ‹ or › to change month.", 12, Color.rgb(169, 192, 211));
+        LinearLayout.LayoutParams behaviorParams = new LinearLayout.LayoutParams(-1, -2); behaviorParams.topMargin = dp(13); body.addView(behavior, behaviorParams);
+    }
+
+    private void addSchedulerLegend(LinearLayout parent) {
+        LinearLayout legend = new LinearLayout(this); legend.setGravity(Gravity.CENTER_VERTICAL); legend.setPadding(dp(3), dp(12), dp(3), dp(10));
+        addSchedulerLegendItem(legend, Color.rgb(102, 215, 187), "Complete", 1f);
+        addSchedulerLegendItem(legend, coral, "Planned / today", 1.35f);
+        addSchedulerLegendItem(legend, Color.rgb(95, 113, 132), "Rest day", 1f);
+        parent.addView(legend, new LinearLayout.LayoutParams(-1, dp(46)));
+    }
+
+    private void addSchedulerLegendItem(LinearLayout parent, int color, String label, float weight) {
+        LinearLayout item = new LinearLayout(this); item.setGravity(Gravity.CENTER_VERTICAL);
+        TextView swatch = new TextView(this); swatch.setBackground(surface(color, 5, 0, Color.TRANSPARENT));
+        item.addView(swatch, new LinearLayout.LayoutParams(dp(16), dp(16)));
+        TextView copy = text(label, 11, Color.rgb(201, 217, 231));
+        LinearLayout.LayoutParams copyParams = new LinearLayout.LayoutParams(0, -2, 1f); copyParams.leftMargin = dp(7); item.addView(copy, copyParams);
+        parent.addView(item, new LinearLayout.LayoutParams(0, -1, weight));
+    }
+
+    private void addSchedulerSelectedDayPreview(LinearLayout parent, Calendar date) {
+        LinearLayout preview = new LinearLayout(this); preview.setOrientation(LinearLayout.VERTICAL);
+        preview.setPadding(dp(13), dp(13), dp(13), dp(13));
+        preview.setBackground(surface(Color.rgb(23, 58, 85), 22, 1, Color.rgb(62, 96, 123)));
+        TextView eyebrow = heading("SELECTED DAY", 11, Color.rgb(255, 177, 168)); eyebrow.setLetterSpacing(.11f); preview.addView(eyebrow);
+        gap(preview, 8);
+        LinearLayout row = new LinearLayout(this); row.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout dateCard = new LinearLayout(this); dateCard.setOrientation(LinearLayout.VERTICAL); dateCard.setGravity(Gravity.CENTER);
+        dateCard.setBackground(surface(Color.rgb(244, 248, 252), 17, 0, Color.TRANSPARENT));
+        TextView month = text(new SimpleDateFormat("MMMM", Locale.getDefault()).format(date.getTime()).toUpperCase(Locale.ROOT), 11, navy);
+        month.setTypeface(Typeface.create("sans-serif", Typeface.BOLD)); month.setGravity(Gravity.CENTER); month.setBackground(surface(coral, 0, 0, Color.TRANSPARENT));
+        dateCard.addView(month, new LinearLayout.LayoutParams(-1, dp(30)));
+        TextView day = heading(String.valueOf(date.get(Calendar.DAY_OF_MONTH)), 42, navy); day.setGravity(Gravity.CENTER); dateCard.addView(day, new LinearLayout.LayoutParams(-1, dp(58)));
+        TextView weekday = text(new SimpleDateFormat("EEEE", Locale.getDefault()).format(date.getTime()).toUpperCase(Locale.ROOT), 10, Color.rgb(73, 100, 122)); weekday.setTypeface(Typeface.create("sans-serif", Typeface.BOLD)); weekday.setGravity(Gravity.CENTER); dateCard.addView(weekday, new LinearLayout.LayoutParams(-1, dp(20)));
+        row.addView(dateCard, new LinearLayout.LayoutParams(dp(112), dp(108)));
+        LinearLayout details = new LinearLayout(this); details.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams detailParams = new LinearLayout.LayoutParams(0, -2, 1f); detailParams.leftMargin = dp(14); row.addView(details, detailParams);
+        boolean hasWorkout = isMonthWorkoutDay(date); List<SchedulerStore.Appointment> appointments = SchedulerStore.onDate(this, date);
+        boolean hasPlan = hasWorkout || !appointments.isEmpty();
+        String titleCopy = hasPlan ? (hasWorkout && !appointments.isEmpty() ? "Workout + Endurance" : hasWorkout ? "Workout Plan" : "Endurance Plan") : "Plan a Workout";
+        details.addView(heading(titleCopy, 20, Color.WHITE));
+        String summary = hasPlan ? (hasWorkout ? schedulerStrengthSummary(date) : appointmentAbbreviation(appointments.get(0).mode)) : "Build a Workout, Endurance, or combined plan.";
+        details.addView(text(summary, 12, Color.rgb(198, 216, 232)));
+        View divider = new View(this); divider.setBackgroundColor(Color.rgb(65, 97, 123)); LinearLayout.LayoutParams dividerParams = new LinearLayout.LayoutParams(-1, dp(1)); dividerParams.topMargin = dp(9); details.addView(divider, dividerParams);
+        TextView weekly = heading("THIS WEEK · " + schedulerWeekPlanCount(date) + " PLANS", 11, mint); weekly.setLetterSpacing(.05f); LinearLayout.LayoutParams weeklyParams = new LinearLayout.LayoutParams(-1, -2); weeklyParams.topMargin = dp(10); details.addView(weekly, weeklyParams);
+        details.addView(text(schedulerWeekProgress(date), 11, Color.rgb(198, 216, 232)));
+        row.setClickable(true); row.setOnClickListener(view -> showSchedulerAppointmentSheet(date));
+        preview.addView(row);
+        LinearLayout.LayoutParams previewParams = new LinearLayout.LayoutParams(-1, dp(158));
+        previewParams.topMargin = dp(3);
+        parent.addView(preview, previewParams);
+    }
+
+    private int schedulerWeekPlanCount(Calendar date) {
+        Calendar cursor = (Calendar) date.clone(); cursor.setFirstDayOfWeek(Calendar.MONDAY); cursor.add(Calendar.DAY_OF_YEAR, -((cursor.get(Calendar.DAY_OF_WEEK) - Calendar.MONDAY + 7) % 7));
+        int count = 0; for (int i = 0; i < 7; i++) { if (isMonthWorkoutDay(cursor) || !SchedulerStore.onDate(this, cursor).isEmpty()) count++; cursor.add(Calendar.DAY_OF_YEAR, 1); }
+        return count;
+    }
+
+    private String schedulerWeekProgress(Calendar date) {
+        Calendar cursor = (Calendar) date.clone(); cursor.setFirstDayOfWeek(Calendar.MONDAY); cursor.add(Calendar.DAY_OF_YEAR, -((cursor.get(Calendar.DAY_OF_WEEK) - Calendar.MONDAY + 7) % 7));
+        int complete = 0, upcoming = 0, rest = 0;
+        for (int i = 0; i < 7; i++) { if (completedStrengthOn(cursor) != null || completedEnduranceOn(cursor) != null) complete++; else if (isMonthWorkoutDay(cursor) || !SchedulerStore.onDate(this, cursor).isEmpty()) upcoming++; else rest++; cursor.add(Calendar.DAY_OF_YEAR, 1); }
+        return complete + " complete · " + upcoming + " upcoming · " + rest + " rest day" + (rest == 1 ? "" : "s");
     }
 
     private void applyCoachRecommendation() {
@@ -13790,11 +13868,13 @@ public final class MainActivity extends FragmentActivity {
                 : planned ? schedulerStrengthSummary(date).toUpperCase(Locale.ROOT)
                 : endurance ? enduranceLabel : "REST DAY";
         if (planned && endurance) state = schedulerStrengthSummary(date).toUpperCase(Locale.ROOT) + " + " + enduranceLabel;
-        int fill = completed ? Color.rgb(102, 215, 187) : (planned || endurance) ? coral : Color.rgb(32, 62, 89);
+        // The approved board uses slate for rest days; navy is reserved for an open day.
+        boolean restDay = !planned && !endurance && !completed;
+        int fill = completed ? Color.rgb(102, 215, 187) : (planned || endurance) ? coral : restDay ? Color.rgb(95, 113, 132) : Color.rgb(23, 53, 78);
         Calendar now = Calendar.getInstance();
         boolean today = sameSchedulerDate(date, now);
         boolean futureSelection = selected && !historical && !today;
-        int border = today ? Color.WHITE : completed ? Color.rgb(181, 246, 228) : (planned || endurance) ? Color.rgb(255, 191, 182) : Color.rgb(78, 117, 149);
+        int border = today ? Color.WHITE : completed ? Color.rgb(181, 246, 228) : (planned || endurance) ? Color.rgb(255, 195, 188) : restDay ? Color.rgb(145, 162, 178) : Color.rgb(62, 96, 123);
         int foreground = completed || planned || endurance ? navy : Color.WHITE;
         LinearLayout cell = new LinearLayout(this);
         cell.setOrientation(LinearLayout.VERTICAL);

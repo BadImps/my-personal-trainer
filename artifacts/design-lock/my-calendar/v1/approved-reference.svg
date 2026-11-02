@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1480" viewBox="0 0 1080 1480">
+  <rect width="1080" height="1480" fill="#061b30"/>
+  <text x="58" y="74" font-family="Arial, sans-serif" font-size="33" font-weight="700" fill="#ffffff">PLAN · My Calendar</text>
+  <text x="58" y="112" font-family="Arial, sans-serif" font-size="19" fill="#bdcede">A full-month view with your training rhythm in one place.</text>
+
+  <rect x="56" y="154" width="968" height="1090" rx="30" fill="#102a43" stroke="#ff7668" stroke-width="3"/>
+  <text x="88" y="208" font-family="Arial, sans-serif" font-size="34" font-weight="700" fill="#ffffff">November 2026</text>
+  <text x="88" y="241" font-family="Arial, sans-serif" font-size="17" fill="#b8cbdd">‹   Full month   ›</text>
+  <path d="M88 268H992" stroke="#38546e" stroke-width="2"/>
+
+  <g transform="translate(-26 0)" font-family="Arial, sans-serif" text-anchor="middle" font-size="16" font-weight="700" fill="#9eb7ca">
+    <text x="170" y="312">MON</text><text x="302" y="312">TUE</text><text x="434" y="312">WED</text><text x="566" y="312">THU</text><text x="698" y="312">FRI</text><text x="830" y="312">SAT</text><text x="962" y="312">SUN</text>
+  </g>
+  <path d="M84 324H996" stroke="#54738d" stroke-width="2"/>
+  <g transform="translate(-26 0)" fill="#17354e" stroke="#3e607b" stroke-width="2">
+    <rect x="110" y="332" width="120" height="116" rx="15"/><rect x="242" y="332" width="120" height="116" rx="15"/><rect x="374" y="332" width="120" height="116" rx="15"/><rect x="506" y="332" width="120" height="116" rx="15"/><rect x="638" y="332" width="120" height="116" rx="15"/><rect x="770" y="332" width="120" height="116" rx="15"/><rect x="902" y="332" width="120" height="116" rx="15"/>
+    <rect x="110" y="458" width="120" height="116" rx="15"/><rect x="242" y="458" width="120" height="116" rx="15"/><rect x="374" y="458" width="120" height="116" rx="15"/><rect x="506" y="458" width="120" height="116" rx="15"/><rect x="638" y="458" width="120" height="116" rx="15"/><rect x="770" y="458" width="120" height="116" rx="15"/><rect x="902" y="458" width="120" height="116" rx="15"/>
+    <rect x="110" y="584" width="120" height="116" rx="15"/><rect x="242" y="584" width="120" height="116" rx="15"/><rect x="374" y="584" width="120" height="116" rx="15"/><rect x="506" y="584" width="120" height="116" rx="15"/><rect x="638" y="584" width="120" height="116" rx="15"/><rect x="770" y="584" width="120" height="116" rx="15"/><rect x="902" y="584" width="120" height="116" rx="15"/>
+    <rect x="110" y="710" width="120" height="116" rx="15"/><rect x="242" y="710" width="120" height="116" rx="15"/><rect x="374" y="710" width="120" height="116" rx="15"/><rect x="506" y="710" width="120" height="116" rx="15"/><rect x="638" y="710" width="120" height="116" rx="15"/><rect x="770" y="710" width="120" height="116" rx="15"/><rect x="902" y="710" width="120" height="116" rx="15"/>
+  </g>
+  <g transform="translate(-26 0)">
+  <!-- calendar states -->
+  <rect x="242" y="332" width="120" height="116" rx="15" fill="#6ad7bb" stroke="#b5f6e4" stroke-width="2"/><rect x="506" y="332" width="120" height="116" rx="15" fill="#6ad7bb" stroke="#b5f6e4" stroke-width="2"/>
+  <rect x="638" y="458" width="120" height="116" rx="15" fill="#ff7668" stroke="#ffffff" stroke-width="3"/>
+  <rect x="770" y="458" width="120" height="116" rx="15" fill="#5f7184" stroke="#91a2b2" stroke-width="2"/>
+  <rect x="374" y="584" width="120" height="116" rx="15" fill="#6ad7bb" stroke="#b5f6e4" stroke-width="2"/><rect x="506" y="584" width="120" height="116" rx="15" fill="#ff7668" stroke="#ffc3bc" stroke-width="2"/>
+  <rect x="902" y="710" width="120" height="116" rx="15" fill="#5f7184" stroke="#91a2b2" stroke-width="2"/>
+  <g font-family="Arial, sans-serif" font-weight="700" font-size="25" text-anchor="middle" fill="#ffffff">
+    <text x="170" y="376">2</text><text x="302" y="376" fill="#102a43">3</text><text x="434" y="376">4</text><text x="566" y="376" fill="#102a43">5</text><text x="698" y="376">6</text><text x="830" y="376">7</text><text x="962" y="376">8</text>
+    <text x="170" y="502">9</text><text x="302" y="502">10</text><text x="434" y="502">11</text><text x="566" y="502">12</text><text x="698" y="502" fill="#102a43">13</text><text x="830" y="502">14</text><text x="962" y="502">15</text>
+    <text x="170" y="628">16</text><text x="302" y="628">17</text><text x="434" y="628" fill="#102a43">18</text><text x="566" y="628" fill="#102a43">19</text><text x="698" y="628">20</text><text x="830" y="628">21</text><text x="962" y="628">22</text>
+    <text x="170" y="754">23</text><text x="302" y="754">24</text><text x="434" y="754">25</text><text x="566" y="754">26</text><text x="698" y="754">27</text><text x="830" y="754">28</text><text x="962" y="754">29</text>
+  </g>
+  <g fill="#102a43" aria-label="Workout and endurance indicators">
+    <!-- Same dumbbell and stride symbols used in Your Week Calendar. -->
+    <path d="M287 419h3v12h-3zM290 416h5v18h-5zM295 422h15v6h-15zM310 416h5v18h-5zM315 419h3v12h-3z"/>
+    <g transform="translate(558 410) scale(.65)"><path d="M13.5,5.5c1.1,0 2,-0.9 2,-2s-0.9,-2 -2,-2s-2,0.9 -2,2s0.9,2 2,2zM9.8,10.8l2.7,-1.1l1.6,1.6c1.1,1.1 2.6,1.7 4.2,1.7v-2c-1,0 -1.9,-0.4 -2.6,-1.1l-1.9,-1.9c-0.5,-0.5 -1.2,-0.8 -1.9,-0.8c-0.3,0 -0.5,0.1 -0.8,0.1l-4.4,1.9v4.8h2v-3.5l1,-0.4L7.2,22h2.1l2.3,-6.4l2.1,2V22h2v-5.8l-2.1,-2l0.6,-2.8z"/></g>
+    <path d="M419 671h3v12h-3zM422 668h5v18h-5zM427 674h15v6h-15zM442 668h5v18h-5zM447 671h3v12h-3z"/>
+  </g>
+  <g font-family="Arial, sans-serif" font-size="13" font-weight="700"><text x="302" y="408" text-anchor="middle" fill="#102a43">UPPER</text><text x="566" y="408" text-anchor="middle" fill="#102a43">RUN</text><text x="698" y="537" text-anchor="middle" fill="#102a43">TODAY</text><text x="830" y="537" text-anchor="middle" fill="#ffffff">REST</text><text x="434" y="660" text-anchor="middle" fill="#102a43">LOWER</text><text x="566" y="663" text-anchor="middle" fill="#102a43">PLAN</text><text x="962" y="789" text-anchor="middle" fill="#ffffff">REST</text></g>
+  </g>
+
+  <path d="M88 858H992" stroke="#38546e" stroke-width="2"/>
+  <g font-family="Arial, sans-serif" font-size="16"><rect x="92" y="888" width="18" height="18" rx="5" fill="#6ad7bb"/><text x="120" y="903" fill="#c9d9e7">Complete</text><rect x="272" y="888" width="18" height="18" rx="5" fill="#ff7668"/><text x="300" y="903" fill="#c9d9e7">Planned / today</text><rect x="502" y="888" width="18" height="18" rx="5" fill="#5f7184"/><text x="530" y="903" fill="#c9d9e7">Rest day</text></g>
+  <rect x="88" y="940" width="904" height="250" rx="22" fill="#173a55" stroke="#3e607b" stroke-width="2"/>
+  <text x="116" y="980" font-family="Arial, sans-serif" font-size="15" font-weight="700" letter-spacing="1.2" fill="#ffb1a8">SELECTED DAY</text>
+  <rect x="116" y="996" width="190" height="162" rx="18" fill="#f4f8fc"/>
+  <path d="M116 1014a18 18 0 0 1 18-18h154a18 18 0 0 1 18 18v30H116z" fill="#ff7668"/>
+  <text x="211" y="1024" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" font-weight="700" fill="#102a43">NOVEMBER</text>
+  <text x="211" y="1108" text-anchor="middle" font-family="Arial, sans-serif" font-size="72" font-weight="700" fill="#102a43">13</text>
+  <text x="211" y="1135" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" font-weight="700" fill="#49647a">FRIDAY</text>
+  <text x="342" y="1025" font-family="Arial, sans-serif" font-size="27" font-weight="700" fill="#ffffff">Plan a Workout</text>
+  <text x="342" y="1058" font-family="Arial, sans-serif" font-size="18" fill="#c6d8e8">Build a Workout, Endurance, or combined plan.</text>
+  <path d="M342 1084H952" stroke="#41617b" stroke-width="2"/>
+  <text x="342" y="1121" font-family="Arial, sans-serif" font-size="17" font-weight="700" letter-spacing="0.6" fill="#8de3cb">THIS WEEK · 3 PLANS</text>
+  <text x="342" y="1149" font-family="Arial, sans-serif" font-size="16" fill="#c6d8e8">1 complete · 1 upcoming · 1 rest day</text>
+  <text x="56" y="1354" font-family="Arial, sans-serif" font-size="17" fill="#a9c0d3">Tile behavior: tap a day to open its plan. Tap empty/today to create a plan. Swipe left or right to change month.</text>
+</svg>
