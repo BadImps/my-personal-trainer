@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 149,
-  "versionName": "6.7",
-  "publishedAt": "2026-11-01T13:25:25Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v6.7/app-release.apk",
-  "sha256": "637971651203ad760006f2ed64342dea5f94259b3f31802528476deddc432615",
-  "sizeBytes": 292377009,
-  "notes": "Progress now uses full-artwork tiles for Nutrition, Body, Apex, Endurance, Guided Workouts, and Energy & Weight. Workout Library moves to Plan beside My Calendar and Plan a Workout."
+  "versionCode": 150,
+  "versionName": "6.8",
+  "publishedAt": "2026-11-02T01:53:32Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v6.8/app-release.apk",
+  "sha256": "e2e6223e4bed85f449b3f870958a5de8198af21c32d6d494e45ab080e84d19aa",
+  "sizeBytes": 281415849,
+  "notes": "Progress is simplified to Nutrition, Body, Apex, and Weekly Report. Completed-plan history can be swiped through prior weeks, Baseline Check-in is at the top of Body, and Workout Library now spans the Plan page."
 }

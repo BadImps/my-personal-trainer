@@ -145,6 +145,8 @@ public final class MainActivity extends FragmentActivity {
     private boolean workoutNoTimer;
     private int trainingDays = 3;
     private int workingWeightKg = 20;
+    /** Progress history starts on the current week; positive values walk backwards through completed weeks. */
+    private int progressHistoryWeekOffset;
     private int planSets = 3;
     private int planReps = 10;
     private int planRestSeconds = 180;
@@ -4070,10 +4072,8 @@ public final class MainActivity extends FragmentActivity {
         gap(body, 10);
         LinearLayout lowerTiles = new LinearLayout(this);
         lowerTiles.setGravity(Gravity.CENTER_VERTICAL);
-        lowerTiles.addView(new View(this), new LinearLayout.LayoutParams(0, -1, 1));
         addPlanHubTile(lowerTiles, "Workout Library", "Browse movements and equipment.",
-                R.drawable.bg_tile_workout_library, this::showWorkoutLibrary, false, 2);
-        lowerTiles.addView(new View(this), new LinearLayout.LayoutParams(0, -1, 1));
+                R.drawable.bg_tile_workout_library, this::showWorkoutLibrary, false, 1);
         body.addView(lowerTiles, new LinearLayout.LayoutParams(-1, dp(222)));
     }
 
@@ -6912,8 +6912,13 @@ public final class MainActivity extends FragmentActivity {
         int planned = plannedSessionsThisWeek();
 
         LinearLayout history = card();
-        history.addView(heading("This week’s completed plan history", 19, ink));
+        Calendar historyWeek = progressHistoryWeekStart();
+        String historyTitle = progressHistoryWeekOffset == 0 ? "This week’s completed plan history"
+                : homeWeekRange(historyWeek) + " completed plan history";
+        history.addView(heading(historyTitle, 19, ink));
+        history.addView(text("Swipe right to left for an earlier week · left to right for a newer week", 12, muted));
         history.addView(text("Green = completed  •  Red = planned, not completed  •  Gray = no plan", 12, muted));
+        attachProgressHistorySwipe(history);
         addWeeklyPlanHistory(history);
         body.addView(history);
         gap(body, 12);
@@ -6966,52 +6971,9 @@ public final class MainActivity extends FragmentActivity {
         body.addView(monthly);
         gap(body, 12);
 
-        LinearLayout next = card();
-        next.addView(heading("Your next best step", 19, ink));
-        String nextStep;
-        if (!BodyProfileStore.configured(this) || !WeightStore.configured(this)) {
-            nextStep = "Complete your private age, height, and weight profile so trends have useful context.";
-        } else if (session.isEmpty()) {
-            nextStep = "Build a workout plan. Progress becomes useful after your first completed guided session.";
-        } else if (snapshot.todayFuelGoals() < 3) {
-            nextStep = "Your plan is ready. Check today's flexible fuel goals, then start when you feel ready.";
-        } else {
-            nextStep = "Your plan and fuel check-in are connected. Start your next session or review your trend.";
-        }
-        next.addView(text(nextStep, 15, muted));
-        gap(next, 10);
-        Button workout = primary(session.isEmpty() ? "Build my workout" : "Open my workout");
-        workout.setOnClickListener(view -> { if (session.isEmpty()) showPlans(); else showPlanReady(); });
-        addButton(next, workout);
-        gap(next, 8);
-        Button nutrition = lightAction("Open today's nutrition check-in");
-        nutrition.setOnClickListener(view -> showMeals());
-        addButton(next, nutrition);
-        body.addView(next);
-        gap(body, 12);
-
-        LinearLayout profileCard = card();
-        profileCard.addView(heading("Private body context", 18, ink));
-        profileCard.addView(text(BodyProfileStore.summary(this), 14, muted));
-        profileCard.addView(text("Current weight: " + WeightStore.latestLabel(this) + ". Measurements add context; they never diagnose health or choose a lifting load.", 13, muted));
-        gap(profileCard, 10);
-        Button editProfile = lightAction(BodyProfileStore.configured(this) ? "Open body context" : "Complete body profile");
-        editProfile.setOnClickListener(view -> { if (BodyProfileStore.configured(this)) showBodyContext(); else showBodyProfileSetup(false); });
-        addButton(profileCard, editProfile);
-        body.addView(profileCard);
-        gap(body, 12);
-
-        LinearLayout trend = card();
-        trend.addView(heading(WeightStore.configured(this) ? WeightStore.summary(this) : "Set a private starting point", 18, ink));
-        trend.addView(text("Look for a multi-week direction alongside workout consistency and fueling—not a verdict from one number.", 14, muted));
-        gap(trend, 10);
-        Button weight = secondary("Weight trend check-in");
-        weight.setOnClickListener(view -> showWeightTracker());
-        addButton(trend, weight);
-        body.addView(trend);
     }
 
-    /** Personal destinations plus the real weekly-report sections form one image-led Progress collage. */
+    /** Four distinct destinations: personal foundations, achievement, and one complete weekly report. */
     private void addProgressDestinations(LinearLayout body) {
         LinearLayout firstRow = new LinearLayout(this);
         firstRow.setGravity(Gravity.CENTER_VERTICAL);
@@ -7026,17 +6988,9 @@ public final class MainActivity extends FragmentActivity {
         secondRow.setGravity(Gravity.CENTER_VERTICAL);
         addProgressDestination(secondRow, "Apex", "Achievements", R.drawable.bg_tile_apex,
                 coral, this::showApex, false);
-        addProgressDestination(secondRow, "Endurance", "Distance · time · pace", R.drawable.bg_tile_endurance,
-                Color.rgb(111, 222, 192), this::showWeeklyProgressReport, true);
-        body.addView(secondRow, new LinearLayout.LayoutParams(-1, dp(128)));
-        gap(body, 9);
-        LinearLayout thirdRow = new LinearLayout(this);
-        thirdRow.setGravity(Gravity.CENTER_VERTICAL);
-        addProgressDestination(thirdRow, "Guided Workouts", "Sessions · sets · active time", R.drawable.bg_tile_guided_workouts,
-                coral, this::showWeeklyProgressReport, false);
-        addProgressDestination(thirdRow, "Energy & Weight", "Energy range · trend", R.drawable.bg_tile_energy_weight,
+        addProgressDestination(secondRow, "Weekly Report", "Activity · energy · trend", R.drawable.bg_tile_weekly_report,
                 Color.rgb(241, 195, 92), this::showWeeklyProgressReport, true);
-        body.addView(thirdRow, new LinearLayout.LayoutParams(-1, dp(128)));
+        body.addView(secondRow, new LinearLayout.LayoutParams(-1, dp(128)));
     }
 
     private void addProgressDestination(LinearLayout row, String label, String detail, int artworkRes, int accent,
@@ -7081,6 +7035,12 @@ public final class MainActivity extends FragmentActivity {
         Calendar week = Calendar.getInstance();
         week.set(Calendar.DAY_OF_WEEK, Calendar.MONDAY);
         week.set(Calendar.HOUR_OF_DAY, 0); week.set(Calendar.MINUTE, 0); week.set(Calendar.SECOND, 0); week.set(Calendar.MILLISECOND, 0);
+        return week;
+    }
+
+    private Calendar progressHistoryWeekStart() {
+        Calendar week = progressWeekStart();
+        week.add(Calendar.DAY_OF_YEAR, -7 * Math.max(0, progressHistoryWeekOffset));
         return week;
     }
 
@@ -7474,15 +7434,44 @@ public final class MainActivity extends FragmentActivity {
         });
     }
 
+    /** Swipe right-to-left for an older week; the reverse gesture cannot go beyond the current week. */
+    private void attachProgressHistorySwipe(View history) {
+        history.setOnTouchListener(new View.OnTouchListener() {
+            private float downX;
+            @Override public boolean onTouch(View view, MotionEvent event) {
+                if (event.getAction() == MotionEvent.ACTION_DOWN) {
+                    downX = event.getX();
+                } else if (event.getAction() == MotionEvent.ACTION_UP) {
+                    float deltaX = event.getX() - downX;
+                    if (Math.abs(deltaX) >= dp(64)) {
+                        if (deltaX < 0f) {
+                            progressHistoryWeekOffset++;
+                            refreshCurrentPageKeepingScroll(MainActivity.this::showProgress);
+                            return true;
+                        }
+                        if (progressHistoryWeekOffset > 0) {
+                            progressHistoryWeekOffset--;
+                            refreshCurrentPageKeepingScroll(MainActivity.this::showProgress);
+                            return true;
+                        }
+                        toast("You are already viewing the current week.");
+                        return true;
+                    }
+                }
+                return false;
+            }
+        });
+    }
+
     private void addWeeklyPlanHistory(LinearLayout history) {
-        Calendar start = progressWeekStart();
-        boolean confirmed = hasHomeWeekSchedule(0, start);
-        WeeklyScheduleStore.Schedule schedule = confirmed ? homeWeekSchedule(0, start, true) : null;
+        Calendar start = progressHistoryWeekStart();
+        boolean confirmed = hasHomeWeekSchedule(progressHistoryWeekOffset, start);
+        WeeklyScheduleStore.Schedule schedule = confirmed ? homeWeekSchedule(progressHistoryWeekOffset, start, true) : null;
         SimpleDateFormat dateFormat = new SimpleDateFormat("EEE, MMM d", Locale.getDefault());
         for (int i = 0; i < 7; i++) {
             Calendar day = (Calendar) start.clone(); day.add(Calendar.DAY_OF_YEAR, i);
             JourneyStore.WorkoutRecord completed = null;
-            for (JourneyStore.WorkoutRecord record : JourneyStore.workoutsThisWeek(this)) {
+            for (JourneyStore.WorkoutRecord record : JourneyStore.workouts(this)) {
                 Calendar recordDay = Calendar.getInstance(); recordDay.setTimeInMillis(record.timestamp);
                 if (recordDay.get(Calendar.YEAR) == day.get(Calendar.YEAR) && recordDay.get(Calendar.DAY_OF_YEAR) == day.get(Calendar.DAY_OF_YEAR)) { completed = record; break; }
             }
@@ -7507,7 +7496,7 @@ public final class MainActivity extends FragmentActivity {
         }
     }
 
-    /** A local-first progression and readiness summary; it never changes a plan automatically. */
+    /** A local-first readiness summary; it never changes a plan automatically. */
     private void addTrainingIntelligenceCards(LinearLayout body, JourneyStore.Snapshot snapshot) {
         String focus = focusSummary(activeTargets());
         if (focus == null || focus.trim().isEmpty()) focus = target;
@@ -7519,19 +7508,6 @@ public final class MainActivity extends FragmentActivity {
         recoveryCard.addView(text(recovery.detail, 14, muted));
         recoveryCard.addView(text("Based on your private completion history only. It is guidance—not medical advice.", 12, muted));
         body.addView(recoveryCard);
-        gap(body, 10);
-
-        TrainingIntelligence.ProgressionAdvice progression = TrainingIntelligence.progression(this, focus, planSets, planReps);
-        LinearLayout progressionCard = card();
-        progressionCard.addView(heading("Smart progression", 19, ink));
-        progressionCard.addView(heading(progression.headline, 17, navy));
-        progressionCard.addView(text(progression.detail, 14, muted));
-        gap(progressionCard, 6);
-        progressionCard.addView(text("Suggested next target · " + progression.nextTarget, 13, mint));
-        Button openPlan = lightAction("Review my plan");
-        openPlan.setOnClickListener(view -> { if (session.isEmpty()) showPlans(); else showPlanReady(); });
-        addButton(progressionCard, openPlan);
-        body.addView(progressionCard);
     }
 
     /** Shows an always-symmetrical, metric plate prescription for the barbell plan. */
@@ -8336,6 +8312,21 @@ public final class MainActivity extends FragmentActivity {
         String distanceToTarget = targetWeight > 0f
                 ? String.format(Locale.US, "%.1f %s to your selected target", Math.abs(current - targetWeight), unit)
                 : "Set a personal target whenever you are ready";
+
+        // The baseline belongs with Body, not buried among general Progress cards.
+        LinearLayout baseline = bodyReferenceCard();
+        baseline.addView(heading("BASELINE CHECK-IN", 11, muted));
+        baseline.addView(heading(WeightStore.summary(this), 21, navy));
+        float starting = WeightStore.starting(this);
+        baseline.addView(text(String.format(Locale.US, "Baseline %.1f %s  •  Current %s", starting, unit,
+                WeightStore.latestLabel(this)), 13, muted));
+        baseline.addView(text("Use your own trend over time—not one number—as your private reference.", 12, muted));
+        gap(baseline, 9);
+        Button checkIn = lightAction("Update baseline check-in");
+        checkIn.setOnClickListener(view -> showWeightTracker());
+        addButton(baseline, checkIn);
+        body.addView(baseline);
+        gap(body, 12);
 
         LinearLayout identity = bodyReferenceCard();
         LinearLayout metrics = new LinearLayout(this);
