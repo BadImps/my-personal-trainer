@@ -1,6 +1,10 @@
 package com.badimps.personaltrainer;
 
 import android.content.Context;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Path;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.MotionEvent;
@@ -20,6 +24,9 @@ import org.mapsforge.map.layer.renderer.TileRendererLayer;
 import org.mapsforge.map.reader.MapFile;
 import org.mapsforge.map.rendertheme.internal.MapsforgeThemes;
 import org.maplibre.android.MapLibre;
+import org.maplibre.android.annotations.IconFactory;
+import org.maplibre.android.annotations.MarkerOptions;
+import org.maplibre.android.camera.CameraPosition;
 import org.maplibre.android.annotations.PolylineOptions;
 import org.maplibre.android.camera.CameraUpdateFactory;
 import org.maplibre.android.geometry.LatLng;
@@ -88,7 +95,7 @@ public final class OfflineRouteMapView extends FrameLayout {
         Paint routePaint = AndroidGraphicFactory.INSTANCE.createPaint();
         routePaint.setStyle(Style.STROKE);
         routePaint.setColor(0xFFADFF2F);
-        routePaint.setStrokeWidth(context.getResources().getDisplayMetrics().density * 5f);
+        routePaint.setStrokeWidth(context.getResources().getDisplayMetrics().density * 8f);
         routePaint.setStrokeCap(Cap.ROUND);
         route = new Polyline(routePaint, AndroidGraphicFactory.INSTANCE);
         map.getLayerManager().getLayers().add(route);
@@ -123,6 +130,7 @@ public final class OfflineRouteMapView extends FrameLayout {
         vectorMap.getMapAsync(loaded -> {
             vectorController = loaded;
             loaded.getUiSettings().setCompassEnabled(true);
+            loaded.getUiSettings().setRotateGesturesEnabled(true);
             loaded.getUiSettings().setLogoEnabled(true);
             loaded.getUiSettings().setAttributionEnabled(true);
             loaded.getUiSettings().setScrollGesturesEnabled(true);
@@ -201,7 +209,7 @@ public final class OfflineRouteMapView extends FrameLayout {
         if (!positioned || fitCamera) {
             LatLong center = routePoints.isEmpty() ? new LatLong(10.6918d, -61.2225d) : routePoints.get(routePoints.size() - 1);
             map.setCenter(center);
-            map.setZoomLevel(routePoints.size() < 2 ? (byte) 16 : (byte) 16);
+            map.setZoomLevel(routePoints.size() < 2 ? (byte) 18 : (byte) 18);
             positioned = true;
             if (routePoints.size() > 1) routeCameraFramed = true;
         }
@@ -218,9 +226,17 @@ public final class OfflineRouteMapView extends FrameLayout {
         vectorController.clear();
         ArrayList<LatLng> line = new ArrayList<>();
         for (LiveTrackingStore.Point point : points) line.add(new LatLng(point.latitude, point.longitude));
-        if (line.size() > 1) vectorController.addPolyline(new PolylineOptions().addAll(line).color(0xFFADFF2F).width(6f));
+        if (line.size() > 1) vectorController.addPolyline(new PolylineOptions().addAll(line).color(0xFFADFF2F).width(9f));
+        if (!line.isEmpty()) {
+            vectorController.addMarker(new MarkerOptions().position(line.get(0)).icon(IconFactory.getInstance(appContext).fromBitmap(markerBitmap(false))).title("Start"));
+            if (line.size() > 1) vectorController.addMarker(new MarkerOptions().position(line.get(line.size() - 1))
+                    .icon(IconFactory.getInstance(appContext).fromBitmap(markerBitmap(true))).title("Current location · north reference"));
+        }
         if (followLatestLocation && !line.isEmpty() && fitCamera) {
-            vectorController.animateCamera(CameraUpdateFactory.newLatLngZoom(line.get(line.size() - 1), 16d));
+            CameraPosition current = vectorController.getCameraPosition();
+            CameraPosition camera = new CameraPosition.Builder(current).target(line.get(line.size() - 1)).zoom(Math.max(18d, current.zoom))
+                    .bearing(current.bearing).tilt(current.tilt).build();
+            vectorController.animateCamera(CameraUpdateFactory.newCameraPosition(camera));
             vectorCameraFramed = true;
         } else if (line.size() > 1 && fitCamera) {
             double north = -90d, south = 90d, east = -180d, west = 180d;
@@ -228,13 +244,32 @@ public final class OfflineRouteMapView extends FrameLayout {
             vectorController.moveCamera(CameraUpdateFactory.newLatLngBounds(LatLngBounds.from(north, east, south, west), dp(28)));
             vectorCameraFramed = true;
         } else if (line.size() == 1 && fitCamera) {
-            vectorController.moveCamera(CameraUpdateFactory.newLatLngZoom(line.get(0), 16d));
+            vectorController.moveCamera(CameraUpdateFactory.newLatLngZoom(line.get(0), 18d));
         } else if (line.isEmpty() && !vectorCameraFramed) {
             vectorController.moveCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(10.6918d, -61.2225d), 12d));
         }
     }
 
     private int dp(int value) { return (int) (value * getResources().getDisplayMetrics().density + .5f); }
+
+    /** North-pointing custom markers give the live map the same language as Google Maps. */
+    private Bitmap markerBitmap(boolean arrow) {
+        int size = dp(38);
+        Bitmap image = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(image);
+        android.graphics.Paint paint = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+        if (!arrow) {
+            paint.setColor(Color.WHITE); canvas.drawCircle(size / 2f, size / 2f, dp(8), paint);
+            paint.setColor(0xff38d9bd); canvas.drawCircle(size / 2f, size / 2f, dp(5), paint);
+            return image;
+        }
+        Path head = new Path();
+        head.moveTo(size / 2f, dp(2)); head.lineTo(size - dp(4), size - dp(4));
+        head.lineTo(size / 2f, size - dp(9)); head.lineTo(dp(4), size - dp(4)); head.close();
+        paint.setColor(Color.WHITE); paint.setStyle(android.graphics.Paint.Style.STROKE); paint.setStrokeWidth(dp(3)); canvas.drawPath(head, paint);
+        paint.setColor(Color.rgb(255, 107, 95)); paint.setStyle(android.graphics.Paint.Style.FILL); canvas.drawPath(head, paint);
+        return image;
+    }
 
     @Override protected void onDetachedFromWindow() {
         stopRouteReplay();

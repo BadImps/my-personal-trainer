@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 151,
-  "versionName": "6.9",
-  "publishedAt": "2026-11-02T03:25:51Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v6.9/app-release.apk",
-  "sha256": "1d7876552ec956046570584939b18cde150d1b44916aafa4cd5b0bb86602ffcc",
+  "versionCode": 152,
+  "versionName": "7.0",
+  "publishedAt": "2026-11-02T04:04:42Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v7.0/app-release.apk",
+  "sha256": "8f4306c6ae03b39fa89e361f5d1aa6d852a94417ea3696b3bdb39a4d5bf34576",
   "sizeBytes": 281415849,
-  "notes": "Progress and Plan tiles now have refined outlines and shadows. Endurance live tracking starts at your current location, and finished GPS routes can be saved as Custom Maps for future time comparisons."
+  "notes": "Progress and Plan tiles now use top-aligned titles, stronger coral frames, shadows, and safer spacing. Live endurance maps are closer, clearer, rotatable navigation views with larger route and position markers."
 }

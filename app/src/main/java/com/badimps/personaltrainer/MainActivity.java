@@ -4072,7 +4072,8 @@ public final class MainActivity extends FragmentActivity {
         addPlanHubTile(topTiles, "Plan a Workout", "Create Daily, Weekly, or Custom.",
                 R.drawable.bg_tile_plan_workout, this::showPlanCadence, true, 1);
         body.addView(topTiles, new LinearLayout.LayoutParams(-1, dp(222)));
-        gap(body, 10);
+        // Extra vertical space prevents the heavier tile shadows from colliding.
+        gap(body, 16);
         LinearLayout lowerTiles = new LinearLayout(this);
         lowerTiles.setGravity(Gravity.CENTER_VERTICAL);
         addPlanHubTile(lowerTiles, "Workout Library", "Browse movements and equipment.",
@@ -4087,35 +4088,39 @@ public final class MainActivity extends FragmentActivity {
         tile.setClickable(true);
         tile.setFocusable(true);
         tile.setContentDescription("Open " + label);
-        // A fine double-weight frame plus real elevation separates the artwork from the
-        // navy page without turning the minimal cards into heavy 3D panels.
-        tile.setBackground(surface(navyPanel, 20, 2, Color.rgb(48, 91, 119)));
+        // A stronger Coach Hero coral frame makes the Plan collection read as one premium set.
+        tile.setBackground(surface(navyPanel, 20, 3, Color.argb(238, Color.red(coral), Color.green(coral), Color.blue(coral))));
         tile.setClipToOutline(true);
         tile.setOutlineProvider(android.view.ViewOutlineProvider.BACKGROUND);
-        tile.setElevation(dp(6));
+        tile.setElevation(dp(7));
         tile.setTranslationZ(dp(1));
         addTileArtwork(tile, artworkRes, Color.argb(126, 4, 20, 38));
-        LinearLayout copy = new LinearLayout(this);
-        copy.setOrientation(LinearLayout.VERTICAL);
-        copy.setGravity(Gravity.CENTER);
-        copy.setPadding(dp(10), dp(18), dp(10), dp(14));
         TextView name = heading(label, label.length() > 12 ? 16 : 18, Color.WHITE);
-        name.setGravity(Gravity.CENTER);
+        name.setGravity(Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+        name.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
+        name.setShadowLayer(dp(2), 0f, dp(1), Color.argb(230, 0, 0, 0));
+        name.setPadding(dp(10), dp(15), dp(10), 0);
         name.setMaxLines(2);
-        copy.addView(name, new LinearLayout.LayoutParams(-1, dp(44)));
         TextView description = text(detail, 12, Color.rgb(205, 225, 237));
-        description.setGravity(Gravity.CENTER);
+        description.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        description.setShadowLayer(dp(2), 0f, dp(1), Color.argb(230, 0, 0, 0));
+        description.setGravity(Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
+        description.setPadding(dp(10), 0, dp(10), dp(7));
         description.setMaxLines(2);
-        copy.addView(description, new LinearLayout.LayoutParams(-1, dp(39)));
         TextView arrow = heading("Open  ›", 13, mint);
+        arrow.setShadowLayer(dp(2), 0f, dp(1), Color.argb(220, 0, 0, 0));
         arrow.setGravity(Gravity.CENTER);
         FrameLayout.LayoutParams arrowParams = new FrameLayout.LayoutParams(-1, dp(26), Gravity.BOTTOM);
-        tile.addView(copy, new FrameLayout.LayoutParams(-1, -1));
+        FrameLayout.LayoutParams nameParams = new FrameLayout.LayoutParams(-1, dp(54), Gravity.TOP);
+        FrameLayout.LayoutParams detailParams = new FrameLayout.LayoutParams(-1, dp(52), Gravity.BOTTOM);
+        detailParams.bottomMargin = dp(22);
+        tile.addView(name, nameParams);
+        tile.addView(description, detailParams);
         tile.addView(arrow, arrowParams);
         tile.setOnClickListener(view -> open.run());
         applyPressMotion(tile);
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, -1, weight);
-        if (second) params.leftMargin = dp(10);
+        if (second) params.leftMargin = dp(14);
         row.addView(tile, params);
     }
 
@@ -6991,7 +6996,8 @@ public final class MainActivity extends FragmentActivity {
                 Color.rgb(112, 190, 244), this::showBodyContext, true);
         body.addView(firstRow, new LinearLayout.LayoutParams(-1, dp(128)));
 
-        gap(body, 9);
+        // Preserve a clear shadow gutter between the two framed Progress rows.
+        gap(body, 14);
         LinearLayout secondRow = new LinearLayout(this);
         secondRow.setGravity(Gravity.CENTER_VERTICAL);
         addProgressDestination(secondRow, "Apex", "Achievements", R.drawable.bg_tile_apex,
@@ -7007,30 +7013,31 @@ public final class MainActivity extends FragmentActivity {
         tile.setClickable(true);
         tile.setFocusable(true);
         tile.setContentDescription("Open " + label);
-        // Keep each Progress destination crisp: its own accent frame and a quiet raised shadow.
-        tile.setBackground(surface(navyPanel, 18, 2, Color.argb(210, Color.red(accent), Color.green(accent), Color.blue(accent))));
+        // A shared coral-orange frame unifies the four destination tiles without changing their artwork.
+        tile.setBackground(surface(navyPanel, 18, 3, Color.argb(238, Color.red(coral), Color.green(coral), Color.blue(coral))));
         tile.setClipToOutline(true);
         tile.setOutlineProvider(android.view.ViewOutlineProvider.BACKGROUND);
-        tile.setElevation(dp(6));
+        tile.setElevation(dp(7));
         tile.setTranslationZ(dp(1));
         addTileArtwork(tile, artworkRes, Color.argb(138, 4, 20, 38));
-        LinearLayout copy = new LinearLayout(this);
-        copy.setOrientation(LinearLayout.VERTICAL);
-        copy.setGravity(Gravity.CENTER);
-        copy.setPadding(dp(8), dp(9), dp(8), dp(8));
         TextView name = heading(label, label.length() > 12 ? 14 : 16, Color.WHITE);
-        name.setGravity(Gravity.CENTER);
+        name.setGravity(Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+        name.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
+        name.setShadowLayer(dp(2), 0f, dp(1), Color.argb(235, 0, 0, 0));
+        name.setPadding(dp(7), dp(11), dp(7), 0);
         name.setMaxLines(2);
-        copy.addView(name, new LinearLayout.LayoutParams(-1, dp(40)));
         TextView subtitle = text(detail, 11, Color.rgb(222, 235, 244));
-        subtitle.setGravity(Gravity.CENTER);
+        subtitle.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        subtitle.setShadowLayer(dp(2), 0f, dp(1), Color.argb(235, 0, 0, 0));
+        subtitle.setGravity(Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
+        subtitle.setPadding(dp(7), 0, dp(7), dp(11));
         subtitle.setMaxLines(2);
-        copy.addView(subtitle, new LinearLayout.LayoutParams(-1, dp(31)));
-        tile.addView(copy, new FrameLayout.LayoutParams(-1, -1));
+        tile.addView(name, new FrameLayout.LayoutParams(-1, dp(48), Gravity.TOP));
+        tile.addView(subtitle, new FrameLayout.LayoutParams(-1, dp(46), Gravity.BOTTOM));
         tile.setOnClickListener(view -> open.run());
         applyPressMotion(tile);
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, -1, 1);
-        if (second) params.leftMargin = dp(9);
+        if (second) params.leftMargin = dp(12);
         row.addView(tile, params);
     }
 
@@ -13954,25 +13961,25 @@ public final class MainActivity extends FragmentActivity {
         if (GoogleMapsConfig.isConfigured()) {
             try {
                 GoogleRouteMapView map = new GoogleRouteMapView(this, live.points);
-                LinearLayout.LayoutParams mapParams = new LinearLayout.LayoutParams(-1, dp(235)); mapParams.topMargin = dp(10);
+                LinearLayout.LayoutParams mapParams = new LinearLayout.LayoutParams(-1, dp(300)); mapParams.topMargin = dp(10);
                 tracker.addView(map, mapParams); routeRenderer = map::setRoute;
             } catch (RuntimeException error) {
                 RouteTraceView trace = new RouteTraceView(this); trace.setPoints(live.points);
-                tracker.addView(trace, new LinearLayout.LayoutParams(-1, dp(150))); routeRenderer = trace::setPoints;
+                tracker.addView(trace, new LinearLayout.LayoutParams(-1, dp(230))); routeRenderer = trace::setPoints;
             }
         } else if (OfflineMapStore.hasAnyMap(this)) {
             try {
                 OfflineRouteMapView map = new OfflineRouteMapView(this, OfflineMapStore.mapFile(this), live.points);
                 map.setFollowLatestLocation(true);
-                LinearLayout.LayoutParams mapParams = new LinearLayout.LayoutParams(-1, dp(235)); mapParams.topMargin = dp(10);
+                LinearLayout.LayoutParams mapParams = new LinearLayout.LayoutParams(-1, dp(300)); mapParams.topMargin = dp(10);
                 tracker.addView(map, mapParams); routeRenderer = map::setRoute;
             } catch (RuntimeException error) {
                 RouteTraceView trace = new RouteTraceView(this); trace.setPoints(live.points);
-                tracker.addView(trace, new LinearLayout.LayoutParams(-1, dp(150))); routeRenderer = trace::setPoints;
+                tracker.addView(trace, new LinearLayout.LayoutParams(-1, dp(230))); routeRenderer = trace::setPoints;
             }
         } else {
             RouteTraceView trace = new RouteTraceView(this); trace.setPoints(live.points);
-            LinearLayout.LayoutParams traceParams = new LinearLayout.LayoutParams(-1, dp(150)); traceParams.topMargin = dp(10);
+            LinearLayout.LayoutParams traceParams = new LinearLayout.LayoutParams(-1, dp(230)); traceParams.topMargin = dp(10);
             tracker.addView(trace, traceParams); routeRenderer = trace::setPoints;
             gap(tracker, 8); addTrinidadOfflineMapControl(tracker, this::showLiveTrackingSession);
         }

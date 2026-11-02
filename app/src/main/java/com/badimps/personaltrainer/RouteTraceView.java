@@ -18,7 +18,7 @@ public final class RouteTraceView extends View {
 
     public RouteTraceView(Context context) {
         super(context);
-        line.setColor(Color.rgb(119, 224, 196)); line.setStyle(Paint.Style.STROKE); line.setStrokeWidth(dp(3));
+        line.setColor(Color.rgb(119, 224, 196)); line.setStyle(Paint.Style.STROKE); line.setStrokeWidth(dp(5));
         line.setStrokeCap(Paint.Cap.ROUND); line.setStrokeJoin(Paint.Join.ROUND);
         point.setStyle(Paint.Style.FILL);
         setBackgroundColor(Color.rgb(21, 42, 65));
@@ -41,8 +41,16 @@ public final class RouteTraceView extends View {
         }
         canvas.drawPath(path, line);
         LiveTrackingStore.Point start = points.get(0), end = points.get(points.size() - 1);
-        point.setColor(Color.WHITE); canvas.drawCircle(xFor(start, minLon, lonRange, pad), yFor(start, minLat, latRange, pad), dp(5), point);
-        point.setColor(Color.rgb(255, 107, 95)); canvas.drawCircle(xFor(end, minLon, lonRange, pad), yFor(end, minLat, latRange, pad), dp(6), point);
+        float startX = xFor(start, minLon, lonRange, pad), startY = yFor(start, minLat, latRange, pad);
+        point.setColor(Color.WHITE); canvas.drawCircle(startX, startY, dp(6), point);
+        point.setColor(Color.rgb(56, 217, 189)); canvas.drawCircle(startX, startY, dp(4), point);
+        // The fallback trace has no map bearing, so the live arrow is deliberately screen-north.
+        float endX = xFor(end, minLon, lonRange, pad), endY = yFor(end, minLat, latRange, pad);
+        Path arrow = new Path();
+        arrow.moveTo(endX, endY - dp(8)); arrow.lineTo(endX + dp(7), endY + dp(7));
+        arrow.lineTo(endX, endY + dp(3)); arrow.lineTo(endX - dp(7), endY + dp(7)); arrow.close();
+        point.setColor(Color.WHITE); point.setStyle(Paint.Style.STROKE); point.setStrokeWidth(dp(2)); canvas.drawPath(arrow, point);
+        point.setStyle(Paint.Style.FILL); point.setColor(Color.rgb(255, 107, 95)); canvas.drawPath(arrow, point);
     }
     private float xFor(LiveTrackingStore.Point p, double min, double range, float pad) { return (float) (pad + (p.longitude - min) / range * (getWidth() - 2 * pad)); }
     private float yFor(LiveTrackingStore.Point p, double min, double range, float pad) { return (float) (getHeight() - pad - (p.latitude - min) / range * (getHeight() - 2 * pad)); }
