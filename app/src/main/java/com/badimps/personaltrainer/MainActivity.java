@@ -4067,15 +4067,19 @@ public final class MainActivity extends FragmentActivity {
         title(body, "PLAN", "Your training, clearly arranged", "Open your calendar or build a new Workout, Endurance, or combined plan.");
         LinearLayout topTiles = new LinearLayout(this);
         topTiles.setGravity(Gravity.CENTER_VERTICAL);
+        topTiles.setClipChildren(false);
+        topTiles.setClipToPadding(false);
         addPlanHubTile(topTiles, "My Calendar", "See and edit scheduled sessions.",
                 R.drawable.bg_tile_calendar, this::showScheduler, false, 1);
         addPlanHubTile(topTiles, "Plan a Workout", "Create Daily, Weekly, or Custom.",
                 R.drawable.bg_tile_plan_workout, this::showPlanCadence, true, 1);
         body.addView(topTiles, new LinearLayout.LayoutParams(-1, dp(222)));
-        // Extra vertical space prevents the heavier tile shadows from colliding.
-        gap(body, 16);
+        // Leave a deliberate shadow gutter between the heavier framed surfaces.
+        gap(body, 20);
         LinearLayout lowerTiles = new LinearLayout(this);
         lowerTiles.setGravity(Gravity.CENTER_VERTICAL);
+        lowerTiles.setClipChildren(false);
+        lowerTiles.setClipToPadding(false);
         addPlanHubTile(lowerTiles, "Workout Library", "Browse movements and equipment.",
                 R.drawable.bg_tile_workout_library, this::showWorkoutLibrary, false, 1);
         body.addView(lowerTiles, new LinearLayout.LayoutParams(-1, dp(222)));
@@ -4088,13 +4092,13 @@ public final class MainActivity extends FragmentActivity {
         tile.setClickable(true);
         tile.setFocusable(true);
         tile.setContentDescription("Open " + label);
-        // A stronger Coach Hero coral frame makes the Plan collection read as one premium set.
-        tile.setBackground(surface(navyPanel, 20, 3, Color.argb(238, Color.red(coral), Color.green(coral), Color.blue(coral))));
+        tile.setBackground(surface(navyPanel, 20, 0, Color.TRANSPARENT));
         tile.setClipToOutline(true);
         tile.setOutlineProvider(android.view.ViewOutlineProvider.BACKGROUND);
-        tile.setElevation(dp(7));
-        tile.setTranslationZ(dp(1));
+        tile.setElevation(dp(10));
+        tile.setTranslationZ(dp(2));
         addTileArtwork(tile, artworkRes, Color.argb(126, 4, 20, 38));
+        addHubTileFrame(tile, 20);
         TextView name = heading(label, label.length() > 12 ? 16 : 18, Color.WHITE);
         name.setGravity(Gravity.TOP | Gravity.CENTER_HORIZONTAL);
         name.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
@@ -4120,7 +4124,7 @@ public final class MainActivity extends FragmentActivity {
         tile.setOnClickListener(view -> open.run());
         applyPressMotion(tile);
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, -1, weight);
-        if (second) params.leftMargin = dp(14);
+        if (second) params.leftMargin = dp(18);
         row.addView(tile, params);
     }
 
@@ -4135,33 +4139,69 @@ public final class MainActivity extends FragmentActivity {
         tile.addView(overlay, new FrameLayout.LayoutParams(-1, -1));
     }
 
+    /**
+     * The tile artwork is an opaque full-bleed image, so a background stroke sits behind it and
+     * disappears. This transparent foreground plate keeps the requested orange outline visible.
+     */
+    private void addHubTileFrame(FrameLayout tile, int radius) {
+        View frame = new View(this);
+        frame.setBackground(surface(Color.TRANSPARENT, radius, 4,
+                Color.argb(255, Color.red(coral), Color.green(coral), Color.blue(coral))));
+        frame.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        tile.addView(frame, new FrameLayout.LayoutParams(-1, -1));
+    }
+
     /** Plan is the only navigation entry: choose timing before choosing what to train. */
     private void showPlanCadence() {
         LinearLayout body = appPage("Plan");
         title(body, "CREATE A PLAN", "When do you want to train?",
                 "Choose a planning style first. Then choose Workout, Endurance, or Both.");
-        addPlanCadenceChoice(body, "Daily", "Plan one current or future day.");
+        addPlanCadenceChoice(body, "Daily", "Plan one current or future day.", R.drawable.ic_plan_daily);
         gap(body, 10);
-        addPlanCadenceChoice(body, "Weekly", "Place different sessions across your week.");
+        addPlanCadenceChoice(body, "Weekly", "Place different sessions across your week.", R.drawable.ic_plan_weekly);
         gap(body, 10);
-        addPlanCadenceChoice(body, "Custom", "Build a flexible plan with your usual detailed setup.");
+        addPlanCadenceChoice(body, "Custom", "Build a flexible plan with your usual detailed setup.", R.drawable.ic_plan_custom);
     }
 
-    private void addPlanCadenceChoice(LinearLayout body, String mode, String detail) {
+    /** Restores the illustrated planning choices without changing the merged Plan flow. */
+    private void addPlanCadenceChoice(LinearLayout body, String mode, String detail, int iconRes) {
         LinearLayout card = card();
-        card.addView(heading(mode + " plan", 20, ink));
-        card.addView(text(detail, 14, muted));
-        Button choose = primary("Choose " + mode.toLowerCase(Locale.ROOT) + " plan");
-        choose.setOnClickListener(view -> {
+        card.setOrientation(LinearLayout.HORIZONTAL);
+        card.setGravity(Gravity.CENTER_VERTICAL);
+        card.setPadding(dp(16), dp(14), dp(14), dp(14));
+        card.setClickable(true);
+        card.setFocusable(true);
+        card.setContentDescription("Choose " + mode + " plan. " + detail);
+
+        ImageView icon = new ImageView(this);
+        icon.setImageResource(iconRes);
+        icon.setImageTintList(ColorStateList.valueOf(coral));
+        icon.setBackground(surface(Color.rgb(255, 242, 239), 99, 1, coral));
+        icon.setPadding(dp(10), dp(10), dp(10), dp(10));
+        card.addView(icon, new LinearLayout.LayoutParams(dp(58), dp(58)));
+
+        LinearLayout copy = new LinearLayout(this);
+        copy.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams copyParams = new LinearLayout.LayoutParams(0, -2, 1);
+        copyParams.leftMargin = dp(14);
+        card.addView(copy, copyParams);
+        copy.addView(heading(mode + " plan", 20, ink));
+        TextView description = text(detail, 14, muted);
+        description.setMaxLines(2);
+        copy.addView(description);
+
+        TextView arrow = heading("›", 32, coral);
+        arrow.setGravity(Gravity.CENTER);
+        card.addView(arrow, new LinearLayout.LayoutParams(dp(28), dp(58)));
+
+        card.setOnClickListener(view -> {
             planMode = mode;
             // The endurance wizard shares this calendar decision. Custom remains flexible,
             // while its existing endurance screen uses its single-day placement control.
             endurancePlanMode = mode;
             showPlanKind();
         });
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(50));
-        params.topMargin = dp(12);
-        card.addView(choose, params);
+        applyPressMotion(card);
         body.addView(card);
     }
 
@@ -6990,6 +7030,8 @@ public final class MainActivity extends FragmentActivity {
     private void addProgressDestinations(LinearLayout body) {
         LinearLayout firstRow = new LinearLayout(this);
         firstRow.setGravity(Gravity.CENTER_VERTICAL);
+        firstRow.setClipChildren(false);
+        firstRow.setClipToPadding(false);
         addProgressDestination(firstRow, "Nutrition", "Fuel check-in", R.drawable.bg_tile_nutrition,
                 Color.rgb(111, 222, 192), this::showMeals, false);
         addProgressDestination(firstRow, "Body", "Private context", R.drawable.bg_tile_body,
@@ -6997,9 +7039,11 @@ public final class MainActivity extends FragmentActivity {
         body.addView(firstRow, new LinearLayout.LayoutParams(-1, dp(128)));
 
         // Preserve a clear shadow gutter between the two framed Progress rows.
-        gap(body, 14);
+        gap(body, 18);
         LinearLayout secondRow = new LinearLayout(this);
         secondRow.setGravity(Gravity.CENTER_VERTICAL);
+        secondRow.setClipChildren(false);
+        secondRow.setClipToPadding(false);
         addProgressDestination(secondRow, "Apex", "Achievements", R.drawable.bg_tile_apex,
                 coral, this::showApex, false);
         addProgressDestination(secondRow, "Weekly Report", "Activity · energy · trend", R.drawable.bg_tile_weekly_report,
@@ -7013,13 +7057,13 @@ public final class MainActivity extends FragmentActivity {
         tile.setClickable(true);
         tile.setFocusable(true);
         tile.setContentDescription("Open " + label);
-        // A shared coral-orange frame unifies the four destination tiles without changing their artwork.
-        tile.setBackground(surface(navyPanel, 18, 3, Color.argb(238, Color.red(coral), Color.green(coral), Color.blue(coral))));
+        tile.setBackground(surface(navyPanel, 18, 0, Color.TRANSPARENT));
         tile.setClipToOutline(true);
         tile.setOutlineProvider(android.view.ViewOutlineProvider.BACKGROUND);
-        tile.setElevation(dp(7));
-        tile.setTranslationZ(dp(1));
+        tile.setElevation(dp(10));
+        tile.setTranslationZ(dp(2));
         addTileArtwork(tile, artworkRes, Color.argb(138, 4, 20, 38));
+        addHubTileFrame(tile, 18);
         TextView name = heading(label, label.length() > 12 ? 14 : 16, Color.WHITE);
         name.setGravity(Gravity.TOP | Gravity.CENTER_HORIZONTAL);
         name.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
@@ -7037,7 +7081,7 @@ public final class MainActivity extends FragmentActivity {
         tile.setOnClickListener(view -> open.run());
         applyPressMotion(tile);
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, -1, 1);
-        if (second) params.leftMargin = dp(12);
+        if (second) params.leftMargin = dp(16);
         row.addView(tile, params);
     }
 

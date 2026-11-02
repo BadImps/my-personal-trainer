@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 152,
-  "versionName": "7.0",
-  "publishedAt": "2026-11-02T04:04:42Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v7.0/app-release.apk",
-  "sha256": "8f4306c6ae03b39fa89e361f5d1aa6d852a94417ea3696b3bdb39a4d5bf34576",
+  "versionCode": 153,
+  "versionName": "7.1",
+  "publishedAt": "2026-11-02T04:57:29Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v7.1/app-release.apk",
+  "sha256": "96537c753879d8abe41d51b8fd0fc49c72d5029a5a22a2538f33304dfdeae49d",
   "sizeBytes": 281415849,
-  "notes": "Progress and Plan tiles now use top-aligned titles, stronger coral frames, shadows, and safer spacing. Live endurance maps are closer, clearer, rotatable navigation views with larger route and position markers."
+  "notes": "Daily, Weekly, and Custom Plan choices have their illustrated icons restored. Progress and Plan hubs now use visible foreground coral frames, deeper shadows, and wider collision-safe spacing."
 }
