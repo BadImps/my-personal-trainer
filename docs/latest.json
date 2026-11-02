@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 157,
-  "versionName": "7.5",
-  "publishedAt": "2026-11-02T16:28:18Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v7.5/app-release.apk",
-  "sha256": "408fc6e58939a117c4ba12d4bab21dda43911408509d52bf15f5e13071337d59",
-  "sizeBytes": 281416509,
-  "notes": "Your Week Calendar now highlights a selected future day with a deeper shadow instead of a coral outline. Google Maps Endurance Report replay now keeps your full route in view and animates more smoothly."
+  "versionCode": 158,
+  "versionName": "7.6",
+  "publishedAt": "2026-11-02T17:38:58Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v7.6/app-release.apk",
+  "sha256": "122844b69812e8b1acd51f05de191f10510f25d395eaf1a58c6c3dcee8672bbe",
+  "sizeBytes": 281416505,
+  "notes": "My Calendar now uses the full-month board with a larger month title, weekday divider, bordered day cells, and activity labels with their workout/endurance icons underneath."
 }
