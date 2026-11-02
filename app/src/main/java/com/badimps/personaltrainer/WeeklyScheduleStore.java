@@ -63,7 +63,7 @@ public final class WeeklyScheduleStore {
         for (int i = 0; i < 7; i++) {
             ArrayList<String> copy = new ArrayList<>();
             if (targets != null && i < targets.size() && targets.get(i) != null) {
-                for (String target : targets.get(i)) if (target != null && !target.isEmpty() && copy.size() < 2) copy.add(target);
+                for (String target : targets.get(i)) if (target != null && !target.isEmpty() && copy.size() < 4) copy.add(target);
             }
             copiedTargets.add(copy);
         }
@@ -102,7 +102,7 @@ public final class WeeklyScheduleStore {
             ArrayList<String> focuses = new ArrayList<>();
             String value = i < days.length ? days[i] : "";
             if (!value.isEmpty()) {
-                for (String focus : value.split("\\|", -1)) if (!focus.isEmpty() && focuses.size() < 2) focuses.add(focus);
+                for (String focus : value.split("\\|", -1)) if (!focus.isEmpty() && focuses.size() < 4) focuses.add(focus);
             } else if (fallback != null && i < fallback.size() && fallback.get(i) != null) {
                 focuses.addAll(fallback.get(i));
             }

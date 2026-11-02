@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 160,
-  "versionName": "7.8",
-  "publishedAt": "2026-11-02T20:20:00Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v7.8/app-release.apk",
-  "sha256": "4ea4c07ca059d620098a9ed2bd6d590c408a61d50d96940694f1d10944a26703",
-  "sizeBytes": 281416505,
-  "notes": "My Calendar now uses the approved full-screen calendar composition rather than a Coach Hero-wrapped substitute."
+  "versionCode": 161,
+  "versionName": "7.9",
+  "publishedAt": "2026-11-02T20:45:00Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v7.9/app-release.apk",
+  "sha256": "d694237d9081a99ab5e23a4e95105d6031ff47f6810ceb9b97eb225b598f22e7",
+  "sizeBytes": 281432893,
+  "notes": "Calendar plan actions, start prompts, safe multi-line labels, and four-area/equipment selection."
 }
