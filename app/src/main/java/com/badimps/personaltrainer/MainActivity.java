@@ -13684,7 +13684,7 @@ public final class MainActivity extends FragmentActivity {
             refreshCurrentPageKeepingScroll(this::showScheduler);
         });
         header.addView(previous, new LinearLayout.LayoutParams(dp(48), dp(46)));
-        TextView label = heading(new SimpleDateFormat("MMMM yyyy", Locale.getDefault()).format(month.getTime()), 21, Color.WHITE);
+        TextView label = heading(new SimpleDateFormat("MMMM yyyy", Locale.getDefault()).format(month.getTime()), 27, Color.WHITE);
         label.setGravity(Gravity.CENTER);
         header.addView(label, new LinearLayout.LayoutParams(0, -2, 1f));
         Button next = action("›", navyPanel, mint);
@@ -13698,9 +13698,16 @@ public final class MainActivity extends FragmentActivity {
         body.addView(header);
         gap(body, 10);
 
-        LinearLayout calendarCard = card();
-        calendarCard.addView(heading("MONTH VIEW", 11, muted));
-        calendarCard.addView(text("Mint = work plan  •  Coral = endurance appointment  •  Slate = rest day", 12, muted));
+        LinearLayout calendarCard = new LinearLayout(this);
+        calendarCard.setOrientation(LinearLayout.VERTICAL);
+        calendarCard.setPadding(dp(12), dp(13), dp(12), dp(12));
+        calendarCard.setBackground(surface(Color.rgb(16, 43, 68), 22, 1, Color.rgb(70, 109, 141)));
+        TextView monthView = heading("MONTH VIEW", 11, Color.rgb(174, 220, 211));
+        monthView.setLetterSpacing(.1f);
+        calendarCard.addView(monthView);
+        calendarCard.addView(text("Mint = complete  •  Coral = planned / today  •  Slate = rest day", 12, Color.rgb(202, 216, 234)));
+        View weekdayDivider = new View(this); weekdayDivider.setBackgroundColor(Color.rgb(77, 111, 141));
+        LinearLayout.LayoutParams weekdayDividerParams = new LinearLayout.LayoutParams(-1, dp(1)); weekdayDividerParams.topMargin = dp(10); calendarCard.addView(weekdayDivider, weekdayDividerParams);
         // Use weighted rows rather than fixed-width grid cells. The sidebar changes available
         // width on phones and tablets, so fixed 39dp cells could crop the last calendar days.
         LinearLayout grid = new LinearLayout(this);
@@ -13712,16 +13719,16 @@ public final class MainActivity extends FragmentActivity {
         for (int rowIndex = -1; rowIndex < rows; rowIndex++) {
             LinearLayout row = new LinearLayout(this); row.setOrientation(LinearLayout.HORIZONTAL);
             for (int column = 0; column < 7; column++) {
-                TextView cell;
+                View cell;
                 int cellHeight;
                 if (rowIndex == -1) {
-                    cell = text(labels[column], 10, muted); cell.setGravity(Gravity.CENTER); cellHeight = 28;
+                    TextView weekday = text(labels[column].toUpperCase(Locale.ROOT), 10, Color.rgb(174, 202, 226)); weekday.setTypeface(Typeface.create("sans-serif", Typeface.BOLD)); weekday.setGravity(Gravity.CENTER); cell = weekday; cellHeight = 31;
                 } else {
                     int index = rowIndex * 7 + column;
                     int day = index - first + 1;
                     Calendar date = null;
                     if (day >= 1 && day <= max) { date = (Calendar) month.clone(); date.set(Calendar.DAY_OF_MONTH, day); }
-                    cell = schedulerCalendarCell(date); cellHeight = 56;
+                    cell = schedulerCalendarCell(date); cellHeight = 72;
                 }
                 LinearLayout.LayoutParams cellParams = new LinearLayout.LayoutParams(0, dp(cellHeight), 1f);
                 cellParams.setMargins(dp(1), dp(1), dp(1), dp(1));
@@ -13730,6 +13737,8 @@ public final class MainActivity extends FragmentActivity {
             grid.addView(row, new LinearLayout.LayoutParams(-1, -2));
         }
         calendarCard.addView(grid);
+        View gridDivider = new View(this); gridDivider.setBackgroundColor(Color.rgb(63, 94, 125));
+        LinearLayout.LayoutParams gridDividerParams = new LinearLayout.LayoutParams(-1, dp(1)); gridDividerParams.topMargin = dp(8); calendarCard.addView(gridDivider, gridDividerParams);
         body.addView(calendarCard);
         gap(body, 12);
         addSchedulerDayAgenda(body, schedulerSelectedDate);
@@ -13762,7 +13771,7 @@ public final class MainActivity extends FragmentActivity {
         return month;
     }
 
-    private TextView schedulerCalendarCell(Calendar date) {
+    private View schedulerCalendarCell(Calendar date) {
         if (date == null) {
             TextView empty = text("", 10, muted);
             return empty;
@@ -13771,16 +13780,53 @@ public final class MainActivity extends FragmentActivity {
         boolean planned = isMonthWorkoutDay(date);
         boolean selected = sameSchedulerDate(date, schedulerSelectedDate);
         boolean historical = isPastCalendarDate(date);
-        String state = !appointments.isEmpty() ? appointmentAbbreviation(appointments.get(0).mode) : planned ? schedulerStrengthSummary(date) : "Rest";
-        if (state.length() > 8) state = state.substring(0, 8);
-        int fill = !appointments.isEmpty() ? coral : planned ? mint : Color.rgb(232, 236, 244);
-        TextView cell = text(date.get(Calendar.DAY_OF_MONTH) + "\n" + state, 10, selected ? navy : (planned || !appointments.isEmpty() ? navy : muted));
-        cell.setGravity(Gravity.CENTER);
-        cell.setTypeface(Typeface.create("sans-serif", selected ? Typeface.BOLD : Typeface.NORMAL));
-        cell.setBackground(surface(fill, 11, selected ? 3 : 0, selected ? coral : Color.TRANSPARENT));
+        JourneyStore.WorkoutRecord completedStrength = completedStrengthOn(date);
+        JourneyStore.WorkoutRecord completedEndurance = completedEnduranceOn(date);
+        boolean completed = completedStrength != null || completedEndurance != null;
+        boolean endurance = !appointments.isEmpty() || completedEndurance != null;
+        String enduranceLabel = completedEndurance != null ? completedEndurance.target.replace("Endurance · ", "").toUpperCase(Locale.ROOT)
+                : !appointments.isEmpty() ? appointmentAbbreviation(appointments.get(0).mode).toUpperCase(Locale.ROOT) : "ENDURANCE";
+        String state = completedStrength != null ? completedTrainingAreaLabel(completedStrength.target)
+                : planned ? schedulerStrengthSummary(date).toUpperCase(Locale.ROOT)
+                : endurance ? enduranceLabel : "REST DAY";
+        if (planned && endurance) state = schedulerStrengthSummary(date).toUpperCase(Locale.ROOT) + " + " + enduranceLabel;
+        int fill = completed ? Color.rgb(102, 215, 187) : (planned || endurance) ? coral : Color.rgb(32, 62, 89);
+        Calendar now = Calendar.getInstance();
+        boolean today = sameSchedulerDate(date, now);
+        boolean futureSelection = selected && !historical && !today;
+        int border = today ? Color.WHITE : completed ? Color.rgb(181, 246, 228) : (planned || endurance) ? Color.rgb(255, 191, 182) : Color.rgb(78, 117, 149);
+        int foreground = completed || planned || endurance ? navy : Color.WHITE;
+        LinearLayout cell = new LinearLayout(this);
+        cell.setOrientation(LinearLayout.VERTICAL);
+        cell.setGravity(Gravity.CENTER_HORIZONTAL);
+        cell.setPadding(dp(1), dp(3), dp(1), dp(2));
+        cell.setBackground(surface(fill, 11, today ? 3 : 1, border));
+        cell.setElevation(futureSelection ? dp(10) : 0);
+        cell.setTranslationZ(futureSelection ? dp(4) : 0);
+        TextView number = text(String.valueOf(date.get(Calendar.DAY_OF_MONTH)), 14, foreground);
+        number.setGravity(Gravity.CENTER); number.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
+        cell.addView(number, new LinearLayout.LayoutParams(-1, dp(21)));
+        TextView activity = text(state, 7, foreground);
+        activity.setGravity(Gravity.CENTER); activity.setTypeface(Typeface.create("sans-serif", Typeface.BOLD)); activity.setSingleLine(true);
+        cell.addView(activity, new LinearLayout.LayoutParams(-1, dp(17)));
+        if (planned || endurance || completed) {
+            LinearLayout icons = new LinearLayout(this); icons.setGravity(Gravity.CENTER);
+            if (planned || completedStrength != null) {
+                ImageView workoutIcon = new ImageView(this); workoutIcon.setImageResource(R.drawable.ic_nav_workouts); workoutIcon.setImageTintList(ColorStateList.valueOf(foreground)); workoutIcon.setContentDescription("Workout");
+                icons.addView(workoutIcon, new LinearLayout.LayoutParams(dp(18), dp(18)));
+            }
+            if (endurance) {
+                ImageView enduranceIcon = new ImageView(this); enduranceIcon.setImageResource(R.drawable.ic_nav_endurance); enduranceIcon.setImageTintList(ColorStateList.valueOf(foreground)); enduranceIcon.setContentDescription("Endurance");
+                LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(dp(18), dp(18)); iconParams.leftMargin = dp(2); icons.addView(enduranceIcon, iconParams);
+            }
+            cell.addView(icons, new LinearLayout.LayoutParams(-1, dp(21)));
+        } else {
+            TextView rest = text("REST", 7, Color.rgb(190, 207, 224)); rest.setGravity(Gravity.CENTER); rest.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
+            cell.addView(rest, new LinearLayout.LayoutParams(-1, dp(21)));
+        }
         cell.setContentDescription(new SimpleDateFormat("EEEE, MMMM d", Locale.getDefault()).format(date.getTime()) + ", " + state);
         cell.setClickable(true);
-        cell.setAlpha(historical ? .52f : 1f);
+        cell.setAlpha(historical && !completed ? .52f : 1f);
         // Selecting a day must only update the agenda. The explicit CTA owns wizard entry,
         // so browsing a calendar cannot accidentally interrupt the user with a modal.
         cell.setOnClickListener(view -> {

@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 158,
-  "versionName": "7.6",
-  "publishedAt": "2026-11-02T17:38:58Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v7.6/app-release.apk",
-  "sha256": "122844b69812e8b1acd51f05de191f10510f25d395eaf1a58c6c3dcee8672bbe",
+  "versionCode": 159,
+  "versionName": "7.7",
+  "publishedAt": "2026-11-02T18:04:00Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v7.7/app-release.apk",
+  "sha256": "03ee23f3b9a39dead1a2ce2b5ab7df7ad54d912d580afa174495f6825ea5abfa",
   "sizeBytes": 281416505,
-  "notes": "My Calendar now uses the full-month board with a larger month title, weekday divider, bordered day cells, and activity labels with their workout/endurance icons underneath."
+  "notes": "Redesigned the actual Plan → My Calendar screen with the approved full-month board, activity icons below labels, and shadow-only future-date selection."
 }
