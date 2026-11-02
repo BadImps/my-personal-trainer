@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 161,
-  "versionName": "7.9",
-  "publishedAt": "2026-11-02T20:45:00Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v7.9/app-release.apk",
-  "sha256": "d694237d9081a99ab5e23a4e95105d6031ff47f6810ceb9b97eb225b598f22e7",
-  "sizeBytes": 281432893,
-  "notes": "Calendar plan actions, start prompts, safe multi-line labels, and four-area/equipment selection."
+  "versionCode": 162,
+  "versionName": "7.10",
+  "publishedAt": "2026-11-02T23:00:27Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v7.10/app-release.apk",
+  "sha256": "78e1f9fb8f9e33cd8a92daafe26d8d8ab7d8a3567f1b9f144bee6a06b581338d",
+  "sizeBytes": 281432841,
+  "notes": "Press-and-hold workout finish options, same-day saved custom workouts for unfinished exercises, and guided-workout set, rep, and cooldown sliders."
 }
