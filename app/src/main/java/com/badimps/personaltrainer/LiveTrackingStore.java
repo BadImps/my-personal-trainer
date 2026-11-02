@@ -22,21 +22,24 @@ public final class LiveTrackingStore {
     public static final class Session {
         public final boolean active;
         public final boolean paused;
-        public final String mode;
+        public final String mode, comparisonRouteId;
         public final long activeMillis;
         public final float distanceMeters;
         public final List<Point> points;
-        Session(boolean active, boolean paused, String mode, long activeMillis, float distanceMeters, List<Point> points) {
+        Session(boolean active, boolean paused, String mode, String comparisonRouteId, long activeMillis, float distanceMeters, List<Point> points) {
             this.active = active; this.paused = paused; this.mode = mode; this.activeMillis = activeMillis;
+            this.comparisonRouteId = comparisonRouteId == null ? "" : comparisonRouteId;
             this.distanceMeters = distanceMeters; this.points = Collections.unmodifiableList(points);
         }
     }
 
-    public static void start(Context context, String mode) {
+    public static void start(Context context, String mode) { start(context, mode, ""); }
+
+    public static void start(Context context, String mode, String comparisonRouteId) {
         long now = System.currentTimeMillis();
         preferences(context).edit().clear()
                 .putBoolean("active", true).putBoolean("paused", false)
-                .putString("mode", normalizeMode(mode)).putLong("active_millis", 0L)
+                .putString("mode", normalizeMode(mode)).putString("comparison_route_id", comparisonRouteId == null ? "" : comparisonRouteId).putLong("active_millis", 0L)
                 .putLong("resumed_at", now).putFloat("distance_meters", 0f)
                 .putString("points", "").apply();
     }
@@ -81,7 +84,7 @@ public final class LiveTrackingStore {
     public static Session last(Context context) {
         SharedPreferences p = preferences(context);
         if (!p.contains("last_mode")) return null;
-        return new Session(false, false, p.getString("last_mode", EndurancePlanStore.WALKING),
+        return new Session(false, false, p.getString("last_mode", EndurancePlanStore.WALKING), "",
                 p.getLong("last_millis", 0L), p.getFloat("last_distance", 0f), parsePoints(p.getString("last_points", "")));
     }
 
@@ -93,7 +96,7 @@ public final class LiveTrackingStore {
         boolean paused = p.getBoolean("paused", false);
         long millis = p.getLong("active_millis", 0L);
         if (active && !paused && includeLiveTime) millis = activeMillis(p, System.currentTimeMillis());
-        return new Session(active, paused, p.getString("mode", EndurancePlanStore.WALKING), millis,
+        return new Session(active, paused, p.getString("mode", EndurancePlanStore.WALKING), p.getString("comparison_route_id", ""), millis,
                 p.getFloat("distance_meters", 0f), parsePoints(p.getString("points", "")));
     }
 

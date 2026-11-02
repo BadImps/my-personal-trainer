@@ -25,6 +25,7 @@ public final class LiveTrackingService extends Service implements LocationListen
     public static final String ACTION_DISCARD = "com.badimps.personaltrainer.tracking.DISCARD";
     public static final String ACTION_UPDATE = "com.badimps.personaltrainer.tracking.UPDATE";
     public static final String EXTRA_MODE = "tracking_mode";
+    public static final String EXTRA_CUSTOM_ROUTE_ID = "comparison_route_id";
     private static final String CHANNEL = "endurance_live_tracking";
     private static final int NOTIFICATION_ID = 2601;
 
@@ -41,7 +42,7 @@ public final class LiveTrackingService extends Service implements LocationListen
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
         String action = intent == null ? null : intent.getAction();
         if (ACTION_START.equals(action)) {
-            LiveTrackingStore.start(this, intent.getStringExtra(EXTRA_MODE));
+            LiveTrackingStore.start(this, intent.getStringExtra(EXTRA_MODE), intent.getStringExtra(EXTRA_CUSTOM_ROUTE_ID));
             ensureChannel();
             startForeground(NOTIFICATION_ID, notification());
             // A recent fix is available immediately, before the next GPS update, so the live
@@ -79,6 +80,7 @@ public final class LiveTrackingService extends Service implements LocationListen
             long completedAt = System.currentTimeMillis();
             JourneyStore.recordWorkoutAt(this, "Endurance · " + session.mode, minutes, completedAt);
             EnduranceHistoryStore.record(this, completedAt, session);
+            CustomRouteStore.recordAttempt(this, session.comparisonRouteId, session.activeMillis, session.distanceMeters);
         }
         stopTracking();
     }
@@ -108,8 +110,10 @@ public final class LiveTrackingService extends Service implements LocationListen
                 if (candidate != null && (newest == null || candidate.getTime() > newest.getTime())) newest = candidate;
             }
         } catch (SecurityException ignored) { return; }
-        if (newest == null || System.currentTimeMillis() - newest.getTime() > 120_000L
-                || (newest.hasAccuracy() && newest.getAccuracy() > 65f)) return;
+        // A cached point is only a bridge while the active provider delivers the first live fix.
+        // Do not silently begin a route from a location that merely happens to be nearby.
+        if (newest == null || System.currentTimeMillis() - newest.getTime() > 30_000L
+                || (newest.hasAccuracy() && newest.getAccuracy() > 35f)) return;
         onLocationChanged(newest);
     }
 

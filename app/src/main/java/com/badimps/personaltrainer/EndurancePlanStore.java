@@ -3,7 +3,7 @@ package com.badimps.personaltrainer;
 import android.content.Context;
 import android.content.SharedPreferences;
 
-/** Stores route-planning details locally; it never requests or stores live location. */
+/** Stores an endurance-session target locally; live GPS points exist only during explicit tracking. */
 public final class EndurancePlanStore {
     public static final String WALKING = "Walking";
     public static final String RUNNING = "Running";
@@ -32,15 +32,16 @@ public final class EndurancePlanStore {
 
     public static void save(Context context, String mode, String name, String origin, String destination,
                             float distanceKm, int minutes, String effort) {
-        if (destination == null || destination.trim().isEmpty()) throw new IllegalArgumentException("Destination is required");
         if (distanceKm <= 0f || distanceKm > 500f) throw new IllegalArgumentException("Distance is out of range");
         if (minutes < 5 || minutes > 1440) throw new IllegalArgumentException("Duration is out of range");
         String key = key(mode);
         preferences(context).edit()
                 .putBoolean(key + "_saved", true)
                 .putString(key + "_name", clean(name, defaultName(normalizeMode(mode))))
-                .putString(key + "_origin", clean(origin, ""))
-                .putString(key + "_destination", destination.trim())
+                // Legacy route endpoints are deliberately cleared. A new live session starts
+                // at the first accurate GPS fix and ends at the last one.
+                .putString(key + "_origin", "")
+                .putString(key + "_destination", "")
                 .putFloat(key + "_distance", distanceKm)
                 .putInt(key + "_minutes", minutes)
                 .putString(key + "_effort", clean(effort, "Steady"))
@@ -69,7 +70,7 @@ public final class EndurancePlanStore {
         if (RUNNING.equals(mode) || CYCLING.equals(mode)) return mode;
         return WALKING;
     }
-    private static String defaultName(String mode) { return mode + " route"; }
+    private static String defaultName(String mode) { return mode + " session"; }
     private static String clean(String value, String fallback) {
         String clean = value == null ? "" : value.trim();
         return clean.isEmpty() ? fallback : clean.replace("\n", " ");

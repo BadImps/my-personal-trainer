@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 150,
-  "versionName": "6.8",
-  "publishedAt": "2026-11-02T01:53:32Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v6.8/app-release.apk",
-  "sha256": "e2e6223e4bed85f449b3f870958a5de8198af21c32d6d494e45ab080e84d19aa",
+  "versionCode": 151,
+  "versionName": "6.9",
+  "publishedAt": "2026-11-02T03:25:51Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v6.9/app-release.apk",
+  "sha256": "1d7876552ec956046570584939b18cde150d1b44916aafa4cd5b0bb86602ffcc",
   "sizeBytes": 281415849,
-  "notes": "Progress is simplified to Nutrition, Body, Apex, and Weekly Report. Completed-plan history can be swiped through prior weeks, Baseline Check-in is at the top of Body, and Workout Library now spans the Plan page."
+  "notes": "Progress and Plan tiles now have refined outlines and shadows. Endurance live tracking starts at your current location, and finished GPS routes can be saved as Custom Maps for future time comparisons."
 }

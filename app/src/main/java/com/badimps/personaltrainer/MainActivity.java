@@ -282,6 +282,7 @@ public final class MainActivity extends FragmentActivity {
     private static final int REQUEST_MIGRATION_EXPORT = 4105;
     private static final int REQUEST_MIGRATION_IMPORT = 4106;
     private String pendingLiveTrackingMode;
+    private String pendingLiveTrackingRouteId;
     private String selectedProfilePhotoUri;
     private BroadcastReceiver liveTrackingReceiver;
     private final BroadcastReceiver wearWorkoutCommandReceiver = new BroadcastReceiver() {
@@ -676,8 +677,10 @@ public final class MainActivity extends FragmentActivity {
         super.onRequestPermissionsResult(requestCode, permissions, results);
         if (requestCode != REQUEST_LIVE_LOCATION) return;
         String mode = pendingLiveTrackingMode;
+        String routeId = pendingLiveTrackingRouteId;
         pendingLiveTrackingMode = null;
-        if (mode != null && hasLiveLocationPermission()) startLiveTrackingService(mode);
+        pendingLiveTrackingRouteId = null;
+        if (mode != null && hasLiveLocationPermission()) startLiveTrackingService(mode, routeId);
         else toast("Location access is needed to measure a live endurance session.");
     }
 
@@ -4084,8 +4087,13 @@ public final class MainActivity extends FragmentActivity {
         tile.setClickable(true);
         tile.setFocusable(true);
         tile.setContentDescription("Open " + label);
-        tile.setBackground(surface(navyPanel, 20, 1, Color.rgb(48, 91, 119)));
+        // A fine double-weight frame plus real elevation separates the artwork from the
+        // navy page without turning the minimal cards into heavy 3D panels.
+        tile.setBackground(surface(navyPanel, 20, 2, Color.rgb(48, 91, 119)));
         tile.setClipToOutline(true);
+        tile.setOutlineProvider(android.view.ViewOutlineProvider.BACKGROUND);
+        tile.setElevation(dp(6));
+        tile.setTranslationZ(dp(1));
         addTileArtwork(tile, artworkRes, Color.argb(126, 4, 20, 38));
         LinearLayout copy = new LinearLayout(this);
         copy.setOrientation(LinearLayout.VERTICAL);
@@ -6999,8 +7007,12 @@ public final class MainActivity extends FragmentActivity {
         tile.setClickable(true);
         tile.setFocusable(true);
         tile.setContentDescription("Open " + label);
-        tile.setBackground(surface(navyPanel, 18, 1, Color.argb(170, Color.red(accent), Color.green(accent), Color.blue(accent))));
+        // Keep each Progress destination crisp: its own accent frame and a quiet raised shadow.
+        tile.setBackground(surface(navyPanel, 18, 2, Color.argb(210, Color.red(accent), Color.green(accent), Color.blue(accent))));
         tile.setClipToOutline(true);
+        tile.setOutlineProvider(android.view.ViewOutlineProvider.BACKGROUND);
+        tile.setElevation(dp(6));
+        tile.setTranslationZ(dp(1));
         addTileArtwork(tile, artworkRes, Color.argb(138, 4, 20, 38));
         LinearLayout copy = new LinearLayout(this);
         copy.setOrientation(LinearLayout.VERTICAL);
@@ -7659,6 +7671,10 @@ public final class MainActivity extends FragmentActivity {
                 gap(route, 8);
                 addTrinidadOfflineMapControl(route, () -> showEnduranceSessionDetails(entry));
             }
+            gap(route, 8);
+            Button saveCustom = secondary("Save as custom map");
+            saveCustom.setOnClickListener(view -> promptSaveCustomMap(entry));
+            addButton(route, saveCustom);
             body.addView(route);
         }
         gap(body, 14);
@@ -12786,9 +12802,11 @@ public final class MainActivity extends FragmentActivity {
     private void startEnduranceWizard(String mode) {
         EndurancePlanStore.Plan existing = EndurancePlanStore.load(this, mode);
         enduranceWizardMode = mode;
-        enduranceWizardName = existing == null ? mode + " route" : existing.name;
-        enduranceWizardOrigin = existing == null ? "" : existing.origin;
-        enduranceWizardDestination = existing == null ? "" : existing.destination;
+        enduranceWizardName = existing == null ? mode + " session" : existing.name;
+        // A live session begins at the first accurate device fix and ends at the last one.
+        // Do not carry forward addresses from the retired route-planning flow.
+        enduranceWizardOrigin = "";
+        enduranceWizardDestination = "";
         enduranceWizardDistanceKm = existing == null ? defaultDistance(mode) : existing.distanceKm;
         enduranceWizardMinutes = existing == null ? defaultMinutes(mode) : existing.minutes;
         enduranceWizardEffort = existing == null ? "Steady" : existing.effort;
@@ -12812,7 +12830,7 @@ public final class MainActivity extends FragmentActivity {
         // This is intentionally the same Coach Hero composition as Workouts.
         FrameLayout hero = coachHeroBackdrop("Endurance");
         root.addView(hero, new LinearLayout.LayoutParams(-1, dp(388)));
-        String[] stepNames = {"PLAN", "ACTIVITY", "SCHEDULE", "ROUTE", "REVIEW"};
+        String[] stepNames = {"PLAN", "ACTIVITY", "SCHEDULE", "DETAILS", "REVIEW"};
         addCoachHeroWizardSteps(hero, stepNames, 0);
 
         LinearLayout heroCopy = new LinearLayout(this);
@@ -12825,7 +12843,7 @@ public final class MainActivity extends FragmentActivity {
         LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(dp(240), -2);
         titleParams.topMargin = dp(11);
         heroCopy.addView(title, titleParams);
-        TextView intro = text("Choose your schedule and activity. I’ll shape a route and session around you.", 15, Color.rgb(222, 233, 245));
+        TextView intro = text("Choose your schedule and activity. Live tracking starts where you are and ends when you finish.", 15, Color.rgb(222, 233, 245));
         intro.setLineSpacing(dp(2), 1f);
         LinearLayout.LayoutParams introParams = new LinearLayout.LayoutParams(dp(235), -2);
         introParams.topMargin = dp(12);
@@ -12946,7 +12964,7 @@ public final class MainActivity extends FragmentActivity {
         scroll.addView(root, new ScrollView.LayoutParams(-1, -2)); setCoachHeroWizardShell(scroll, "Plan");
 
         FrameLayout hero = coachHeroBackdrop("Endurance step " + step); root.addView(hero, new LinearLayout.LayoutParams(-1, dp(260)));
-        String[] labels = {"ACTIVITY", "SCHEDULE", "ROUTE", "REVIEW"};
+        String[] labels = {"ACTIVITY", "SCHEDULE", "DETAILS", "REVIEW"};
         addCoachHeroWizardSteps(hero, labels, step - 1);
         LinearLayout copy = new LinearLayout(this); copy.setOrientation(LinearLayout.VERTICAL);
         TextView eyebrow = heading("PLAN YOUR ENDURANCE · STEP " + step, 10, mint); eyebrow.setLetterSpacing(.14f); copy.addView(eyebrow);
@@ -12967,6 +12985,7 @@ public final class MainActivity extends FragmentActivity {
         body.addView(enduranceModeTile(EndurancePlanStore.WALKING, "Walking", "Low-impact distance and pace")); gap(body, 8);
         body.addView(enduranceModeTile(EndurancePlanStore.RUNNING, "Running", "Pace-focused route or treadmill")); gap(body, 8);
         body.addView(enduranceModeTile(EndurancePlanStore.CYCLING, "Cycling", "Road, bike path, or indoor bike")); gap(body, 14);
+        Button savedMaps = secondary("My saved custom maps"); savedMaps.setOnClickListener(view -> showCustomMaps()); body.addView(savedMaps, new LinearLayout.LayoutParams(-1, dp(48))); gap(body, 8);
         Button next = action("Next: choose schedule  →", coral, Color.WHITE); next.setOnClickListener(view -> showEnduranceWizardSchedule()); body.addView(next, new LinearLayout.LayoutParams(-1, dp(54)));
         Button back = new Button(this); back.setText("Back"); back.setTextColor(mint); back.setTextSize(14); back.setAllCaps(false); back.setBackgroundColor(Color.TRANSPARENT); back.setOnClickListener(view -> { if (!returnToPreviousPage()) showPlans(); }); body.addView(back, new LinearLayout.LayoutParams(-1, dp(46)));
     }
@@ -12998,7 +13017,7 @@ public final class MainActivity extends FragmentActivity {
         gap(body, 14);
         addEndurancePremiumCalendar(body, weekly);
         if (weekly) { int count=0; for(boolean selected:enduranceWorkoutDays)if(selected)count++; LinearLayout rhythm=card(); rhythm.addView(heading(count+" endurance sessions",19,ink)); rhythm.addView(text("Use the days above to place walking, running, or cycling without changing your strength plan.",13,muted)); body.addView(rhythm); gap(body,12); }
-        Button next=action("Next: set up route  →", coral, Color.WHITE); next.setOnClickListener(v->{if(weekly){boolean any=false;for(boolean selected:enduranceWorkoutDays)if(selected)any=true;if(!any){toast("Choose at least one endurance day.");return;}} showEnduranceWizardRoute();}); body.addView(next, new LinearLayout.LayoutParams(-1, dp(54))); Button back=new Button(this); back.setText("Back"); back.setTextColor(mint); back.setTextSize(14); back.setAllCaps(false); back.setBackgroundColor(Color.TRANSPARENT); back.setOnClickListener(v->showEnduranceWizardActivity()); body.addView(back, new LinearLayout.LayoutParams(-1, dp(46)));
+        Button next=action("Next: set session details  →", coral, Color.WHITE); next.setOnClickListener(v->{if(weekly){boolean any=false;for(boolean selected:enduranceWorkoutDays)if(selected)any=true;if(!any){toast("Choose at least one endurance day.");return;}} showEnduranceWizardRoute();}); body.addView(next, new LinearLayout.LayoutParams(-1, dp(54))); Button back=new Button(this); back.setText("Back"); back.setTextColor(mint); back.setTextSize(14); back.setAllCaps(false); back.setBackgroundColor(Color.TRANSPARENT); back.setOnClickListener(v->showEnduranceWizardActivity()); body.addView(back, new LinearLayout.LayoutParams(-1, dp(46)));
     }
 
     /** Uses the same editorial timeline as the Workout planner, with endurance-specific activity icons. */
@@ -13051,19 +13070,15 @@ public final class MainActivity extends FragmentActivity {
     }
 
     private void showEnduranceWizardRoute() {
-        LinearLayout body = enduranceWizardPage(3, "Set your route\nand time", "Enter a place name or street address. We will check the place and prepare its marker for your plan.");
-        body.addView(heading("Route details", 23, ink));
+        LinearLayout body = enduranceWizardPage(3, "Set your session\nand time", "Live tracking begins at your current location. Finish tracking wherever you end.");
+        body.addView(heading("Session details", 23, ink));
         body.addView(text("Set a clear name, distance, and duration for your " + enduranceAction(enduranceWizardMode).toLowerCase(Locale.ROOT) + ".", 13, muted));
         gap(body, 14);
         EditText name = input("Session name", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES); name.setText(enduranceWizardName); body.addView(name); gap(body, 8);
-        EditText origin = input("Starting point or address (optional)", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES); origin.setText(enduranceWizardOrigin);
-        TextView originMarker = text("Type an address, or tap the map pin to choose the exact starting point.", 12, muted);
-        addRouteAddressField(body, origin, originMarker, "Starting point"); body.addView(originMarker); gap(body, 8);
-        EditText destination = input("Destination or loop landmark (optional)", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES); destination.setText(enduranceWizardDestination);
-        TextView destinationMarker = text("Type an address, or tap the map pin to choose the exact destination.", 12, muted);
-        addRouteAddressField(body, destination, destinationMarker, "Destination or landmark"); body.addView(destinationMarker); gap(body, 8);
-        bindRouteAddressField(origin, originMarker, "Starting point");
-        bindRouteAddressField(destination, destinationMarker, "Destination");
+        LinearLayout liveRule = card();
+        liveRule.addView(heading("LIVE TRACKING", 11, mint));
+        liveRule.addView(text("Start point: your current location. End point: the place where you finish live tracking. No route addresses are needed.", 13, muted));
+        body.addView(liveRule); gap(body, 8);
         EditText distance = input("Target distance in km", InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL); distance.setText(String.valueOf(enduranceWizardDistanceKm)); body.addView(distance); gap(body, 8);
         EditText minutes = input("Target minutes", InputType.TYPE_CLASS_NUMBER); minutes.setText(String.valueOf(enduranceWizardMinutes)); body.addView(minutes); gap(body, 10);
         body.addView(heading("Effort", 17, ink));
@@ -13073,7 +13088,7 @@ public final class MainActivity extends FragmentActivity {
         Button next = action("Next: review plan  →", coral, Color.WHITE);
         next.setOnClickListener(view -> {
             try {
-                enduranceWizardName = name.getText().toString().trim(); enduranceWizardOrigin = origin.getText().toString().trim(); enduranceWizardDestination = destination.getText().toString().trim();
+                enduranceWizardName = name.getText().toString().trim(); enduranceWizardOrigin = ""; enduranceWizardDestination = "";
                 enduranceWizardDistanceKm = Float.parseFloat(distance.getText().toString().trim()); enduranceWizardMinutes = Integer.parseInt(minutes.getText().toString().trim());
                 int checked = effort.getCheckedRadioButtonId(); enduranceWizardEffort = checked == View.NO_ID ? "Steady" : ((RadioButton) effort.findViewById(checked)).getText().toString();
                 if (enduranceWizardName.isEmpty()) { name.setError("Add a session name"); return; }
@@ -13082,6 +13097,65 @@ public final class MainActivity extends FragmentActivity {
             } catch (NumberFormatException error) { toast("Enter a positive distance and at least 5 minutes."); }
         }); body.addView(next, new LinearLayout.LayoutParams(-1, dp(54)));
         Button back = new Button(this); back.setText("Back"); back.setTextColor(mint); back.setTextSize(14); back.setAllCaps(false); back.setBackgroundColor(Color.TRANSPARENT); back.setOnClickListener(view -> showEnduranceWizardSchedule()); body.addView(back, new LinearLayout.LayoutParams(-1, dp(46)));
+    }
+
+    /** Personal time-trial routes are saved from a real completed live trace, never from an address field. */
+    private void showCustomMaps() {
+        LinearLayout body = appPage("Endurance");
+        title(body, "CUSTOM MAPS", "Run your route again", "Save a finished live route, return another day, and compare your time against your own best.");
+        List<CustomRouteStore.Map> maps = CustomRouteStore.all(this);
+        if (maps.isEmpty()) {
+            LinearLayout empty = card();
+            empty.addView(heading("No custom maps yet", 20, ink));
+            empty.addView(text("Finish a live walk, run, or ride, then open its report and choose Save as custom map.", 14, muted));
+            body.addView(empty);
+        }
+        for (CustomRouteStore.Map map : maps) {
+            LinearLayout card = card();
+            card.addView(heading(map.name, 20, ink));
+            card.addView(text(map.mode + "  •  " + formatLiveDistance(map.distanceMeters) + "  •  Baseline " + formatLiveDuration(map.baselineMillis), 13, muted));
+            card.addView(text(map.attempts == 0 ? "No comparison attempts yet." : "Best " + formatLiveDuration(map.bestMillis) + "  •  " + map.attempts + " comparison attempt" + (map.attempts == 1 ? "" : "s"), 13, mint));
+            gap(card, 9);
+            Button open = secondary("View map and compare");
+            open.setOnClickListener(view -> showCustomMapDetail(map));
+            addButton(card, open);
+            body.addView(card); gap(body, 10);
+        }
+        Button back = secondary("Back to endurance"); back.setOnClickListener(view -> startEnduranceWizard(enduranceWizardMode == null ? EndurancePlanStore.WALKING : enduranceWizardMode)); addButton(body, back);
+    }
+
+    private void showCustomMapDetail(CustomRouteStore.Map map) {
+        LinearLayout body = appPage("Endurance");
+        title(body, "CUSTOM MAP", map.name, "Follow this saved trace with live tracking and compare the time when you finish.");
+        LinearLayout details = card();
+        details.addView(heading(map.mode.toUpperCase(Locale.ROOT) + " TIME TRIAL", 11, mint));
+        details.addView(heading("Baseline " + formatLiveDuration(map.baselineMillis), 28, ink));
+        details.addView(text("Best time " + formatLiveDuration(map.bestMillis) + "  •  " + formatLiveDistance(map.distanceMeters), 14, muted));
+        details.addView(text(map.attempts == 0 ? "Your first repeat will set the comparison." : map.attempts + " saved repeat" + (map.attempts == 1 ? "" : "s") + ".", 13, muted));
+        if (!map.points.isEmpty()) { gap(details, 10); addPrivateRouteTrace(details, map.points, dp(220)); }
+        body.addView(details); gap(body, 12);
+        Button start = primary("Start live comparison");
+        start.setOnClickListener(view -> requestLiveTracking(map.mode, map.id));
+        addButton(body, start); gap(body, 8);
+        Button remove = secondary("Remove custom map");
+        remove.setOnClickListener(view -> new AlertDialog.Builder(this).setTitle("Remove " + map.name + "?")
+                .setMessage("This removes only the saved comparison map. Your completed endurance history remains.")
+                .setNegativeButton("Keep", null).setPositiveButton("Remove", (dialog, which) -> { CustomRouteStore.remove(this, map.id); showCustomMaps(); }).show());
+        addButton(body, remove); gap(body, 8);
+        Button back = secondary("Back to saved maps"); back.setOnClickListener(view -> showCustomMaps()); addButton(body, back);
+    }
+
+    private void promptSaveCustomMap(EnduranceHistoryStore.Entry entry) {
+        EditText name = input("Custom map name", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+        name.setText(entry.mode + " time trial");
+        new AlertDialog.Builder(this).setTitle("Save as custom map")
+                .setMessage("The route and this time become your private baseline for future comparisons.")
+                .setView(name).setNegativeButton("Cancel", null).setPositiveButton("Save", (dialog, which) -> {
+                    try {
+                        CustomRouteStore.create(this, name.getText().toString(), entry.mode, entry.activeMillis, entry.distanceMeters, entry.points);
+                        toast("Custom map saved. Use it from Endurance when you want to beat your time.");
+                    } catch (IllegalArgumentException error) { toast(error.getMessage()); }
+                }).show();
     }
 
     /** Google Places is primary when configured; the device geocoder keeps the offline fallback usable. */
@@ -13247,18 +13321,18 @@ public final class MainActivity extends FragmentActivity {
     }
 
     private void showEnduranceWizardReview() {
-        LinearLayout body = enduranceWizardPage(4, "Review your\n" + enduranceAction(enduranceWizardMode), "Your saved route details stay in the app. Start the guided timer whenever you are ready.");
+        LinearLayout body = enduranceWizardPage(4, "Review your\n" + enduranceAction(enduranceWizardMode), "Start the guided timer whenever you are ready, or use live tracking from your current location.");
         body.addView(heading("Ready to move", 23, ink));
         body.addView(text("Your endurance plan is ready to save, track, or start right away.", 13, muted));
         gap(body, 14);
         LinearLayout review = card();
         review.addView(heading(appointmentAbbreviation(enduranceWizardMode) + " · " + enduranceWizardName, 20, ink));
         review.addView(text(formatDistance(enduranceWizardDistanceKm) + "  •  " + enduranceWizardMinutes + " min  •  " + enduranceWizardEffort, 14, muted));
-        review.addView(text(enduranceWizardDestination.isEmpty() ? "Indoor or open route" : "Destination: " + enduranceWizardDestination, 13, muted)); body.addView(review); gap(body, 13);
+        review.addView(text("Live tracking begins at your current location and ends at the point where you finish.", 13, muted)); body.addView(review); gap(body, 13);
         Button start = action("Start " + appointmentAbbreviation(enduranceWizardMode) + "  →", coral, Color.WHITE);
         start.setOnClickListener(view -> {
             try {
-                EndurancePlanStore.save(this, enduranceWizardMode, enduranceWizardName, enduranceWizardOrigin, enduranceWizardDestination, enduranceWizardDistanceKm, enduranceWizardMinutes, enduranceWizardEffort);
+                EndurancePlanStore.save(this, enduranceWizardMode, enduranceWizardName, "", "", enduranceWizardDistanceKm, enduranceWizardMinutes, enduranceWizardEffort);
                 publishEnduranceWizardSchedule();
                 startGuidedEndurance(enduranceWizardMode);
             } catch (IllegalArgumentException error) { toast(error.getMessage()); }
@@ -13266,7 +13340,7 @@ public final class MainActivity extends FragmentActivity {
         Button live = action("Start " + appointmentAbbreviation(enduranceWizardMode) + " with live tracking", mint, navy);
         live.setOnClickListener(view -> {
             try {
-                EndurancePlanStore.save(this, enduranceWizardMode, enduranceWizardName, enduranceWizardOrigin, enduranceWizardDestination, enduranceWizardDistanceKm, enduranceWizardMinutes, enduranceWizardEffort);
+                EndurancePlanStore.save(this, enduranceWizardMode, enduranceWizardName, "", "", enduranceWizardDistanceKm, enduranceWizardMinutes, enduranceWizardEffort);
                 publishEnduranceWizardSchedule();
                 requestLiveTracking(enduranceWizardMode);
             } catch (IllegalArgumentException error) { toast(error.getMessage()); }
@@ -13274,7 +13348,7 @@ public final class MainActivity extends FragmentActivity {
         Button save = action("Save endurance plan", navyPanel, mint);
         save.setOnClickListener(view -> {
             try {
-                EndurancePlanStore.save(this, enduranceWizardMode, enduranceWizardName, enduranceWizardOrigin, enduranceWizardDestination, enduranceWizardDistanceKm, enduranceWizardMinutes, enduranceWizardEffort);
+                EndurancePlanStore.save(this, enduranceWizardMode, enduranceWizardName, "", "", enduranceWizardDistanceKm, enduranceWizardMinutes, enduranceWizardEffort);
                 publishEnduranceWizardSchedule();
                 if (combinedPlanFlow && combinedPlanWorkoutSaved) {
                     toast("Workout + endurance plan saved.");
@@ -13773,7 +13847,7 @@ public final class MainActivity extends FragmentActivity {
             addButton(tile, create);
         } else {
             tile.addView(text(plan.name + "  •  " + formatDistance(plan.distanceKm) + "  •  " + plan.minutes + " min  •  " + plan.effort, 14, ink));
-            tile.addView(text("Destination: " + plan.destination, 13, muted));
+            tile.addView(text("Live tracking starts at your current location and ends where you finish.", 13, muted));
             gap(tile, 9);
             Button complete = primary("Log " + plan.minutes + " min to Progress");
             complete.setOnClickListener(view -> {
@@ -13863,6 +13937,13 @@ public final class MainActivity extends FragmentActivity {
         TextView stats = text(liveTrackingStats(live), 20, ink);
         tracker.addView(state);
         tracker.addView(stats);
+        if (!live.comparisonRouteId.isEmpty()) {
+            tracker.addView(heading("CUSTOM MAP CHALLENGE", 11, mint));
+            tracker.addView(text("When you finish, this time is saved beside your baseline and personal best.", 13, muted));
+        }
+        tracker.addView(text(live.points.isEmpty()
+                ? "Finding your current location to set the start point."
+                : "Your first GPS point is the start. Finish here when this is your endpoint.", 13, muted));
         OfflineMapStore.MapRecord selectedMap = OfflineMapStore.selectedMap(this);
         tracker.addView(text(GoogleMapsConfig.isConfigured()
                 ? "Google Maps is showing this live route. If it is unavailable, your private MapLibre route view remains the fallback."
@@ -13903,7 +13984,7 @@ public final class MainActivity extends FragmentActivity {
         });
         addButton(tracker, pause);
         gap(tracker, 7);
-        Button finish = primary("Finish and save to Progress");
+        Button finish = primary("Finish here and save to Progress");
         finish.setOnClickListener(view -> {
             sendTrackingCommand(LiveTrackingService.ACTION_FINISH);
             workoutHandler.postDelayed(this::showWorkoutHistory, 300L);
@@ -13937,12 +14018,15 @@ public final class MainActivity extends FragmentActivity {
         addButton(body, background);
     }
 
-    private void requestLiveTracking(String mode) {
+    private void requestLiveTracking(String mode) { requestLiveTracking(mode, ""); }
+
+    private void requestLiveTracking(String mode, String comparisonRouteId) {
         if (hasLiveLocationPermission()) {
-            startLiveTrackingService(mode);
+            startLiveTrackingService(mode, comparisonRouteId);
             return;
         }
         pendingLiveTrackingMode = mode;
+        pendingLiveTrackingRouteId = comparisonRouteId;
         new AlertDialog.Builder(this).setTitle("Track your " + enduranceAction(mode))
                 .setMessage("My Personal Trainer will use your location only while this live session is running to measure distance and draw your private route trace. Android will show an ongoing tracking notification. You can pause, finish, or discard it at any time.")
                 .setNegativeButton("Not now", null)
@@ -13954,11 +14038,13 @@ public final class MainActivity extends FragmentActivity {
                 || checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
     }
 
-    private void startLiveTrackingService(String mode) {
-        Intent intent = new Intent(this, LiveTrackingService.class).setAction(LiveTrackingService.ACTION_START).putExtra(LiveTrackingService.EXTRA_MODE, mode);
+    private void startLiveTrackingService(String mode, String comparisonRouteId) {
+        Intent intent = new Intent(this, LiveTrackingService.class).setAction(LiveTrackingService.ACTION_START)
+                .putExtra(LiveTrackingService.EXTRA_MODE, mode)
+                .putExtra(LiveTrackingService.EXTRA_CUSTOM_ROUTE_ID, comparisonRouteId == null ? "" : comparisonRouteId);
         // Create visible local session state first so a slow service launch never throws the person
         // back into the planner. The service repeats this initialization when it reaches START.
-        LiveTrackingStore.start(this, mode);
+        LiveTrackingStore.start(this, mode, comparisonRouteId);
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(intent); else startService(intent);
         } catch (RuntimeException error) {
