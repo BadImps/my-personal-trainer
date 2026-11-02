@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 154,
-  "versionName": "7.2",
-  "publishedAt": "2026-11-02T08:31:05Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v7.2/app-release.apk",
-  "sha256": "9a5e6651a54d4a6f168459ba1f4fc7a39b8795d98c1f1b8e831b7dfbb094673a",
+  "versionCode": 155,
+  "versionName": "7.3",
+  "publishedAt": "2026-11-02T14:09:02Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v7.3/app-release.apk",
+  "sha256": "74eedc553c8d775d9e0011623f4c153f499ef920a416fafec02dc495e8d63a89",
   "sizeBytes": 281416505,
-  "notes": "Workout, Endurance, and Workout + Endurance now use illustrated Plan choice cards. Progress history swipe direction is corrected, stopping at the current week. Hub tiles use slimmer coral frames with deeper collision-safe shadows."
+  "notes": "Completed Plan History gestures now work from every day row. Training Readiness has a raised emoji badge. Live tracking and Google Maps route replay use a heading-up camera, and endurance reports now prefer Google Maps when configured."
 }

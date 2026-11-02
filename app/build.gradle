@@ -42,8 +42,8 @@ android {
         applicationId 'com.badimps.personaltrainer'
         minSdk 26
         targetSdk 36
-        versionCode (migrationBridge ? 73 : 154)
-        versionName (migrationBridge ? '5.31 Migration' : '7.2')
+        versionCode (migrationBridge ? 73 : 155)
+        versionName (migrationBridge ? '5.31 Migration' : '7.3')
         // The anon/publishable key is intentionally a client credential. Never place a
         // service-role key in an APK. RLS remains the actual database security boundary.
         buildConfigField 'String', 'SUPABASE_URL', quotedBuildValue(localProperties.getProperty('SUPABASE_URL', ''))

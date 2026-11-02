@@ -7569,6 +7569,9 @@ public final class MainActivity extends FragmentActivity {
                 JourneyStore.WorkoutRecord opened = completed; EnduranceHistoryStore.Entry enduranceOpened = endurance;
                 row.setClickable(true); row.setFocusable(true); row.setOnClickListener(view -> { if (enduranceOpened != null) showEnduranceSessionDetails(enduranceOpened); else showWorkoutSetTimeDetails(opened, SetTimeStore.loadWorkout(this, opened.timestamp)); });
             } else row.setAlpha(planned ? 1f : .58f);
+            // Rows occupy the entire card, so they must receive the same horizontal gesture
+            // listener as the parent. A completed row still opens only on an ordinary tap.
+            attachProgressHistorySwipe(row);
             LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2); params.topMargin = dp(7); history.addView(row, params);
         }
     }
@@ -7579,9 +7582,37 @@ public final class MainActivity extends FragmentActivity {
         if (focus == null || focus.trim().isEmpty()) focus = target;
         TrainingIntelligence.RecoveryInsight recovery = TrainingIntelligence.recovery(this, focus);
         LinearLayout recoveryCard = card();
-        recoveryCard.addView(heading("Training readiness", 19, ink));
-        recoveryCard.addView(heading(recovery.headline, 17,
-                recovery.readiness == TrainingIntelligence.Readiness.READY ? Color.rgb(38, 118, 100) : coral));
+        boolean ready = recovery.readiness == TrainingIntelligence.Readiness.READY;
+        int statusFill = ready ? Color.rgb(225, 248, 238) : Color.rgb(255, 232, 230);
+        int statusBorder = ready ? Color.rgb(91, 183, 144) : Color.rgb(238, 128, 116);
+        recoveryCard.setBackground(surface(statusFill, CoachHeroDesign.CARD_RADIUS_DP, 2, statusBorder));
+        recoveryCard.setElevation(dp(7));
+        recoveryCard.setGravity(Gravity.CENTER_HORIZONTAL);
+        recoveryCard.setClipChildren(false);
+        recoveryCard.setClipToPadding(false);
+        FrameLayout statusMount = new FrameLayout(this);
+        statusMount.setBackground(surface(Color.TRANSPARENT, 99, 3, statusBorder));
+        TextView statusIcon = new TextView(this);
+        statusIcon.setText(ready ? "🙂" : "🫩");
+        statusIcon.setTextSize(28);
+        statusIcon.setGravity(Gravity.CENTER);
+        statusIcon.setContentDescription(ready ? "Ready for training" : "Recovery suggested");
+        statusIcon.setBackground(surface(Color.WHITE, 99, 1, statusBorder));
+        FrameLayout.LayoutParams iconParams = new FrameLayout.LayoutParams(dp(58), dp(58), Gravity.CENTER);
+        statusMount.addView(statusIcon, iconParams);
+        // Pull the mount upward so it deliberately breaks the card's top edge.
+        LinearLayout.LayoutParams mountParams = new LinearLayout.LayoutParams(dp(70), dp(70));
+        mountParams.topMargin = dp(-31);
+        recoveryCard.addView(statusMount, mountParams);
+        TextView readinessTitle = heading("TRAINING READINESS", 12, ink);
+        readinessTitle.setLetterSpacing(.1f);
+        readinessTitle.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(-1, -2);
+        titleParams.topMargin = dp(5);
+        recoveryCard.addView(readinessTitle, titleParams);
+        TextView headline = heading(recovery.headline, 17, ready ? Color.rgb(29, 109, 78) : Color.rgb(177, 63, 53));
+        headline.setGravity(Gravity.CENTER);
+        recoveryCard.addView(headline);
         recoveryCard.addView(text(recovery.detail, 14, muted));
         recoveryCard.addView(text("Based on your private completion history only. It is guidance—not medical advice.", 12, muted));
         body.addView(recoveryCard);
@@ -7718,7 +7749,17 @@ public final class MainActivity extends FragmentActivity {
             route.addView(heading("Your " + entry.mode.toLowerCase(Locale.ROOT) + " from start to finish", 19, ink));
             TextView replayTime = text("0:00 / " + formatLiveDuration(entry.activeMillis), 14, mint);
             route.addView(replayTime);
-            if (OfflineMapStore.hasAnyMap(this)) {
+            if (GoogleMapsConfig.isConfigured()) {
+                route.addView(text("Google Maps · heading-up route replay follows your recorded movement.", 13, muted));
+                try {
+                    GoogleRouteMapView map = new GoogleRouteMapView(this, entry.points);
+                    LinearLayout.LayoutParams mapParams = new LinearLayout.LayoutParams(-1, dp(300)); mapParams.topMargin = dp(10); route.addView(map, mapParams);
+                    Button replay = lightAction("Replay route");
+                    replay.setOnClickListener(view -> playEnduranceRouteReplay(map, entry, replayTime));
+                    addButton(route, replay);
+                    startEnduranceReplayWhenVisible(route, map, entry, replayTime);
+                } catch (RuntimeException error) { addPrivateRouteTrace(route, entry.points, dp(235)); }
+            } else if (OfflineMapStore.hasAnyMap(this)) {
                 route.addView(text("MapLibre vector streets · lime route replay stays private on this phone.", 13, muted));
                 try {
                     OfflineRouteMapView map = new OfflineRouteMapView(this, OfflineMapStore.mapFile(this), entry.points);
@@ -7787,6 +7828,28 @@ public final class MainActivity extends FragmentActivity {
     }
 
     private void startEnduranceReplayWhenVisible(View routeCard, OfflineRouteMapView map, EnduranceHistoryStore.Entry entry, TextView replayTime) {
+        routeCard.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener() {
+            private boolean played;
+            @Override public boolean onPreDraw() {
+                if (played) return true;
+                Rect visible = new Rect();
+                if (!routeCard.getGlobalVisibleRect(visible) || visible.height() < dp(60)) return true;
+                played = true;
+                if (routeCard.getViewTreeObserver().isAlive()) routeCard.getViewTreeObserver().removeOnPreDrawListener(this);
+                playEnduranceRouteReplay(map, entry, replayTime);
+                return true;
+            }
+        });
+    }
+
+    private void playEnduranceRouteReplay(GoogleRouteMapView map, EnduranceHistoryStore.Entry entry, TextView replayTime) {
+        map.playRouteReplay(entry.activeMillis, new GoogleRouteMapView.RouteReplayListener() {
+            @Override public void onReplayFrame(long elapsedMillis, float fraction) { replayTime.setText(formatLiveDuration(elapsedMillis) + " / " + formatLiveDuration(entry.activeMillis)); }
+            @Override public void onReplayFinished() { replayTime.setText(formatLiveDuration(entry.activeMillis) + " / " + formatLiveDuration(entry.activeMillis) + "  •  complete"); }
+        });
+    }
+
+    private void startEnduranceReplayWhenVisible(View routeCard, GoogleRouteMapView map, EnduranceHistoryStore.Entry entry, TextView replayTime) {
         routeCard.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener() {
             private boolean played;
             @Override public boolean onPreDraw() {

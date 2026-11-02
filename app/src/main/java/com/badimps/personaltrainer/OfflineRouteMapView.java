@@ -230,12 +230,12 @@ public final class OfflineRouteMapView extends FrameLayout {
         if (!line.isEmpty()) {
             vectorController.addMarker(new MarkerOptions().position(line.get(0)).icon(IconFactory.getInstance(appContext).fromBitmap(markerBitmap(false))).title("Start"));
             if (line.size() > 1) vectorController.addMarker(new MarkerOptions().position(line.get(line.size() - 1))
-                    .icon(IconFactory.getInstance(appContext).fromBitmap(markerBitmap(true))).title("Current location · north reference"));
+                    .icon(IconFactory.getInstance(appContext).fromBitmap(markerBitmap(true))).title("Current location · heading up"));
         }
         if (followLatestLocation && !line.isEmpty() && fitCamera) {
             CameraPosition current = vectorController.getCameraPosition();
             CameraPosition camera = new CameraPosition.Builder(current).target(line.get(line.size() - 1)).zoom(Math.max(18d, current.zoom))
-                    .bearing(current.bearing).tilt(current.tilt).build();
+                    .bearing(travelBearing(points)).tilt(current.tilt).build();
             vectorController.animateCamera(CameraUpdateFactory.newCameraPosition(camera));
             vectorCameraFramed = true;
         } else if (line.size() > 1 && fitCamera) {
@@ -251,6 +251,18 @@ public final class OfflineRouteMapView extends FrameLayout {
     }
 
     private int dp(int value) { return (int) (value * getResources().getDisplayMetrics().density + .5f); }
+
+    /** Uses the last movement vector to keep the navigation arrow at screen-top. */
+    private float travelBearing(List<LiveTrackingStore.Point> points) {
+        if (points == null || points.size() < 2) return vectorController == null ? 0f : (float) vectorController.getCameraPosition().bearing;
+        LiveTrackingStore.Point from = points.get(points.size() - 2), to = points.get(points.size() - 1);
+        double longitude = Math.toRadians(to.longitude - from.longitude);
+        double firstLatitude = Math.toRadians(from.latitude), secondLatitude = Math.toRadians(to.latitude);
+        double y = Math.sin(longitude) * Math.cos(secondLatitude);
+        double x = Math.cos(firstLatitude) * Math.sin(secondLatitude)
+                - Math.sin(firstLatitude) * Math.cos(secondLatitude) * Math.cos(longitude);
+        return (float) ((Math.toDegrees(Math.atan2(y, x)) + 360d) % 360d);
+    }
 
     /** North-pointing custom markers give the live map the same language as Google Maps. */
     private Bitmap markerBitmap(boolean arrow) {
