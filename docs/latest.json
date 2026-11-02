@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 153,
-  "versionName": "7.1",
-  "publishedAt": "2026-11-02T04:57:29Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v7.1/app-release.apk",
-  "sha256": "96537c753879d8abe41d51b8fd0fc49c72d5029a5a22a2538f33304dfdeae49d",
-  "sizeBytes": 281415849,
-  "notes": "Daily, Weekly, and Custom Plan choices have their illustrated icons restored. Progress and Plan hubs now use visible foreground coral frames, deeper shadows, and wider collision-safe spacing."
+  "versionCode": 154,
+  "versionName": "7.2",
+  "publishedAt": "2026-11-02T08:31:05Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v7.2/app-release.apk",
+  "sha256": "9a5e6651a54d4a6f168459ba1f4fc7a39b8795d98c1f1b8e831b7dfbb094673a",
+  "sizeBytes": 281416505,
+  "notes": "Workout, Endurance, and Workout + Endurance now use illustrated Plan choice cards. Progress history swipe direction is corrected, stopping at the current week. Hub tiles use slimmer coral frames with deeper collision-safe shadows."
 }

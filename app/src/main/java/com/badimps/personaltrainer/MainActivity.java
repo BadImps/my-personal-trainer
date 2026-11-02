@@ -4145,7 +4145,7 @@ public final class MainActivity extends FragmentActivity {
      */
     private void addHubTileFrame(FrameLayout tile, int radius) {
         View frame = new View(this);
-        frame.setBackground(surface(Color.TRANSPARENT, radius, 4,
+        frame.setBackground(surface(Color.TRANSPARENT, radius, 2,
                 Color.argb(255, Color.red(coral), Color.green(coral), Color.blue(coral))));
         frame.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
         tile.addView(frame, new FrameLayout.LayoutParams(-1, -1));
@@ -4211,49 +4211,63 @@ public final class MainActivity extends FragmentActivity {
         title(body, "CREATE A " + planMode.toUpperCase(Locale.ROOT) + " PLAN", "What do you want to plan?",
                 "Your existing Workout and Endurance setup screens stay exactly as they are.");
 
-        LinearLayout workout = card();
-        workout.addView(heading("Workout", 20, ink));
-        workout.addView(text("Strength training with your established workout wizard.", 14, muted));
-        Button workoutOpen = primary("Create workout plan");
-        workoutOpen.setOnClickListener(view -> {
+        addPlanKindChoice(body, "Workout", "Strength training with your established workout wizard.", R.drawable.ic_nav_workouts, () -> {
             combinedPlanFlow = false;
             beginWorkoutPlanDraft(planMode);
             showPlanTarget();
         });
-        LinearLayout.LayoutParams workoutParams = new LinearLayout.LayoutParams(-1, dp(50)); workoutParams.topMargin = dp(12);
-        workout.addView(workoutOpen, workoutParams);
-        body.addView(workout); gap(body, 10);
-
-        LinearLayout endurance = card();
-        endurance.addView(heading("Endurance", 20, ink));
-        endurance.addView(text("Walking, running, or cycling with your established endurance wizard.", 14, muted));
-        Button enduranceOpen = primary("Create endurance plan");
-        enduranceOpen.setOnClickListener(view -> {
+        gap(body, 10);
+        addPlanKindChoice(body, "Endurance", "Walking, running, or cycling with your established endurance wizard.", R.drawable.ic_nav_endurance, () -> {
             combinedPlanFlow = false;
             startEnduranceWizard(EndurancePlanStore.WALKING);
         });
-        LinearLayout.LayoutParams enduranceParams = new LinearLayout.LayoutParams(-1, dp(50)); enduranceParams.topMargin = dp(12);
-        endurance.addView(enduranceOpen, enduranceParams);
-        body.addView(endurance); gap(body, 10);
-
-        LinearLayout both = card();
-        both.addView(heading("Workout + Endurance", 20, ink));
-        both.addView(text("Build the workout first, then add a run, walk, or cycle to the same plan.", 14, muted));
-        Button bothOpen = primary("Create both");
-        bothOpen.setOnClickListener(view -> {
+        gap(body, 10);
+        addPlanKindChoice(body, "Workout + Endurance", "Build the workout first, then add a run, walk, or cycle to the same plan.", R.drawable.ic_plan_both, () -> {
             combinedPlanFlow = true;
             combinedPlanWorkoutSaved = false;
             beginWorkoutPlanDraft(planMode);
             toast("Step 1 of 2: build your workout.");
             showPlanTarget();
         });
-        LinearLayout.LayoutParams bothParams = new LinearLayout.LayoutParams(-1, dp(50)); bothParams.topMargin = dp(12);
-        both.addView(bothOpen, bothParams);
-        body.addView(both); gap(body, 12);
+        gap(body, 12);
 
         Button back = secondary("Back to plan style");
         back.setOnClickListener(view -> showPlanCadence());
         addButton(body, back);
+    }
+
+    /** Uses the same illustrated choice treatment as Daily, Weekly, and Custom. */
+    private void addPlanKindChoice(LinearLayout body, String label, String detail, int iconRes, Runnable open) {
+        LinearLayout card = card();
+        card.setOrientation(LinearLayout.HORIZONTAL);
+        card.setGravity(Gravity.CENTER_VERTICAL);
+        card.setPadding(dp(16), dp(14), dp(14), dp(14));
+        card.setClickable(true);
+        card.setFocusable(true);
+        card.setContentDescription("Create " + label + " plan. " + detail);
+        ImageView icon = new ImageView(this);
+        icon.setImageResource(iconRes);
+        icon.setImageTintList(ColorStateList.valueOf(coral));
+        icon.setBackground(surface(Color.rgb(255, 242, 239), 99, 1, coral));
+        icon.setPadding(dp(10), dp(10), dp(10), dp(10));
+        card.addView(icon, new LinearLayout.LayoutParams(dp(58), dp(58)));
+        LinearLayout copy = new LinearLayout(this);
+        copy.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams copyParams = new LinearLayout.LayoutParams(0, -2, 1);
+        copyParams.leftMargin = dp(14);
+        card.addView(copy, copyParams);
+        TextView title = heading(label, label.length() > 16 ? 18 : 20, ink);
+        title.setMaxLines(2);
+        copy.addView(title);
+        TextView description = text(detail, 14, muted);
+        description.setMaxLines(2);
+        copy.addView(description);
+        TextView arrow = heading("›", 32, coral);
+        arrow.setGravity(Gravity.CENTER);
+        card.addView(arrow, new LinearLayout.LayoutParams(dp(28), dp(58)));
+        card.setOnClickListener(view -> open.run());
+        applyPressMotion(card);
+        body.addView(card);
     }
 
     /** Home is a shortcut to the already-built plan, not a restart of the planning wizard. */
@@ -6969,7 +6983,7 @@ public final class MainActivity extends FragmentActivity {
         String historyTitle = progressHistoryWeekOffset == 0 ? "This week’s completed plan history"
                 : homeWeekRange(historyWeek) + " completed plan history";
         history.addView(heading(historyTitle, 19, ink));
-        history.addView(text("Swipe right to left for an earlier week · left to right for a newer week", 12, muted));
+        history.addView(text("Swipe left to right for an earlier week · right to left for a newer week", 12, muted));
         history.addView(text("Green = completed  •  Red = planned, not completed  •  Gray = no plan", 12, muted));
         attachProgressHistorySwipe(history);
         addWeeklyPlanHistory(history);
@@ -7497,7 +7511,7 @@ public final class MainActivity extends FragmentActivity {
         });
     }
 
-    /** Swipe right-to-left for an older week; the reverse gesture cannot go beyond the current week. */
+    /** Swipe left-to-right for an older week; the reverse gesture cannot go beyond the current week. */
     private void attachProgressHistorySwipe(View history) {
         history.setOnTouchListener(new View.OnTouchListener() {
             private float downX;
@@ -7507,7 +7521,7 @@ public final class MainActivity extends FragmentActivity {
                 } else if (event.getAction() == MotionEvent.ACTION_UP) {
                     float deltaX = event.getX() - downX;
                     if (Math.abs(deltaX) >= dp(64)) {
-                        if (deltaX < 0f) {
+                        if (deltaX > 0f) {
                             progressHistoryWeekOffset++;
                             refreshCurrentPageKeepingScroll(MainActivity.this::showProgress);
                             return true;
