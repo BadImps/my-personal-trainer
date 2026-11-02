@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 155,
-  "versionName": "7.3",
-  "publishedAt": "2026-11-02T14:09:02Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v7.3/app-release.apk",
-  "sha256": "74eedc553c8d775d9e0011623f4c153f499ef920a416fafec02dc495e8d63a89",
+  "versionCode": 156,
+  "versionName": "7.4",
+  "publishedAt": "2026-11-02T14:23:51Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v7.4/app-release.apk",
+  "sha256": "95cee0fdbd04d661d7a6e85890882ff62c45fc4029772a8aac0feddebc2c384b",
   "sizeBytes": 281416505,
-  "notes": "Completed Plan History gestures now work from every day row. Training Readiness has a raised emoji badge. Live tracking and Google Maps route replay use a heading-up camera, and endurance reports now prefer Google Maps when configured."
+  "notes": "Fixed Google Maps Endurance Report replay tracking: the camera now stays aligned with the replay marker and heading instead of falling behind queued animations."
 }

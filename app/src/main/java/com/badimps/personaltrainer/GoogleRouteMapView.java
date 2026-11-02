@@ -45,6 +45,8 @@ public final class GoogleRouteMapView extends FrameLayout implements OnMapReadyC
     private List<LiveTrackingStore.Point> points = new ArrayList<>();
     private int renderedPointCount;
     private Runnable replayRunnable;
+    /** Replay renders at ~30fps, so it must not queue the normal camera animations. */
+    private boolean replaying;
 
     /** Report pages receive progress without owning Google Maps' rendering lifecycle. */
     public interface RouteReplayListener {
@@ -97,6 +99,7 @@ public final class GoogleRouteMapView extends FrameLayout implements OnMapReadyC
         final long totalMillis = Math.max(1L, sessionMillis);
         final long replayDuration = Math.max(2800L, Math.min(6500L, fullRoute.size() * 34L));
         final long startedAt = android.os.SystemClock.elapsedRealtime();
+        replaying = true;
         renderedPointCount = 0;
         replayRunnable = new Runnable() {
             @Override public void run() {
@@ -107,6 +110,7 @@ public final class GoogleRouteMapView extends FrameLayout implements OnMapReadyC
                 if (fraction < 1f) handler.postDelayed(this, 33L);
                 else {
                     replayRunnable = null;
+                    replaying = false;
                     setRoute(fullRoute);
                     if (listener != null) listener.onReplayFinished();
                 }
@@ -118,6 +122,7 @@ public final class GoogleRouteMapView extends FrameLayout implements OnMapReadyC
     public void stopRouteReplay() {
         if (replayRunnable != null) handler.removeCallbacks(replayRunnable);
         replayRunnable = null;
+        replaying = false;
     }
 
     private void render() {
@@ -148,8 +153,12 @@ public final class GoogleRouteMapView extends FrameLayout implements OnMapReadyC
         CameraPosition current = map.getCameraPosition();
         CameraPosition camera = new CameraPosition.Builder(current).target(last).zoom(zoom)
                 .bearing(travelBearing).tilt(current == null ? 0f : current.tilt).build();
-        if (renderedPointCount == 0) map.moveCamera(CameraUpdateFactory.newCameraPosition(camera));
-        else map.animateCamera(CameraUpdateFactory.newCameraPosition(camera));
+        if (renderedPointCount == 0 || replaying) {
+            // A replay changes on every frame. Cancelling then moving prevents a backlog of
+            // camera animations, which otherwise makes the map trail far behind the marker.
+            map.stopAnimation();
+            map.moveCamera(CameraUpdateFactory.newCameraPosition(camera));
+        } else map.animateCamera(CameraUpdateFactory.newCameraPosition(camera));
         renderedPointCount = points.size();
     }
 
