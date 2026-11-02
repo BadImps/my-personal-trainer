@@ -3652,11 +3652,14 @@ public final class MainActivity extends FragmentActivity {
         tile.setOrientation(LinearLayout.VERTICAL);
         tile.setGravity(Gravity.CENTER_HORIZONTAL);
         tile.setPadding(dp(2), dp(5), dp(2), dp(3));
-        // The coral selection frame belongs to the full day tile, not the small activity icon.
-        // Only today carries the active-day frame. Future plans remain legible without
-        // looking selected; past days are deliberately watermark-like historical records.
+        // Today alone receives the coral active-day frame. A selected future date keeps
+        // its normal colour and is raised with a denser shadow, so it reads as a target
+        // without looking like today or colliding with a completed-day ribbon.
         boolean selectedForScheduling = sameSchedulerDate(date, homeSelectedScheduleDate);
-        tile.setBackground(homeScheduleDaySurface(base, today || selectedForScheduling));
+        boolean futureSelection = selectedForScheduling && !today && !historical;
+        tile.setBackground(homeScheduleDaySurface(base, today));
+        tile.setElevation(futureSelection ? dp(10) : 0);
+        tile.setTranslationZ(futureSelection ? dp(4) : 0);
         tile.setAlpha(historical && !completed ? .64f : 1f);
         TextView dateLabel = text(weekDays[dayIndex] + "\n" + homeWeekDate(date, 0), 9, (showWorkout || endurance) ? navy : muted);
         dateLabel.setGravity(Gravity.CENTER);
@@ -7750,9 +7753,10 @@ public final class MainActivity extends FragmentActivity {
             TextView replayTime = text("0:00 / " + formatLiveDuration(entry.activeMillis), 14, mint);
             route.addView(replayTime);
             if (GoogleMapsConfig.isConfigured()) {
-                route.addView(text("Google Maps · heading-up route replay follows your recorded movement.", 13, muted));
+                route.addView(text("Google Maps · full-route overview replay keeps your start and finish in view.", 13, muted));
                 try {
                     GoogleRouteMapView map = new GoogleRouteMapView(this, entry.points);
+                    map.setReplayOverviewMode(true);
                     LinearLayout.LayoutParams mapParams = new LinearLayout.LayoutParams(-1, dp(300)); mapParams.topMargin = dp(10); route.addView(map, mapParams);
                     Button replay = lightAction("Replay route");
                     replay.setOnClickListener(view -> playEnduranceRouteReplay(map, entry, replayTime));

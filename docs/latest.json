@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 156,
-  "versionName": "7.4",
-  "publishedAt": "2026-11-02T14:23:51Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v7.4/app-release.apk",
-  "sha256": "95cee0fdbd04d661d7a6e85890882ff62c45fc4029772a8aac0feddebc2c384b",
-  "sizeBytes": 281416505,
-  "notes": "Fixed Google Maps Endurance Report replay tracking: the camera now stays aligned with the replay marker and heading instead of falling behind queued animations."
+  "versionCode": 157,
+  "versionName": "7.5",
+  "publishedAt": "2026-11-02T16:28:18Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v7.5/app-release.apk",
+  "sha256": "408fc6e58939a117c4ba12d4bab21dda43911408509d52bf15f5e13071337d59",
+  "sizeBytes": 281416509,
+  "notes": "Your Week Calendar now highlights a selected future day with a deeper shadow instead of a coral outline. Google Maps Endurance Report replay now keeps your full route in view and animates more smoothly."
 }

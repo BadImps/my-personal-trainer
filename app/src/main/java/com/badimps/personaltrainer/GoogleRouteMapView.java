@@ -17,6 +17,7 @@ import com.google.android.gms.maps.model.BitmapDescriptor;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.CameraPosition;
 import com.google.android.gms.maps.GoogleMap;
+import com.google.android.gms.maps.model.LatLngBounds;
 import com.google.android.gms.maps.MapView;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.model.LatLng;
@@ -47,6 +48,10 @@ public final class GoogleRouteMapView extends FrameLayout implements OnMapReadyC
     private Runnable replayRunnable;
     /** Replay renders at ~30fps, so it must not queue the normal camera animations. */
     private boolean replaying;
+    /** Report replay is an overview, unlike the close follow-camera used during live tracking. */
+    private boolean replayOverviewMode;
+    private boolean overviewFramed;
+    private List<LiveTrackingStore.Point> overviewPoints = new ArrayList<>();
 
     /** Report pages receive progress without owning Google Maps' rendering lifecycle. */
     public interface RouteReplayListener {
@@ -88,6 +93,14 @@ public final class GoogleRouteMapView extends FrameLayout implements OnMapReadyC
         render();
     }
 
+    /** Keeps a report replay framed from start to finish rather than following every GPS point. */
+    public void setReplayOverviewMode(boolean enabled) {
+        replayOverviewMode = enabled;
+        overviewPoints = enabled ? new ArrayList<>(points) : new ArrayList<>();
+        overviewFramed = false;
+        render();
+    }
+
     /** Replays a saved route on Google Maps using the same heading-up camera as live tracking. */
     public void playRouteReplay(long sessionMillis, RouteReplayListener listener) {
         stopRouteReplay();
@@ -97,15 +110,24 @@ public final class GoogleRouteMapView extends FrameLayout implements OnMapReadyC
         }
         final List<LiveTrackingStore.Point> fullRoute = new ArrayList<>(points);
         final long totalMillis = Math.max(1L, sessionMillis);
-        final long replayDuration = Math.max(2800L, Math.min(6500L, fullRoute.size() * 34L));
+        final long replayDuration = Math.max(4200L, Math.min(9000L, fullRoute.size() * 45L));
         final long startedAt = android.os.SystemClock.elapsedRealtime();
         replaying = true;
         renderedPointCount = 0;
         replayRunnable = new Runnable() {
             @Override public void run() {
                 float fraction = Math.min(1f, (android.os.SystemClock.elapsedRealtime() - startedAt) / (float) replayDuration);
-                int end = Math.max(1, Math.min(fullRoute.size(), 1 + Math.round(fraction * (fullRoute.size() - 1))));
-                setRoute(fullRoute.subList(0, end));
+                float routeIndex = fraction * (fullRoute.size() - 1);
+                int complete = Math.max(0, Math.min(fullRoute.size() - 1, (int) Math.floor(routeIndex)));
+                ArrayList<LiveTrackingStore.Point> frame = new ArrayList<>(fullRoute.subList(0, complete + 1));
+                if (complete + 1 < fullRoute.size()) {
+                    LiveTrackingStore.Point from = fullRoute.get(complete), to = fullRoute.get(complete + 1);
+                    float between = routeIndex - complete;
+                    frame.add(new LiveTrackingStore.Point(
+                            from.latitude + (to.latitude - from.latitude) * between,
+                            from.longitude + (to.longitude - from.longitude) * between));
+                }
+                setRoute(frame);
                 if (listener != null) listener.onReplayFrame(Math.round(totalMillis * fraction), fraction);
                 if (fraction < 1f) handler.postDelayed(this, 33L);
                 else {
@@ -147,6 +169,11 @@ public final class GoogleRouteMapView extends FrameLayout implements OnMapReadyC
         float travelBearing = travelBearing();
         if (points.size() > 1) map.addMarker(new MarkerOptions().position(last).icon(northArrow())
                 .anchor(.5f, .5f).flat(true).rotation(travelBearing).title("Current location · heading up"));
+        if (replayOverviewMode) {
+            frameOverviewIfNeeded();
+            renderedPointCount = points.size();
+            return;
+        }
         // Live tracking follows the latest recorded fix. The route remains visible behind the
         // marker, while the camera stays useful for a person moving through the real world.
         float zoom = map.getCameraPosition() == null ? 18.25f : Math.max(18f, map.getCameraPosition().zoom);
@@ -160,6 +187,19 @@ public final class GoogleRouteMapView extends FrameLayout implements OnMapReadyC
             map.moveCamera(CameraUpdateFactory.newCameraPosition(camera));
         } else map.animateCamera(CameraUpdateFactory.newCameraPosition(camera));
         renderedPointCount = points.size();
+    }
+
+    private void frameOverviewIfNeeded() {
+        if (overviewFramed || overviewPoints.isEmpty() || map == null) return;
+        if (overviewPoints.size() == 1) {
+            LiveTrackingStore.Point point = overviewPoints.get(0);
+            map.moveCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(point.latitude, point.longitude), 17f));
+        } else {
+            LatLngBounds.Builder bounds = new LatLngBounds.Builder();
+            for (LiveTrackingStore.Point point : overviewPoints) bounds.include(new LatLng(point.latitude, point.longitude));
+            map.moveCamera(CameraUpdateFactory.newLatLngBounds(bounds.build(), dp(38)));
+        }
+        overviewFramed = true;
     }
 
     /** Rotates the map underneath the fixed screen-up arrow using the last two GPS fixes. */
