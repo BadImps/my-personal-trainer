@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 162,
-  "versionName": "7.10",
-  "publishedAt": "2026-11-02T23:00:27Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v7.10/app-release.apk",
-  "sha256": "78e1f9fb8f9e33cd8a92daafe26d8d8ab7d8a3567f1b9f144bee6a06b581338d",
-  "sizeBytes": 281432841,
-  "notes": "Press-and-hold workout finish options, same-day saved custom workouts for unfinished exercises, and guided-workout set, rep, and cooldown sliders."
+  "versionCode": 163,
+  "versionName": "7.11",
+  "publishedAt": "2026-11-03T11:17:49Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v7.11/app-release.apk",
+  "sha256": "6dd125bebee9b9a2699a9bb14e84ba1e4625d9caafe09d90e3c66420291d3b98",
+  "sizeBytes": 281432933,
+  "notes": "Google Maps route reports keep the full route in view and replay saved GPS points smoothly."
 }

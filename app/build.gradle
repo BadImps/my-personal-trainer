@@ -19,12 +19,17 @@ def migrationBridge = project.hasProperty('migrationBridge')
 if (releasePropertiesFile.exists()) {
     releasePropertiesFile.withInputStream { releaseProperties.load(it) }
 }
-def releaseStoreFile = new File(releaseProperties.getProperty('storeFile', 'keys/my-personal-trainer-release.jks'))
+// Accept the OTA upload-signing property names too, so the protected local release key can
+// be used directly by both the desktop release flow and CI.
+def releaseStoreFile = new File(releaseProperties.getProperty('storeFile', releaseProperties.getProperty('UPLOAD_STORE_FILE', 'keys/my-personal-trainer-release.jks')))
 if (!releaseStoreFile.isAbsolute()) releaseStoreFile = new File(releasePropertiesFile.parentFile, releaseStoreFile.path)
 // Older private signing files used a path relative to a different checkout. Prefer the keystore
 // stored beside this signing file when that old relative path is no longer valid.
 if (!releaseStoreFile.exists() && releasePropertiesFile.parentFile != null) {
-    releaseStoreFile = new File(new File(releasePropertiesFile.parentFile, 'keys'), releaseStoreFile.name)
+    def siblingStoreFile = new File(releasePropertiesFile.parentFile, releaseStoreFile.name)
+    releaseStoreFile = siblingStoreFile.exists()
+            ? siblingStoreFile
+            : new File(new File(releasePropertiesFile.parentFile, 'keys'), releaseStoreFile.name)
 }
 
 android {
@@ -33,17 +38,17 @@ android {
     signingConfigs {
         production {
             storeFile releaseStoreFile
-            storePassword releaseProperties.getProperty('storePassword', '')
-            keyAlias releaseProperties.getProperty('keyAlias', 'my-personal-trainer')
-            keyPassword releaseProperties.getProperty('keyPassword', '')
+            storePassword releaseProperties.getProperty('storePassword', releaseProperties.getProperty('UPLOAD_STORE_PASSWORD', ''))
+            keyAlias releaseProperties.getProperty('keyAlias', releaseProperties.getProperty('UPLOAD_KEY_ALIAS', 'my-personal-trainer'))
+            keyPassword releaseProperties.getProperty('keyPassword', releaseProperties.getProperty('UPLOAD_KEY_PASSWORD', ''))
         }
     }
     defaultConfig {
         applicationId 'com.badimps.personaltrainer'
         minSdk 26
         targetSdk 36
-        versionCode (migrationBridge ? 73 : 162)
-        versionName (migrationBridge ? '5.31 Migration' : '7.10')
+        versionCode (migrationBridge ? 73 : 163)
+        versionName (migrationBridge ? '5.31 Migration' : '7.11')
         // The anon/publishable key is intentionally a client credential. Never place a
         // service-role key in an APK. RLS remains the actual database security boundary.
         buildConfigField 'String', 'SUPABASE_URL', quotedBuildValue(localProperties.getProperty('SUPABASE_URL', ''))
