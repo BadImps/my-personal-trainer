@@ -25,7 +25,7 @@ public final class CoachPreferences {
     }
 
     private static final List<CoachOption> COACHES = Arrays.asList(
-            new CoachOption("Mia", "Female", "Spanish accent", new Locale("en", "ES")),
+            new CoachOption("Mia", "Female", "Soft Spanish-accented", new Locale("en", "ES")),
             new CoachOption("Amy", "Female", "US accent", Locale.US),
             new CoachOption("Claudia", "Female", "UK accent", Locale.UK),
             new CoachOption("Leo", "Male", "Spanish accent", new Locale("en", "ES")),

@@ -35,6 +35,8 @@ public final class CoachAudioClips {
 
     /** Returns null when a phrase needs the system speech fallback. */
     public static String cueFor(String words) {
+        String refreshedCue = CoachVoiceScript.renderedCue(words);
+        if (refreshedCue != null) return refreshedCue;
         String value = normalise(words);
         if (value.equals("lets go") && words != null && words.trim().endsWith("!")) return "go";
         if (value.matches("hi,? im (mia|amy|claudia|leo|mark|stephen),? your personal trainer.*")) return "welcome";

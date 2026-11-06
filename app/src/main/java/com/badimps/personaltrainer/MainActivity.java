@@ -176,7 +176,7 @@ public final class MainActivity extends FragmentActivity {
     private String workoutLibraryBodyArea = "All body areas";
     private String workoutLibraryEquipment = "All equipment";
     private TextToSpeech voice;
-    /** Recorded coach cues are used first; Android TTS remains the dynamic-text fallback. */
+    /** Fixed guided-workout cues use the selected coach's compact local voice pack. */
     private CoachAudioClips coachAudio;
     private CountDownTimer restTimer;
     /** Kept across a rest-surface refresh so changing an interval never collapses the athlete's controls. */
@@ -10225,9 +10225,10 @@ public final class MainActivity extends FragmentActivity {
         LinearLayout note = card();
         note.addView(heading("Coach voice", 17, ink));
         note.addView(text(coachVoiceStatus, 13, muted));
+        note.addView(text("A refreshed original local voice is included for Coach " + profile.coachName + ".", 13, muted));
         gap(note, 9);
         Button previewVoice = primary("Preview Coach " + profile.coachName + "’s voice");
-        previewVoice.setOnClickListener(view -> speakCoach("Hi, I’m " + profile.coachName + ". Let’s get ready for your workout.", TextToSpeech.QUEUE_FLUSH, null));
+        previewVoice.setOnClickListener(view -> speakCoach(CoachVoiceScript.preview(profile.coachName), TextToSpeech.QUEUE_FLUSH, null));
         addButton(note, previewVoice);
         gap(note, 7);
         Button organizeVoices = secondary("Preview & label installed voices");
@@ -12530,7 +12531,8 @@ public final class MainActivity extends FragmentActivity {
     }
 
     private void speakCoach(String words, int queueMode, Runnable done) {
-        if (playRecordedCoachCue(words, queueMode, null, done)) return;
+        String script = coachScript(words);
+        if (playRecordedCoachCue(script, queueMode, null, done)) return;
         if (!ttsReady || voice == null) {
             final long generation = speechGeneration;
             if (done != null) workoutHandler.postDelayed(() -> {
@@ -12538,12 +12540,13 @@ public final class MainActivity extends FragmentActivity {
             }, 350L);
             return;
         }
-        speakWithVoice(words, queueMode, coachTtsVoice, done);
+        speakWithVoice(script, queueMode, coachTtsVoice, done);
     }
 
     /** Speaks an utterance and runs {@code started} at the exact audio start event. */
     private void speakCoachWithStart(String words, int queueMode, Runnable started, Runnable done) {
-        if (playRecordedCoachCue(words, queueMode, started, done)) return;
+        String script = coachScript(words);
+        if (playRecordedCoachCue(script, queueMode, started, done)) return;
         if (!ttsReady || voice == null) {
             final long generation = speechGeneration;
             workoutHandler.post(() -> {
@@ -12554,7 +12557,15 @@ public final class MainActivity extends FragmentActivity {
             }, 350L);
             return;
         }
-        speakWithVoice(words, queueMode, coachTtsVoice, started, done);
+        speakWithVoice(script, queueMode, coachTtsVoice, started, done);
+    }
+
+    private String activeCoachName() {
+        return AccountStore.exists(this) ? profile().coachName : CoachPreferences.defaultCoach(selectedTrainer);
+    }
+
+    private String coachScript(String words) {
+        return CoachVoiceScript.rewrite(activeCoachName(), words);
     }
 
     private void speakWithVoice(String words, int queueMode, Voice selectedVoice, Runnable done) {
@@ -12629,7 +12640,7 @@ public final class MainActivity extends FragmentActivity {
         if (coachAudio == null || !CoachPreferences.usesVoice(profile().dialogueMode)) return false;
         String cue = CoachAudioClips.cueFor(words);
         if (cue == null) return false;
-        String coach = AccountStore.exists(this) ? profile().coachName : CoachPreferences.defaultCoach(selectedTrainer);
+        String coach = activeCoachName();
         String coachId = coach == null ? "mia" : coach.toLowerCase(Locale.ROOT);
         if (queueMode == TextToSpeech.QUEUE_FLUSH) {
             speechGeneration++;

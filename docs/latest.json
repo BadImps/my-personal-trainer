@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 163,
-  "versionName": "7.11",
-  "publishedAt": "2026-11-03T11:17:49Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v7.11/app-release.apk",
-  "sha256": "6dd125bebee9b9a2699a9bb14e84ba1e4625d9caafe09d90e3c66420291d3b98",
-  "sizeBytes": 281432933,
-  "notes": "Google Maps route reports keep the full route in view and replay saved GPS points smoothly."
+  "versionCode": 164,
+  "versionName": "7.12",
+  "publishedAt": "2026-11-06T15:18:46Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v7.12/app-release.apk",
+  "sha256": "a2a6326c4aba1dde90ef17743b789357fa1da5a2a4fac9e00895e4548bae6f6f",
+  "sizeBytes": 280628065,
+  "notes": "Every coach now has an original local voice, a complete five-to-one count-in, and distinct warm guidance for every guided-workout cue."
 }
