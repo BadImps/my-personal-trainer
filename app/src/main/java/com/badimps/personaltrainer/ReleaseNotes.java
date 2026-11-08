@@ -15,6 +15,7 @@ public final class ReleaseNotes {
     }
 
     public static final Entry[] HISTORY = {
+            new Entry("7.13", "Cast your workout screen", "Active guided workouts now include a Cast screen control that opens Android's television picker and mirrors the exact phone workout without a hosted receiver or additional service fee."),
             new Entry("7.12", "Original human-touch coach voices", "Every coach now has an original local voice, a full five-to-one count-in, and distinct warm coaching language for starts, recovery, set completions, and cooldowns."),
             new Entry("6.7", "Image-led Progress & Plan", "Progress now uses rich tile artwork for Nutrition, Body, Apex, Endurance, Guided Workouts, and Energy & Weight. Workout Library moves to Plan beside My Calendar and Plan a Workout, while weekly details open in one complete report."),
             new Entry("6.6", "Hub KPI icons", "Progress and Plan now use six distinct, full-colour KPI icons for Nutrition, Body, Apex, Workout Library, My Calendar, and Plan a Workout."),

@@ -18,6 +18,23 @@ import java.util.Set;
  * Apex is an optional consistency lane, not a prescription for intensity.</p>
  */
 public final class AchievementStore {
+    /** Shared rank result used by tests and every surface that presents the eight-level ladder. */
+    public static final class Rank {
+        public final String title;
+        Rank(String title) { this.title = title; }
+    }
+
+    public static Rank rankForLevel(int level) {
+        if (level <= 10) return new Rank("BEGINNER");
+        if (level <= 25) return new Rank("NOVICE");
+        if (level <= 50) return new Rank("CONTENDER");
+        if (level <= 75) return new Rank("COMPETITOR");
+        if (level <= 100) return new Rank("ATHLETE");
+        if (level <= 150) return new Rank("ELITE");
+        if (level <= 200) return new Rank("CHAMPION");
+        return new Rank("APEX");
+    }
+
     public static final class Badge {
         public final String family;
         public final String name;

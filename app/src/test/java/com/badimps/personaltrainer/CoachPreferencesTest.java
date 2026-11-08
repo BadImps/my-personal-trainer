@@ -9,7 +9,7 @@ import org.junit.Test;
 public final class CoachPreferencesTest {
     @Test public void rosterContainsThreeCoachesPerGenderWithRequestedAccents() {
         assertEquals(6, CoachPreferences.coaches().size());
-        assertEquals("Spanish accent", CoachPreferences.coach("Mia").accent);
+        assertEquals("Soft Spanish-accented", CoachPreferences.coach("Mia").accent);
         assertEquals("US accent", CoachPreferences.coach("Amy").accent);
         assertEquals("UK accent", CoachPreferences.coach("Claudia").accent);
         assertEquals("Spanish accent", CoachPreferences.coach("Leo").accent);

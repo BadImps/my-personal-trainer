@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 164,
-  "versionName": "7.12",
-  "publishedAt": "2026-11-06T15:18:46Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v7.12/app-release.apk",
-  "sha256": "a2a6326c4aba1dde90ef17743b789357fa1da5a2a4fac9e00895e4548bae6f6f",
-  "sizeBytes": 280628065,
-  "notes": "Every coach now has an original local voice, a complete five-to-one count-in, and distinct warm guidance for every guided-workout cue."
+  "versionCode": 165,
+  "versionName": "7.13",
+  "publishedAt": "2026-11-08T22:33:12Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v7.13/app-release.apk",
+  "sha256": "2613561c4255170a9ef2a74257bb6046b17c128a55964a497325d169f075c05f",
+  "sizeBytes": 280628841,
+  "notes": "Active guided workouts now include Cast screen, opening Android's television picker to mirror the exact workout without a hosted receiver or ongoing fee."
 }

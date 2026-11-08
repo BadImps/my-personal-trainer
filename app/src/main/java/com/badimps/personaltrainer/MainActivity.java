@@ -8880,14 +8880,8 @@ public final class MainActivity extends FragmentActivity {
 
     /** The Lobby displays the same clear eight-rank ladder used by its premium banner artwork. */
     private String lobbyRankTitle(int level) {
-        if (level <= 10) return "Beginner";
-        if (level <= 25) return "Novice";
-        if (level <= 40) return "Contender";
-        if (level <= 60) return "Competitor";
-        if (level <= 80) return "Athlete";
-        if (level <= 100) return "Elite";
-        if (level <= 150) return "Champion";
-        return "Apex";
+        String title = AchievementStore.rankForLevel(level).title.toLowerCase(Locale.ROOT);
+        return title.substring(0, 1).toUpperCase(Locale.ROOT) + title.substring(1);
     }
 
     private void lobbySlogan(LinearLayout body) {
@@ -11377,6 +11371,22 @@ public final class MainActivity extends FragmentActivity {
         header.setOrientation(LinearLayout.VERTICAL);
         // The status strip intentionally blends into the page instead of becoming another tile.
         header.setPadding(0, dp(3), 0, dp(3));
+        LinearLayout castRow = new LinearLayout(this);
+        castRow.setGravity(Gravity.CENTER_VERTICAL);
+        TextView castCopy = heading("Workout on TV", 12, Color.WHITE);
+        castCopy.setContentDescription("Mirror this workout on a television");
+        castRow.addView(castCopy, new LinearLayout.LayoutParams(0, -2, 1));
+        Button castScreen = action("Cast screen", mint, navy);
+        castScreen.setTextSize(12);
+        castScreen.setMinHeight(0);
+        castScreen.setMinimumHeight(0);
+        castScreen.setPadding(dp(10), 0, dp(12), 0);
+        castScreen.setCompoundDrawablePadding(dp(6));
+        castScreen.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_cast_screen, 0, 0, 0);
+        castScreen.setContentDescription("Cast workout screen to a television");
+        castScreen.setOnClickListener(view -> openWorkoutScreenCastPicker());
+        castRow.addView(castScreen, new LinearLayout.LayoutParams(dp(126), dp(40)));
+        header.addView(castRow, new LinearLayout.LayoutParams(-1, dp(44)));
         ProgressBar progress = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
         progress.setMax(1000);
         progress.setIndeterminate(workoutNoTimer);
@@ -11422,6 +11432,19 @@ public final class MainActivity extends FragmentActivity {
             }
         };
         workoutHandler.post(workoutRemainingUpdate);
+    }
+
+    /**
+     * Opens the phone manufacturer's own screen-mirroring picker. This deliberately uses Android's
+     * system surface instead of a Google Cast receiver: the television mirrors the exact guided
+     * workout screen and the athlete keeps controlling the session on the phone.
+     */
+    private void openWorkoutScreenCastPicker() {
+        if (WorkoutScreenCasting.openSystemPicker(this)) {
+            toast("Choose your TV, then return to the workout.");
+        } else {
+            toast("Screen casting is unavailable here. Open Quick Settings and choose Cast or Screen share.");
+        }
     }
 
     private TextView workoutTimerChip(int color) {
@@ -14471,9 +14494,10 @@ public final class MainActivity extends FragmentActivity {
             tracker.addView(heading("CUSTOM MAP CHALLENGE", 11, mint));
             tracker.addView(text("When you finish, this time is saved beside your baseline and personal best.", 13, muted));
         }
-        tracker.addView(text(live.points.isEmpty()
+        TextView routeStatus = text(live.points.isEmpty()
                 ? "Finding your current location to set the start point."
-                : "Your first GPS point is the start. Finish here when this is your endpoint.", 13, muted));
+                : "Your first GPS point is the start. Finish here when this is your endpoint.", 13, muted);
+        tracker.addView(routeStatus);
         OfflineMapStore.MapRecord selectedMap = OfflineMapStore.selectedMap(this);
         tracker.addView(text(GoogleMapsConfig.isConfigured()
                 ? "Google Maps is showing this live route. If it is unavailable, your private MapLibre route view remains the fallback."
@@ -14528,7 +14552,7 @@ public final class MainActivity extends FragmentActivity {
         });
         addButton(tracker, discard);
         body.addView(tracker);
-        observeLiveTracking(state, stats, routeRenderer);
+        observeLiveTracking(state, stats, routeStatus, routeRenderer);
     }
 
     /** Dedicated in-app surface for an active GPS session; it remains available after navigation. */
@@ -14592,7 +14616,8 @@ public final class MainActivity extends FragmentActivity {
 
     private interface LiveRouteRenderer { void setRoute(List<LiveTrackingStore.Point> points); }
 
-    private void observeLiveTracking(TextView state, TextView stats, LiveRouteRenderer routeRenderer) {
+    private void observeLiveTracking(TextView state, TextView stats, TextView routeStatus,
+                                     LiveRouteRenderer routeRenderer) {
         stopLiveTrackingUiObserver();
         liveTrackingReceiver = new BroadcastReceiver() {
             @Override public void onReceive(Context context, Intent intent) {
@@ -14600,6 +14625,9 @@ public final class MainActivity extends FragmentActivity {
                 if (!latest.active) return;
                 state.setText("LIVE " + latest.mode.toUpperCase(Locale.ROOT) + (latest.paused ? " · PAUSED" : " · TRACKING"));
                 stats.setText(liveTrackingStats(latest));
+                routeStatus.setText(latest.points.isEmpty()
+                        ? "Finding your current location to set the start point."
+                        : "Your first GPS point is the start. Finish here when this is your endpoint.");
                 routeRenderer.setRoute(latest.points);
             }
         };
