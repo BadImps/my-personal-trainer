@@ -4,13 +4,14 @@ import android.content.Context;
 import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
 import android.view.HapticFeedbackConstants;
-import android.widget.ImageView;
+
+import androidx.appcompat.widget.AppCompatImageView;
 
 /**
  * Renders the icon-only Mintfoil inserts for the Canvas-locked card mount. The card plate
  * owns the single physical coin rim and landscape; this view must never introduce another.
  */
-public final class MintfoilBadgeView extends ImageView {
+public final class MintfoilBadgeView extends AppCompatImageView {
     private boolean unlocked;
     private int artwork = R.drawable.achievement_symbol_flame;
     private final GradientDrawable coin;

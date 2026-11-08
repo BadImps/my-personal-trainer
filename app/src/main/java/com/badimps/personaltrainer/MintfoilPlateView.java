@@ -3,10 +3,11 @@ package com.badimps.personaltrainer;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Path;
-import android.widget.ImageView;
+
+import androidx.appcompat.widget.AppCompatImageView;
 
 /** Clips the original Mintfoil artwork to its iron-card silhouette. */
-public final class MintfoilPlateView extends ImageView {
+public final class MintfoilPlateView extends AppCompatImageView {
     public MintfoilPlateView(Context context) {
         super(context);
         setScaleType(ScaleType.CENTER_CROP);

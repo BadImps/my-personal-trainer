@@ -5,12 +5,12 @@ import android.graphics.ImageDecoder;
 import android.graphics.drawable.AnimatedImageDrawable;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
-import android.widget.ImageView;
 
 import androidx.annotation.RequiresApi;
+import androidx.appcompat.widget.AppCompatImageView;
 
 /** Local, muted animated WebP loop. Android 9+ uses the platform decoder; older devices show its poster frame. */
-public final class LoopingExerciseWebpView extends ImageView {
+public final class LoopingExerciseWebpView extends AppCompatImageView {
     private final int drawableId;
     private AnimatedImageDrawable animation;
 
