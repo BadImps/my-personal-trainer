@@ -15,6 +15,7 @@ public final class ReleaseNotes {
     }
 
     public static final Entry[] HISTORY = {
+            new Entry("7.16", "Target-aware animated cool-downs", "The optional five-minute guided cool-down now chooses gentle mobility for the areas you trained and shows local animated Strength Level illustrations, with a still reduced-motion fallback."),
             new Entry("7.15", "Focused training controls", "Working Sets and in-workout Exercise Settings now share premium focused bands: clear value pills, easier sliders, and grouped strength and recovery controls."),
             new Entry("7.14", "Cleaner TV workout control", "Guided Workout now keeps one compact Workout on TV control beside its heading, with the Cast icon and no duplicate button."),
             new Entry("7.13", "Cast your workout screen", "Active guided workouts now include a Cast screen control that opens Android's television picker and mirrors the exact phone workout without a hosted receiver or additional service fee."),

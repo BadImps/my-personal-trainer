@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 167,
-  "versionName": "7.15",
-  "publishedAt": "2026-11-08T22:00:00Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v7.15/app-release.apk",
-  "sha256": "ba873901928753666b43b69815afecdc0c6f1e795ad880c870eb469e68dc748e",
+  "versionCode": 168,
+  "versionName": "7.16",
+  "publishedAt": "2026-11-08T23:00:00Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v7.16/app-release.apk",
+  "sha256": "381db781239dcf5d7c67f2b15c9c0ca4590eaef6fb712ddaad1458c92cb0ff80",
   "sizeBytes": 280780909,
-  "notes": "Working Sets and in-workout Exercise Settings now share premium focused bands with clearer value pills, easier sliders, and grouped strength and recovery controls."
+  "notes": "The optional five-minute guided cool-down now chooses gentle mobility for the areas you trained and shows local animated Strength Level illustrations, with a still reduced-motion fallback."
 }

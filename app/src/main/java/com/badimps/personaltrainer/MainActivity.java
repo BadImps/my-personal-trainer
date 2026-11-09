@@ -11040,7 +11040,7 @@ public final class MainActivity extends FragmentActivity {
         }.start();
     }
 
-    /** A static first-frame Strength Level illustration for warm-up/cool-down recommendations. */
+    /** A static first-frame Strength Level illustration for warm-up or reduced-motion cooldown cards. */
     private View staticExerciseArtwork(Coach.Exercise exercise) {
         ImageView image = new ImageView(this);
         int artwork = ExerciseWebp.forExercise(this, exercise.name);
@@ -11050,6 +11050,21 @@ public final class MainActivity extends FragmentActivity {
         image.setBackground(surface(Color.rgb(244, 248, 251), 14, 1, cardLine));
         image.setContentDescription("Still Strength Level illustration for " + exercise.name);
         return image;
+    }
+
+    /** Cool-down cards reuse local Strength Level loops; reduced-motion keeps the same pose still. */
+    private View cooldownStretchArtwork(Coach.Exercise exercise) {
+        int artwork = ExerciseWebp.forExercise(this, exercise.name);
+        if (!reducedMotion && artwork != 0) {
+            FrameLayout frame = new FrameLayout(this);
+            frame.setBackground(surface(Color.rgb(244, 248, 251), 14, 1, cardLine));
+            frame.setClipToOutline(true);
+            frame.setClipChildren(true);
+            frame.setContentDescription("Animated Strength Level illustration for " + exercise.name);
+            frame.addView(new LoopingExerciseWebpView(this, artwork), new FrameLayout.LayoutParams(-1, -1));
+            return frame;
+        }
+        return staticExerciseArtwork(exercise);
     }
 
     private void showSetCountIn(int index, int set, boolean newExercise) {
@@ -12138,7 +12153,7 @@ public final class MainActivity extends FragmentActivity {
         if (requested) showGuidedFinishCooldown(); else showComplete();
     }
 
-    /** Optional five-minute end cooldown with still, target-aware Strength Level stretch cards. */
+    /** Optional five-minute end cooldown with target-aware animated Strength Level mobility cards. */
     private void showGuidedFinishCooldown() {
         if (guidedWorkoutAborted) return;
         guidedFinishCooldownShown = true;
@@ -12149,16 +12164,23 @@ public final class MainActivity extends FragmentActivity {
         if (!guidedSessionRecorded) syncWorkoutService();
         LinearLayout body = guidedWorkoutPage();
         addWorkoutRemainingHeader(body);
-        title(body, "FIVE-MINUTE COOL-DOWN", "Recover with purpose", "Coach " + coachName() + " selected gentle mobility for your " + focusSummary(activeTargets()) + " session.");
+        title(body, "FIVE-MINUTE COOL-DOWN", "Reset with purpose", "Coach " + coachName() + " selected gentle, target-aware mobility for your " + focusSummary(activeTargets()) + " session.");
+        LinearLayout guidance = card();
+        guidance.setBackground(surface(Color.rgb(229, 248, 243), 16, 1, Color.rgb(183, 230, 218)));
+        guidance.addView(heading("GENTLE RESET", 11, Color.rgb(17, 112, 94)));
+        guidance.addView(text("Move slowly. Breathe normally. Stay at mild tension—never pain. Do not bounce or force your range.", 12, ink));
+        body.addView(guidance); gap(body, 10);
         LinearLayout collage = new LinearLayout(this); collage.setOrientation(LinearLayout.HORIZONTAL);
-        List<Coach.Exercise> stretches = cooldownStretchExercises();
+        List<CooldownStretchLibrary.Move> stretches = cooldownStretchExercises();
         for (int i = 0; i < stretches.size(); i++) {
-            Coach.Exercise stretch = stretches.get(i);
+            CooldownStretchLibrary.Move stretch = stretches.get(i);
             LinearLayout tile = new LinearLayout(this); tile.setOrientation(LinearLayout.VERTICAL); tile.setPadding(dp(6), dp(6), dp(6), dp(7));
             tile.setBackground(surface(Color.WHITE, 16, 1, cardLine)); elevatePlanSurface(tile, false);
-            tile.addView(staticExerciseArtwork(stretch), new LinearLayout.LayoutParams(-1, dp(118)));
-            TextView label = heading(stretch.name, 11, ink); label.setMaxLines(2); tile.addView(label);
-            LinearLayout.LayoutParams tileParams = new LinearLayout.LayoutParams(0, dp(158), 1);
+            tile.addView(cooldownStretchArtwork(stretch.exercise), new LinearLayout.LayoutParams(-1, dp(118)));
+            TextView label = heading(stretch.exercise.name, 11, ink); label.setMaxLines(2); tile.addView(label);
+            TextView timing = text(stretch.timing, 10, Color.rgb(17, 112, 94)); timing.setMaxLines(1); tile.addView(timing);
+            TextView cue = text(stretch.exercise.cue, 10, muted); cue.setMaxLines(2); tile.addView(cue);
+            LinearLayout.LayoutParams tileParams = new LinearLayout.LayoutParams(0, dp(195), 1);
             if (i > 0) tileParams.leftMargin = dp(8); collage.addView(tile, tileParams);
         }
         body.addView(collage); gap(body, 14);
@@ -12329,19 +12351,8 @@ public final class MainActivity extends FragmentActivity {
         showRest(index, completedSet, latest, secondsRemaining, running, false);
     }
 
-    private List<Coach.Exercise> cooldownStretchExercises() {
-        String primary = target == null ? "Full Body" : target;
-        String[] names = (primary.contains("Lower") || primary.contains("Leg"))
-                ? new String[]{"90/90 Hip Switch", "World's Greatest Stretch"}
-                : primary.contains("Back") || primary.contains("Shoulder")
-                ? new String[]{"Cat Cow", "Shoulder Wall Slide"}
-                : new String[]{"World's Greatest Stretch", "Shoulder Wall Slide"};
-        ArrayList<Coach.Exercise> output = new ArrayList<>();
-        for (String name : names) for (Coach.Exercise exercise : workoutLibraryCatalog()) {
-            if (name.equals(exercise.name)) { output.add(exercise); break; }
-        }
-        while (output.size() < 2 && !session.isEmpty()) output.add(session.get(Math.min(output.size(), session.size() - 1)));
-        return output;
+    private List<CooldownStretchLibrary.Move> cooldownStretchExercises() {
+        return CooldownStretchLibrary.forTargets(activeTargets());
     }
 
     private int nextWorkoutExerciseIndex(int currentIndex) {
@@ -15265,7 +15276,7 @@ public final class MainActivity extends FragmentActivity {
             LinearLayout cooldown = card();
             cooldown.addView(heading("OPTIONAL FIVE-MINUTE COOL-DOWN", 11, mint));
             cooldown.addView(heading("Stretch and reset", 19, ink));
-            cooldown.addView(text("Open the guided recovery timer with coach-selected, still Strength Level stretch cards for this workout.", 13, muted));
+            cooldown.addView(text("Open the guided recovery timer with coach-selected, animated Strength Level mobility cards for this workout.", 13, muted));
             gap(cooldown, 10);
             Button beginCooldown = action("Start 5-minute cool-down", coral, Color.WHITE);
             beginCooldown.setOnClickListener(view -> showGuidedFinishCooldown());
