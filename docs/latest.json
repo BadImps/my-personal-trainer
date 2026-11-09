@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 166,
-  "versionName": "7.14",
-  "publishedAt": "2026-11-08T20:10:00Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v7.14/app-release.apk",
-  "sha256": "b951f6908136bb663ab8a3b06e906711485b8375c963ef641a2a3f0feeb0d720",
-  "sizeBytes": 280628837,
-  "notes": "Guided Workout now has one compact Workout on TV control beside its heading, with the Cast icon and no duplicate button."
+  "versionCode": 167,
+  "versionName": "7.15",
+  "publishedAt": "2026-11-08T22:00:00Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v7.15/app-release.apk",
+  "sha256": "ba873901928753666b43b69815afecdc0c6f1e795ad880c870eb469e68dc748e",
+  "sizeBytes": 280780909,
+  "notes": "Working Sets and in-workout Exercise Settings now share premium focused bands with clearer value pills, easier sliders, and grouped strength and recovery controls."
 }

@@ -6661,76 +6661,24 @@ public final class MainActivity extends FragmentActivity {
         if (selectedEquipmentTypes.contains("Dumbbells") || selectedEquipmentTypes.contains("Machine-assisted") || selectedEquipmentTypes.contains("Barbell")) {
             String weightLabel = selectedEquipmentTypes.contains("Barbell") ? "Barbell total" : "Weight";
             int minimumWeight = selectedEquipmentTypes.contains("Barbell") ? 20 : 0;
-            addWorkingStepper(settings, weightLabel, workingWeightKg + " kg", () -> workingWeightKg = Math.max(minimumWeight, workingWeightKg - 2), () -> workingWeightKg += 2);
+            addFocusedWorkingBand(settings, "WEIGHT", weightLabel + " for your working sets", workingWeightKg,
+                    minimumWeight, 200, value -> value + " kg", value -> workingWeightKg = value, true);
         }
-        addWorkingSlider(settings, "Sets", planSets, 1, 6, value -> planSets = value);
-        addWorkingSlider(settings, "Reps", planReps, 1, 30, value -> planReps = value);
-        LinearLayout rest = new LinearLayout(this);
-        rest.setOrientation(LinearLayout.VERTICAL);
-        LinearLayout restHeading = new LinearLayout(this);
-        restHeading.setOrientation(LinearLayout.HORIZONTAL);
-        restHeading.setGravity(Gravity.CENTER_VERTICAL);
-        TextView restTitle = heading("Custom rest between sets", 15, ink);
-        restHeading.addView(restTitle, new LinearLayout.LayoutParams(0, -2, 1));
-        TextView restValue = heading(restChoiceLabel(planRestSeconds), 15, navy);
-        restValue.setGravity(Gravity.END);
-        restHeading.addView(restValue, new LinearLayout.LayoutParams(dp(110), -2));
-        rest.addView(restHeading);
-        SeekBar restSlider = new SeekBar(this);
         int restSteps = (WorkoutTiming.MAX_REST_SECONDS - WorkoutTiming.MIN_REST_SECONDS) / WorkoutTiming.REST_STEP_SECONDS;
-        restSlider.setMax(restSteps);
-        restSlider.setKeyProgressIncrement(1);
-        restSlider.setProgress((WorkoutTiming.clampRestSeconds(planRestSeconds) - WorkoutTiming.MIN_REST_SECONDS) / WorkoutTiming.REST_STEP_SECONDS);
-        restSlider.setProgressTintList(ColorStateList.valueOf(mint));
-        restSlider.setThumbTintList(ColorStateList.valueOf(coral));
-        restSlider.setContentDescription("Custom rest between sets, " + restChoiceLabel(planRestSeconds));
-        restSlider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            @Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                planRestSeconds = WorkoutTiming.MIN_REST_SECONDS + progress * WorkoutTiming.REST_STEP_SECONDS;
-                restValue.setText(restChoiceLabel(planRestSeconds));
-                seekBar.setContentDescription("Custom rest between sets, " + restChoiceLabel(planRestSeconds));
-            }
-            @Override public void onStartTrackingTouch(SeekBar seekBar) { }
-            @Override public void onStopTrackingTouch(SeekBar seekBar) { }
-        });
-        rest.addView(restSlider, new LinearLayout.LayoutParams(-1, dp(44)));
-        LinearLayout restRange = new LinearLayout(this);
-        restRange.setOrientation(LinearLayout.HORIZONTAL);
-        TextView minimum = text("45 sec", 12, muted);
-        TextView maximum = text("8 min", 12, muted);
-        maximum.setGravity(Gravity.END);
-        restRange.addView(minimum, new LinearLayout.LayoutParams(0, -2, 1));
-        restRange.addView(maximum, new LinearLayout.LayoutParams(0, -2, 1));
-        rest.addView(restRange);
-        settings.addView(rest);
-        gap(settings, 14);
-        LinearLayout cooldown = new LinearLayout(this);
-        cooldown.setOrientation(LinearLayout.VERTICAL);
-        LinearLayout cooldownHeading = new LinearLayout(this); cooldownHeading.setGravity(Gravity.CENTER_VERTICAL);
-        cooldownHeading.addView(heading("Cooldown between exercises", 15, ink), new LinearLayout.LayoutParams(0, -2, 1));
-        TextView cooldownValue = heading(restChoiceLabel(planCooldownSeconds), 15, navy); cooldownValue.setGravity(Gravity.END); cooldownHeading.addView(cooldownValue, new LinearLayout.LayoutParams(dp(110), -2));
-        cooldown.addView(cooldownHeading);
-        cooldown.addView(text("Drag to choose recovery before the next exercise begins.", 12, muted));
-        SeekBar cooldownSlider = new SeekBar(this);
-        cooldownSlider.setMax(WorkoutTiming.COOLDOWN_PRESET_SECONDS.length - 1);
         int cooldownIndex = 0; for (int i = 0; i < WorkoutTiming.COOLDOWN_PRESET_SECONDS.length; i++) if (WorkoutTiming.COOLDOWN_PRESET_SECONDS[i] == planCooldownSeconds) cooldownIndex = i;
-        cooldownSlider.setProgress(cooldownIndex); cooldownSlider.setProgressTintList(ColorStateList.valueOf(mint)); cooldownSlider.setThumbTintList(ColorStateList.valueOf(coral));
-        cooldownSlider.setContentDescription("Cooldown between exercises, " + restChoiceLabel(planCooldownSeconds));
-        cooldownSlider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            @Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                planCooldownSeconds = WorkoutTiming.COOLDOWN_PRESET_SECONDS[progress];
-                cooldownValue.setText(restChoiceLabel(planCooldownSeconds));
-                seekBar.setContentDescription("Cooldown between exercises, " + restChoiceLabel(planCooldownSeconds));
-            }
-            @Override public void onStartTrackingTouch(SeekBar seekBar) { }
-            @Override public void onStopTrackingTouch(SeekBar seekBar) { }
-        });
-        cooldown.addView(cooldownSlider, new LinearLayout.LayoutParams(-1, dp(44)));
-        LinearLayout cooldownRange = new LinearLayout(this); cooldownRange.setOrientation(LinearLayout.HORIZONTAL);
-        TextView cooldownMinimum = text(restChoiceLabel(WorkoutTiming.COOLDOWN_PRESET_SECONDS[0]), 12, muted);
-        TextView cooldownMaximum = text(restChoiceLabel(WorkoutTiming.COOLDOWN_PRESET_SECONDS[WorkoutTiming.COOLDOWN_PRESET_SECONDS.length - 1]), 12, muted); cooldownMaximum.setGravity(Gravity.END);
-        cooldownRange.addView(cooldownMinimum, new LinearLayout.LayoutParams(0, -2, 1)); cooldownRange.addView(cooldownMaximum, new LinearLayout.LayoutParams(0, -2, 1)); cooldown.addView(cooldownRange);
-        settings.addView(cooldown);
+        addFocusedWorkingBand(settings, "SETS", "Working sets to complete", planSets, 1, 6,
+                String::valueOf, value -> planSets = value, false);
+        addFocusedWorkingBand(settings, "REPS", "Repetitions in each set", planReps, 1, 30,
+                String::valueOf, value -> planReps = value, false);
+        addFocusedWorkingBand(settings, "REST BETWEEN SETS", "Recovery before the next set",
+                (WorkoutTiming.clampRestSeconds(planRestSeconds) - WorkoutTiming.MIN_REST_SECONDS) / WorkoutTiming.REST_STEP_SECONDS,
+                0, restSteps,
+                value -> restChoiceLabel(WorkoutTiming.MIN_REST_SECONDS + value * WorkoutTiming.REST_STEP_SECONDS),
+                value -> planRestSeconds = WorkoutTiming.MIN_REST_SECONDS + value * WorkoutTiming.REST_STEP_SECONDS, false);
+        addFocusedWorkingBand(settings, "COOLDOWN", "Recovery before the next exercise", cooldownIndex,
+                0, WorkoutTiming.COOLDOWN_PRESET_SECONDS.length - 1,
+                value -> restChoiceLabel(WorkoutTiming.COOLDOWN_PRESET_SECONDS[value]),
+                value -> planCooldownSeconds = WorkoutTiming.COOLDOWN_PRESET_SECONDS[value], false);
         body.addView(settings);
         gap(body, 12);
 
@@ -6796,55 +6744,60 @@ public final class MainActivity extends FragmentActivity {
         }
     }
 
-    private void addWorkingStepper(LinearLayout container, String label, String value, Runnable decrease, Runnable increase) {
-        LinearLayout row = new LinearLayout(this);
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setGravity(Gravity.CENTER_VERTICAL);
-        TextView name = heading(label, 15, ink);
-        row.addView(name, new LinearLayout.LayoutParams(0, dp(44), 1));
-        Button minus = compactControl("−");
-        minus.setContentDescription("Decrease " + label);
-        minus.setOnClickListener(view -> {
-            decrease.run();
-            refreshPlanKeepingScroll(this::showPlanSetup);
-        });
-        row.addView(minus, new LinearLayout.LayoutParams(dp(42), dp(42)));
-        TextView number = heading(value, 15, ink);
-        number.setGravity(Gravity.CENTER);
-        row.addView(number, new LinearLayout.LayoutParams(dp(72), dp(42)));
-        Button plus = compactControl("+");
-        plus.setContentDescription("Increase " + label);
-        plus.setOnClickListener(view -> {
-            increase.run();
-            refreshPlanKeepingScroll(this::showPlanSetup);
-        });
-        row.addView(plus, new LinearLayout.LayoutParams(dp(42), dp(42)));
-        container.addView(row);
-    }
+    /** Option 8's focused-band control: label and value stay readable while the slider remains easy to grab. */
+    private void addFocusedWorkingBand(LinearLayout container, String label, String helper, int value,
+                                       int minimum, int maximum, java.util.function.IntFunction<String> display,
+                                       java.util.function.IntConsumer change, boolean weightBand) {
+        LinearLayout band = new LinearLayout(this);
+        band.setOrientation(LinearLayout.VERTICAL);
+        band.setPadding(dp(13), dp(9), dp(13), dp(8));
+        band.setBackground(surface(weightBand ? Color.rgb(224, 250, 243) : Color.rgb(242, 246, 252),
+                16, 1, Color.rgb(219, 229, 240)));
+        LinearLayout.LayoutParams bandParams = new LinearLayout.LayoutParams(-1, -2);
+        bandParams.topMargin = dp(7);
+        container.addView(band, bandParams);
 
-    /** Sliders prevent repeated tapping while keeping each set/repetition choice explicit. */
-    private void addWorkingSlider(LinearLayout container, String label, int value, int minimum, int maximum,
-                                  java.util.function.IntConsumer change) {
-        LinearLayout section = new LinearLayout(this); section.setOrientation(LinearLayout.VERTICAL);
-        LinearLayout header = new LinearLayout(this); header.setGravity(Gravity.CENTER_VERTICAL);
-        header.addView(heading(label, 15, ink), new LinearLayout.LayoutParams(0, -2, 1));
-        TextView selected = heading(String.valueOf(value), 16, navy); selected.setGravity(Gravity.END); header.addView(selected, new LinearLayout.LayoutParams(dp(72), -2));
-        section.addView(header);
-        SeekBar slider = new SeekBar(this); slider.setMax(maximum - minimum); slider.setProgress(Math.max(0, Math.min(maximum - minimum, value - minimum)));
-        slider.setKeyProgressIncrement(1); slider.setProgressTintList(ColorStateList.valueOf(mint)); slider.setThumbTintList(ColorStateList.valueOf(coral));
-        slider.setContentDescription(label + ", " + value);
+        LinearLayout header = new LinearLayout(this);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        TextView name = heading(label, 13, ink);
+        header.addView(name, new LinearLayout.LayoutParams(0, -2, 1));
+        TextView selected = heading(display.apply(value), 17, ink);
+        selected.setGravity(Gravity.CENTER);
+        selected.setPadding(dp(12), dp(5), dp(12), dp(5));
+        selected.setBackground(surface(weightBand ? mint : Color.rgb(221, 232, 244), 50, 0, Color.TRANSPARENT));
+        header.addView(selected, new LinearLayout.LayoutParams(-2, -2));
+        band.addView(header);
+        TextView hint = text(helper, 11, muted);
+        LinearLayout.LayoutParams hintParams = new LinearLayout.LayoutParams(-1, -2);
+        hintParams.topMargin = dp(1);
+        band.addView(hint, hintParams);
+
+        SeekBar slider = new SeekBar(this);
+        slider.setMax(Math.max(1, maximum - minimum));
+        slider.setProgress(Math.max(0, Math.min(maximum - minimum, value - minimum)));
+        slider.setKeyProgressIncrement(1);
+        slider.setProgressTintList(ColorStateList.valueOf(mint));
+        slider.setThumbTintList(ColorStateList.valueOf(coral));
+        slider.setContentDescription(label + ", " + display.apply(value));
         slider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                int updated = minimum + progress; change.accept(updated); selected.setText(String.valueOf(updated)); seekBar.setContentDescription(label + ", " + updated);
+                int updated = minimum + progress;
+                change.accept(updated);
+                String shown = display.apply(updated);
+                selected.setText(shown);
+                seekBar.setContentDescription(label + ", " + shown);
             }
             @Override public void onStartTrackingTouch(SeekBar seekBar) { }
             @Override public void onStopTrackingTouch(SeekBar seekBar) { }
         });
-        section.addView(slider, new LinearLayout.LayoutParams(-1, dp(38)));
-        LinearLayout range = new LinearLayout(this); range.setOrientation(LinearLayout.HORIZONTAL);
-        range.addView(text(String.valueOf(minimum), 11, muted), new LinearLayout.LayoutParams(0, -2, 1));
-        TextView max = text(String.valueOf(maximum), 11, muted); max.setGravity(Gravity.END); range.addView(max, new LinearLayout.LayoutParams(0, -2, 1)); section.addView(range);
-        container.addView(section);
+        band.addView(slider, new LinearLayout.LayoutParams(-1, dp(31)));
+        LinearLayout range = new LinearLayout(this);
+        range.setOrientation(LinearLayout.HORIZONTAL);
+        range.addView(text(display.apply(minimum), 10, muted), new LinearLayout.LayoutParams(0, -2, 1));
+        TextView max = text(display.apply(maximum), 10, muted);
+        max.setGravity(Gravity.END);
+        range.addView(max, new LinearLayout.LayoutParams(0, -2, 1));
+        band.addView(range);
     }
 
     private Button compactControl(String label) {
@@ -12262,89 +12215,95 @@ public final class MainActivity extends FragmentActivity {
             if (weighted) {
                 int minimumWeight = selectedEquipmentTypes.contains("Barbell") ? 20 : 0;
                 String label = selectedEquipmentTypes.contains("Barbell") ? "Barbell total" : "Weight";
-                addRestSettingsStepper(shell, label, workingWeightKg + " kg",
-                        () -> workingWeightKg = Math.max(minimumWeight, workingWeightKg - 2),
-                        () -> workingWeightKg += 2,
-                        () -> {
-                            // Keep an in-session load adjustment when the plan is reopened later.
+                addFocusedExerciseBand(shell, "WEIGHT", label, workingWeightKg, minimumWeight, 200,
+                        value -> value + " kg", value -> {
+                            workingWeightKg = value;
                             savePlanWithReminder();
                             refreshRestSettingsSurface(exerciseIndex, completedSet, exercise, remaining[0], running);
                         });
             }
-            addRestSettingsStepper(shell, "Sets", String.valueOf(exercise.sets),
-                    () -> {
-                        if (exercise.sets <= Math.max(1, completedSet)) {
-                            toast("You already completed " + completedSet + " set" + (completedSet == 1 ? "" : "s") + ".");
-                            return;
-                        }
+            addFocusedExerciseBand(shell, "SETS", "Working sets", exercise.sets,
+                    Math.max(1, completedSet), 8, String::valueOf, value -> {
                         updateRestExercise(exerciseIndex, completedSet, exercise,
-                                Coach.prescribe(exercise, exercise.sets - 1, exercise.reps, exercise.restSeconds),
+                                Coach.prescribe(exercise, value, exercise.reps, exercise.restSeconds),
                                 remaining[0], running, false);
-                    },
-                    () -> updateRestExercise(exerciseIndex, completedSet, exercise,
-                            Coach.prescribe(exercise, Math.min(8, exercise.sets + 1), exercise.reps, exercise.restSeconds),
-                            remaining[0], running, false), null);
-            addRestSettingsStepper(shell, "Reps", String.valueOf(exercise.reps),
-                    () -> updateRestExercise(exerciseIndex, completedSet, exercise,
-                            Coach.prescribe(exercise, exercise.sets, Math.max(1, exercise.reps - 1), exercise.restSeconds),
-                            remaining[0], running, false),
-                    () -> updateRestExercise(exerciseIndex, completedSet, exercise,
-                            Coach.prescribe(exercise, exercise.sets, Math.min(40, exercise.reps + 1), exercise.restSeconds),
-                            remaining[0], running, false), null);
-            addRestSettingsStepper(shell, "Set rest", restChoiceLabel(exercise.restSeconds),
-                    () -> updateRestExercise(exerciseIndex, completedSet, exercise,
-                            Coach.prescribe(exercise, exercise.sets, exercise.reps, Math.max(45, exercise.restSeconds - 15)),
-                            remaining[0], running, true),
-                    () -> updateRestExercise(exerciseIndex, completedSet, exercise,
-                            Coach.prescribe(exercise, exercise.sets, exercise.reps, Math.min(480, exercise.restSeconds + 15)),
-                            remaining[0], running, true), null);
-
-            TextView cooldownLabel = heading("Cooldown between exercises", 14, Color.WHITE);
-            LinearLayout.LayoutParams cooldownLabelParams = new LinearLayout.LayoutParams(-1, -2);
-            cooldownLabelParams.topMargin = dp(8);
-            shell.addView(cooldownLabel, cooldownLabelParams);
-            LinearLayout presets = new LinearLayout(this);
-            presets.setOrientation(LinearLayout.HORIZONTAL);
-            int[] presetsSeconds = {60, 180, 300};
-            for (int i = 0; i < presetsSeconds.length; i++) {
-                final int preset = presetsSeconds[i];
-                Button choice = planCooldownSeconds == preset
-                        ? action(restChoiceLabel(preset), mint, navy)
-                        : action(restChoiceLabel(preset), Color.rgb(35, 71, 91), Color.WHITE);
-                choice.setTextSize(11);
-                choice.setOnClickListener(view -> {
-                    planCooldownSeconds = preset;
-                    savePlanWithReminder();
-                    refreshRestSettingsSurface(exerciseIndex, completedSet, exercise, remaining[0], running);
-                });
-                LinearLayout.LayoutParams choiceParams = new LinearLayout.LayoutParams(0, dp(42), 1);
-                choiceParams.rightMargin = i == presetsSeconds.length - 1 ? 0 : dp(6);
-                presets.addView(choice, choiceParams);
+                    });
+            addFocusedExerciseBand(shell, "REPS", "Repetitions in each set", exercise.reps, 1, 40,
+                    String::valueOf, value -> updateRestExercise(exerciseIndex, completedSet, exercise,
+                            Coach.prescribe(exercise, exercise.sets, value, exercise.restSeconds),
+                            remaining[0], running, false));
+            int restSteps = (WorkoutTiming.MAX_REST_SECONDS - WorkoutTiming.MIN_REST_SECONDS) / WorkoutTiming.REST_STEP_SECONDS;
+            addFocusedExerciseBand(shell, "REST BETWEEN SETS", "Recovery before the next set",
+                    (WorkoutTiming.clampRestSeconds(exercise.restSeconds) - WorkoutTiming.MIN_REST_SECONDS) / WorkoutTiming.REST_STEP_SECONDS,
+                    0, restSteps, value -> restChoiceLabel(WorkoutTiming.MIN_REST_SECONDS + value * WorkoutTiming.REST_STEP_SECONDS),
+                    value -> updateRestExercise(exerciseIndex, completedSet, exercise,
+                            Coach.prescribe(exercise, exercise.sets, exercise.reps,
+                                    WorkoutTiming.MIN_REST_SECONDS + value * WorkoutTiming.REST_STEP_SECONDS),
+                            remaining[0], running, true));
+            int cooldownIndex = 0;
+            for (int i = 0; i < WorkoutTiming.COOLDOWN_PRESET_SECONDS.length; i++) {
+                if (WorkoutTiming.COOLDOWN_PRESET_SECONDS[i] == planCooldownSeconds) cooldownIndex = i;
             }
-            shell.addView(presets, new LinearLayout.LayoutParams(-1, dp(42)));
+            addFocusedExerciseBand(shell, "COOLDOWN", "Recovery before the next exercise", cooldownIndex,
+                    0, WorkoutTiming.COOLDOWN_PRESET_SECONDS.length - 1,
+                    value -> restChoiceLabel(WorkoutTiming.COOLDOWN_PRESET_SECONDS[value]), value -> {
+                        planCooldownSeconds = WorkoutTiming.COOLDOWN_PRESET_SECONDS[value];
+                        savePlanWithReminder();
+                        refreshRestSettingsSurface(exerciseIndex, completedSet, exercise, remaining[0], running);
+                    });
         }
         container.addView(shell);
     }
 
-    private void addRestSettingsStepper(LinearLayout container, String label, String value,
-                                        Runnable decrease, Runnable increase, Runnable refresh) {
-        LinearLayout row = new LinearLayout(this);
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setGravity(Gravity.CENTER_VERTICAL);
-        TextView name = text(label, 14, Color.WHITE);
-        row.addView(name, new LinearLayout.LayoutParams(0, dp(47), 1));
-        Button minus = compactControl("−");
-        minus.setContentDescription("Decrease " + label);
-        minus.setOnClickListener(view -> { decrease.run(); if (refresh != null) refresh.run(); });
-        row.addView(minus, new LinearLayout.LayoutParams(dp(42), dp(42)));
-        TextView amount = heading(value, 13, mint);
+    /** Dark-surface counterpart of the plan builder's focused bands, committed only after a drag ends. */
+    private void addFocusedExerciseBand(LinearLayout container, String label, String helper, int value,
+                                        int minimum, int maximum, java.util.function.IntFunction<String> display,
+                                        java.util.function.IntConsumer commit) {
+        LinearLayout band = new LinearLayout(this);
+        band.setOrientation(LinearLayout.VERTICAL);
+        band.setPadding(dp(10), dp(8), dp(10), dp(7));
+        band.setBackground(surface(Color.rgb(21, 60, 80), 13, 1, Color.rgb(57, 102, 120)));
+        LinearLayout.LayoutParams bandParams = new LinearLayout.LayoutParams(-1, -2);
+        bandParams.topMargin = dp(7);
+        container.addView(band, bandParams);
+
+        LinearLayout header = new LinearLayout(this);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        header.addView(heading(label, 12, Color.WHITE), new LinearLayout.LayoutParams(0, -2, 1));
+        TextView amount = heading(display.apply(value), 15, navy);
         amount.setGravity(Gravity.CENTER);
-        row.addView(amount, new LinearLayout.LayoutParams(dp(88), dp(42)));
-        Button plus = compactControl("+");
-        plus.setContentDescription("Increase " + label);
-        plus.setOnClickListener(view -> { increase.run(); if (refresh != null) refresh.run(); });
-        row.addView(plus, new LinearLayout.LayoutParams(dp(42), dp(42)));
-        container.addView(row);
+        amount.setPadding(dp(10), dp(4), dp(10), dp(4));
+        amount.setBackground(surface(mint, 50, 0, Color.TRANSPARENT));
+        header.addView(amount, new LinearLayout.LayoutParams(-2, -2));
+        band.addView(header);
+        band.addView(text(helper, 10, Color.rgb(185, 213, 226)));
+
+        SeekBar slider = new SeekBar(this);
+        slider.setMax(Math.max(1, maximum - minimum));
+        slider.setProgress(Math.max(0, Math.min(maximum - minimum, value - minimum)));
+        slider.setKeyProgressIncrement(1);
+        slider.setProgressTintList(ColorStateList.valueOf(mint));
+        slider.setThumbTintList(ColorStateList.valueOf(coral));
+        slider.setContentDescription(label + ", " + display.apply(value));
+        slider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            private int pending = value;
+            @Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                pending = minimum + progress;
+                String shown = display.apply(pending);
+                amount.setText(shown);
+                seekBar.setContentDescription(label + ", " + shown);
+            }
+            @Override public void onStartTrackingTouch(SeekBar seekBar) { }
+            @Override public void onStopTrackingTouch(SeekBar seekBar) { commit.accept(pending); }
+        });
+        band.addView(slider, new LinearLayout.LayoutParams(-1, dp(30)));
+        LinearLayout range = new LinearLayout(this);
+        range.setOrientation(LinearLayout.HORIZONTAL);
+        range.addView(text(display.apply(minimum), 10, Color.rgb(185, 213, 226)), new LinearLayout.LayoutParams(0, -2, 1));
+        TextView max = text(display.apply(maximum), 10, Color.rgb(185, 213, 226));
+        max.setGravity(Gravity.END);
+        range.addView(max, new LinearLayout.LayoutParams(0, -2, 1));
+        band.addView(range);
     }
 
     private void updateRestExercise(int index, int completedSet, Coach.Exercise previous,

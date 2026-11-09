@@ -15,6 +15,7 @@ public final class ReleaseNotes {
     }
 
     public static final Entry[] HISTORY = {
+            new Entry("7.15", "Focused training controls", "Working Sets and in-workout Exercise Settings now share premium focused bands: clear value pills, easier sliders, and grouped strength and recovery controls."),
             new Entry("7.14", "Cleaner TV workout control", "Guided Workout now keeps one compact Workout on TV control beside its heading, with the Cast icon and no duplicate button."),
             new Entry("7.13", "Cast your workout screen", "Active guided workouts now include a Cast screen control that opens Android's television picker and mirrors the exact phone workout without a hosted receiver or additional service fee."),
             new Entry("7.12", "Original human-touch coach voices", "Every coach now has an original local voice, a full five-to-one count-in, and distinct warm coaching language for starts, recovery, set completions, and cooldowns."),
