@@ -1,10 +1,10 @@
 {
   "applicationId": "com.badimps.personaltrainer",
-  "versionCode": 165,
-  "versionName": "7.13",
-  "publishedAt": "2026-11-08T22:33:12Z",
-  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v7.13/app-release.apk",
-  "sha256": "2613561c4255170a9ef2a74257bb6046b17c128a55964a497325d169f075c05f",
-  "sizeBytes": 280628841,
-  "notes": "Active guided workouts now include Cast screen, opening Android's television picker to mirror the exact workout without a hosted receiver or ongoing fee."
+  "versionCode": 166,
+  "versionName": "7.14",
+  "publishedAt": "2026-11-08T20:10:00Z",
+  "apkUrl": "https://github.com/BadImps/my-personal-trainer/releases/download/v7.14/app-release.apk",
+  "sha256": "b951f6908136bb663ab8a3b06e906711485b8375c963ef641a2a3f0feeb0d720",
+  "sizeBytes": 280628837,
+  "notes": "Guided Workout now has one compact Workout on TV control beside its heading, with the Cast icon and no duplicate button."
 }
